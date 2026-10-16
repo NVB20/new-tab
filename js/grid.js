@@ -1,6 +1,6 @@
-// A tiles block: the tiles of one group (the active one, or a pinned group) with the search bar
-// docked among them when the block has one. Open, drag to reorder, drop a tile on another to
-// make a folder, drag a tile to another block to move it there, context menu, add/edit dialog.
+// A tiles block: the tiles of one group (the active one, or a pinned group). Open, drag to
+// reorder, drop a tile on another to make a folder, drag a tile to another block to move it there,
+// context menu, add/edit dialog.
 
 import { el, icon, tileIcon, showMenu, openDialog, confirmDialog, field, TILE_MIME, tileDrag } from './ui.js';
 import {
@@ -11,7 +11,6 @@ import { openFolder, settleFolder } from './folders.js';
 import { openUrl } from './chrome-api.js';
 import { normalizeUrl, hostOf } from './util.js';
 import { copyById, TYPES } from './layout.js';
-import { mountSearchBar } from './searchbar.js';
 
 const isWeb = url => /^https?:/i.test(url);
 const MARKS = ['drop-before', 'drop-after', 'drop-into'];
@@ -25,12 +24,10 @@ export function mountTiles(root, store, copy, ctx) {
 
   const headTitle = el('span');
   const heading = el('h2', { class: 'widget-head tiles-head', hidden: true }, icon('grid', 18), headTitle);
-  const bar = el('div', { class: 'searchbar', role: 'search', hidden: true });
   const grid = el('div', { class: 'grid' });
-  const wrap = el('div', { class: 'grid-wrap' }, bar, grid);
+  const wrap = el('div', { class: 'grid-wrap' }, grid);
   const section = el('section', { class: 'widget widget-tiles' }, heading, wrap);
   root.append(section);
-  const search = mountSearchBar(bar, store, { grid, copy, ctx });
 
   let canNest = false;
   let marked = null;   // the tile showing a drop mark
@@ -136,7 +133,7 @@ export function mountTiles(root, store, copy, ctx) {
   function key(state) {
     const s = settings();
     const group = state.groups.find(g => g.id === s.group);
-    return [tilePrefs(state.prefs), s.group, s.columns, s.bar == null, group?.title ?? '', s.group ? '' : state.activeGroupId].join('|');
+    return [tilePrefs(state.prefs), s.group, s.columns, group?.title ?? '', s.group ? '' : state.activeGroupId].join('|');
   }
 
   function render() {
@@ -149,7 +146,6 @@ export function mountTiles(root, store, copy, ctx) {
     heading.hidden = !group;
     headTitle.textContent = group?.title ?? '';
     wrap.style.setProperty('--cols', String(s.columns));
-    bar.hidden = s.bar == null;
 
     const kids = Map.groupBy(tiles.filter(t => t.folderId), t => t.folderId);
     const nodes = topLevel({ tiles }, gid).map(t => tileNode(t, prefs, kids.get(t.id)));
@@ -166,7 +162,6 @@ export function mountTiles(root, store, copy, ctx) {
       nodes.push(el('p', { class: 'grid-empty', text: 'No tiles in this group. Turn on the + button in Preferences to add some.' }));
     }
     grid.replaceChildren(...nodes);
-    search.place();
     fade();
   }
 
@@ -266,7 +261,6 @@ export function mountTiles(root, store, copy, ctx) {
     destroy() {
       unsubscribe();
       sizes.disconnect();
-      search.destroy();
     },
   };
 }

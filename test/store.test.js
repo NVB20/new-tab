@@ -37,7 +37,7 @@ test('normalizeState(null) returns a usable default state', () => {
   const { layout, ...rest } = s.prefs;
   const { layout: nil, ...defaults } = DEFAULT_PREFS;
   assert.deepEqual(rest, defaults);
-  assert.deepEqual(layout.widgets.map(c => c.type), ['clock', 'tasks', 'notes', 'markets', 'github', 'tiles']);
+  assert.deepEqual(layout.widgets.map(c => c.type), ['clock', 'tasks', 'notes', 'markets', 'github', 'search', 'tiles']);
 });
 
 test('a saved state from before Layout mode converts to the same page, and loses the old keys', () => {
@@ -59,7 +59,9 @@ test('a saved state from before Layout mode converts to the same page, and loses
   assert.equal(c.notes, undefined);
   assert.deepEqual(c.markets.settings.items, ['BTC', 'DOGE']);
   assert.deepEqual(c.github.settings, { user: 'octo', parts: ['heatmap', 'pulls', 'issues'] });
-  assert.deepEqual(c.tiles.settings, { group: null, columns: 7, bar: 1 });
+  assert.deepEqual(c.tiles.settings, { group: null, columns: 7 });
+  assert.deepEqual([c.search.x, c.search.y, c.search.w, c.search.h], [3, 0, 6, 1]);
+  assert.deepEqual([c.tiles.y, c.tiles.h], [1, 11]);
   assert.equal(s.prefs.github.token, 'ghp_x');
   assert.deepEqual(s.prefs.search, { google: true, claude: false, chatgpt: true, gemini: false, mode: 'chatgpt' });
   for (const k of ['columns', 'width', 'widgets']) assert.equal(k in s.prefs, false, k);
@@ -131,7 +133,7 @@ test('the old GitHub Show choice becomes the parts of the copy', () => {
 
 test('the old switch that hid every widget leaves only the tiles', () => {
   const s = normalizeState({ prefs: { widgets: { enabled: false, tasks: { enabled: true }, markets: { enabled: true } } } });
-  assert.deepEqual(s.prefs.layout.widgets.map(c => c.type), ['tiles']);
+  assert.deepEqual(s.prefs.layout.widgets.map(c => c.type), ['search', 'tiles']);
 });
 
 test('each widget\'s own switch decides whether it has a copy', () => {
@@ -324,7 +326,7 @@ test('store falls back to defaults when saved state is corrupt', async () => {
 test('a saved state from before the search bar gets the bar with Google and Claude on top, and no Claude widget', () => {
   const s = normalizeState({ prefs: { widgets: { tasks: { enabled: false } } } });
   assert.deepEqual(s.prefs.search, { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' });
-  assert.equal(copies(s).tiles.settings.bar, 0);
+  assert.deepEqual([copies(s).search.y, copies(s).search.h], [0, 1]);
   assert.equal(copies(s).claude, undefined);
   assert.equal(copies(s).tasks, undefined);
 });
