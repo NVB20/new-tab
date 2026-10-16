@@ -53,6 +53,24 @@ their one-line twins under them, Dot under Classic. Preferences → Clock: Style
 (Classic · Stencil · Rounded · Serif · Dot); for the three fonts with both layouts an
 "Hours over minutes" switch picks stacked or one line, and changing font keeps that choice.
 
+`clock.colon` (default `true`): one-line faces show "15:41", or "1541" with it off. Preferences shows
+a Colon switch under Clock while the face is one-line.
+
+## Clock intro
+
+On each new tab (`js/clock-intro.js`, called once after the first render): the time, date and
+greeting are hidden until the face's font has loaded, then a dot appears at the centre of the time,
+swells, and every character (AM/PM as one piece) grows out of that point (scale 0 → 1, blur → sharp,
+slight overshoot) and travels to its place, 70ms apart. The date and greeting fade up after the
+digits. About 1.3s in all; skipped under `prefers-reduced-motion`. The clock is redrawn as plain
+text when it ends.
+
+## Hooks for the GitHub issues work (new-tab-93)
+
+`open(id, anchor)` scrolls to the group with that `data-anchor` and focuses its first empty text box;
+the GitHub switch and its options are the `github` group. A Show choice (Commits · Issues · Both)
+appears under GitHub once `widgets.github.show` exists.
+
 ## Features being built in parallel
 
 The panel draws these from the data, so it is right before and after each one lands on main:

@@ -39,6 +39,9 @@ export function setupPrefs(store) {
   // Options that only matter while the switch or choice above them is on, indented under it.
   const sub = (on, ...rows) => on && el('div', { class: 'pref-sub' }, rows);
 
+  // Rows that open(id, anchor) can scroll to, e.g. from a widget's own "set up" button.
+  const group = (anchor, ...rows) => el('div', { dataset: { anchor } }, rows);
+
   function switchFor(label, key, checked, set) {
     const input = el('input', {
       type: 'checkbox', class: 'switch', role: 'switch', checked, 'aria-label': label,
@@ -236,14 +239,21 @@ export function setupPrefs(store) {
       w.claude && toggle('Claude', 'widgets.claude.enabled', 'A box that sends a message to a new chat on claude.ai'),
       title(`${far} column`),
       toggle('Markets', 'widgets.markets.enabled', 'Use ✎ on the widget to choose coins and currency pairs'),
-      toggle('GitHub', 'widgets.github.enabled', 'Your latest commits, open pull requests and a year of activity'),
-      sub(w.github.enabled,
-        textInput('Username', 'widgets.github.user', 'NVB20'),
-        textInput('Access token', 'widgets.github.token', 'github_pat_…', {
-          type: 'password',
-          maxLength: 300,
-          hint: 'Optional and read-only; adds private repos (e.g. eitan-capital). Kept only in this browser, never in backups.',
-        })),
+      group('github',
+        toggle('GitHub', 'widgets.github.enabled', 'Your latest commits, open pull requests and a year of activity'),
+        sub(w.github.enabled,
+          textInput('Username', 'widgets.github.user', 'NVB20'),
+          // Arrives with the GitHub issues feature.
+          w.github.show && segmented('Show', 'widgets.github.show', [
+            { value: 'commits', label: 'Commits' },
+            { value: 'issues', label: 'Issues' },
+            { value: 'both', label: 'Both' },
+          ]),
+          textInput('Access token', 'widgets.github.token', 'github_pat_…', {
+            type: 'password',
+            maxLength: 300,
+            hint: 'Optional and read-only; adds private repos (e.g. eitan-capital). Kept only in this browser, never in backups.',
+          }))),
     ];
   }
 
@@ -258,6 +268,7 @@ export function setupPrefs(store) {
       row('Style', choice('Clock style', font, fonts, f => setPref('widgets.clock.face', face.font && lineOf(f) ? lineOf(f) : f))),
       lineOf(font) && row('Hours over minutes', switchFor('Hours over minutes', 'clock-stacked', !face.font,
         on => setPref('widgets.clock.face', on ? font : lineOf(font)))),
+      !face.stacked && toggle('Colon', 'widgets.clock.colon', '15:41, or 1541 without it'),
     ];
   }
 
@@ -447,12 +458,18 @@ export function setupPrefs(store) {
   addEventListener('resize', () => { if (dialog.open) place(offset.x, offset.y); });
 
   return {
-    open(id = current) {
+    // anchor: a group to scroll to; its first empty text box gets the focus.
+    open(id = current, anchor) {
       wantImage = false;
       show(id);
       dialog.showModal();
       content.scrollTop = 0;
       place(offset.x, offset.y);
+      const target = anchor && [...content.querySelectorAll('[data-anchor]')].find(n => n.dataset.anchor === anchor);
+      if (target) {
+        target.scrollIntoView({ block: 'start' });
+        [...target.querySelectorAll('input.pref-input')].find(i => !i.value)?.focus();
+      }
     },
   };
 }

@@ -25,7 +25,8 @@ export const DEFAULT_PREFS = {
     position: 'left',
     // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks),
     // or 'stencil-line' | 'rounded-line' | 'serif-line' for those fonts on one line.
-    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic' },
+    // colon: one-line faces show "15:41", or "1541" without it.
+    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic', colon: true },
     tasks: { enabled: true },
     notes: { enabled: true },
     // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')

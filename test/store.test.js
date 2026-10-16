@@ -66,6 +66,7 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.equal(s.prefs.tiles.icons, 'logo');
   assert.deepEqual(s.prefs.widgets.markets.items, ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
   assert.equal(s.prefs.widgets.clock.face, 'classic');
+  assert.equal(s.prefs.widgets.clock.colon, true);
   assert.equal(s.prefs.widgets.github.user, '');
   assert.equal(s.prefs.tiles.color, '#ffffff');
 });

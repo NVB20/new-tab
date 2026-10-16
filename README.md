@@ -161,8 +161,10 @@ should, the widget says why (for example, missing *Contents* access or org appro
 - **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
-  line (the second row of the picker, or **Hours over minutes** off in Preferences). The faces'
-  fonts are bundled in `fonts/` (SIL Open Font License), so they work offline.
+  line (the second row of the picker, or **Hours over minutes** off in Preferences), and one-line
+  faces can drop the colon (1541). Each new tab builds the time out of a single point (skipped if
+  Windows is set to reduce animations). The faces' fonts are bundled in `fonts/` (SIL Open Font
+  License), so they work offline.
 - **Background:** Preferences → Page: ASCII, Plain or Image (upload a picture or paste a link).
   Switching back to ASCII or Plain keeps your picture, so Image brings it back.
 - **Preferences:** drag the panel by its header to see the page behind it change as you adjust;
