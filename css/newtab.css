@@ -204,6 +204,10 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 }
 .gh-body > .widget-sub:first-child { margin-top: 0; }
 .widget-empty { margin: 4px 0; font-size: 13px; color: var(--muted); }
+.widget-head-link { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.widget-head-link > .icon:last-child { color: var(--muted); opacity: 0; transition: opacity 0.15s; }
+.widget-head-link:hover > .icon:last-child, .widget-head-link:focus-visible > .icon:last-child { opacity: 1; }
+.widget-head-link:hover > span { text-decoration: underline; text-underline-offset: 3px; }
 .widget-note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--muted); opacity: 0.8; }
 
 :root { --up: #4fb286; --down: #e5534b; }

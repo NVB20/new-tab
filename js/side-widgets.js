@@ -41,7 +41,11 @@ export function mountSideWidgets(root, store) {
   const marketList = el('div', { class: 'mk-list' });
   const markets = el('section', { class: 'widget widget-markets' }, heading('trend', 'Markets'), marketList);
   const githubBody = el('div', { class: 'gh-body' });
-  const github = el('section', { class: 'widget widget-github' }, heading('branch', 'GitHub'), githubBody);
+  // The heading opens the user's GitHub profile.
+  const githubLink = el('a', { class: 'widget-head-link', title: 'Open your GitHub profile' },
+    icon('branch', 18), el('span', { text: 'GitHub' }), icon('external', 13));
+  const githubHead = el('h2', { class: 'widget-head' }, githubLink);
+  const github = el('section', { class: 'widget widget-github' }, githubHead, githubBody);
   root.append(markets, github);
 
   const prefs = () => store.get().prefs;
@@ -174,7 +178,7 @@ export function mountSideWidgets(root, store) {
         parts.push(el('p', {
           class: 'widget-note',
           text: !t.privateRepos
-            ? 'Token works but sees no private repos. Check its resource owner and repository access.'
+            ? `Token works but sees no private repos in ${t.owners.join(', ')}. A fine-grained token only reaches the one account or organisation picked as its resource owner.`
             : t.unreadable
               ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only.`
               : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}.`,
@@ -189,6 +193,10 @@ export function mountSideWidgets(root, store) {
     const g = prefs().widgets.github;
     const user = g.user.trim();
     const token = g.token.trim();
+    const profile = linkProps(`https://github.com/${encodeURIComponent(user)}`);
+    githubLink.href = user ? profile.href : 'https://github.com/';
+    if (profile.target) githubLink.target = profile.target;
+    else githubLink.removeAttribute('target');
     if (!user) {
       renderGithubSetup();
       return;
@@ -199,19 +207,30 @@ export function mountSideWidgets(root, store) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     const my = ++githubSeq;
-    const result = await feed(`github-v3:${user}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
+    const result = await feed(`github-v4:${user}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
       // Commit search finds the user's commits in every repo and organisation (default branches);
       // GitHub's events feed returns nothing for this account. 100 results reach enough repos to
       // pick the latest commit of each.
       const commitQuery = encodeURIComponent(`author:${user}`);
       const prQuery = encodeURIComponent(`is:pr is:open involves:${user}`);
-      const [searched, pulls, tokenRepos] = await Promise.all([
+      const asList = list => (Array.isArray(list) ? list : []);
+      const [searched, pulls, ownPrivate] = await Promise.all([
         fetchJson(`${GITHUB}/search/commits?q=${commitQuery}&sort=author-date&order=desc&per_page=100`, headers).then(parseCommits),
         fetchJson(`${GITHUB}/search/issues?q=${prQuery}&sort=updated&per_page=4`, headers).then(parsePulls),
         token
-          ? fetchJson(`${GITHUB}/user/repos?visibility=private&sort=pushed&per_page=30`, headers).then(list => (Array.isArray(list) ? list : []))
+          ? fetchJson(`${GITHUB}/user/repos?visibility=private&sort=pushed&per_page=30`, headers).then(asList).catch(() => [])
           : [],
       ]);
+      // A fine-grained token made for an organisation may not show its repos under /user/repos,
+      // so each organisation found in the commit history is also asked for its private repos.
+      const orgs = [...new Set(searched.map(c => c.repo.split('/')[0]))].filter(o => o.toLowerCase() !== user.toLowerCase());
+      const orgPrivate = token
+        ? await Promise.all(orgs.map(o => fetchJson(`${GITHUB}/orgs/${encodeURIComponent(o)}/repos?type=private&sort=pushed&per_page=30`, headers)
+          .then(asList)
+          .catch(() => [])))
+        : [];
+      const byName = new Map([...ownPrivate, ...orgPrivate.flat()].filter(r => r.private).map(r => [r.full_name, r]));
+      const tokenRepos = [...byName.values()];
       // Private repos the token can see are asked directly, since search may leave them out.
       // 409 means an empty repo; other failures (usually missing Contents access) are counted.
       let unreadable = 0;
@@ -223,7 +242,9 @@ export function mountSideWidgets(root, store) {
           if (err.status !== 409) unreadable++;
           return [];
         })));
-      const tokenInfo = token ? { privateRepos: tokenRepos.length, unreadable, withCommits: privateCommits.filter(c => c.length).length } : null;
+      const tokenInfo = token
+        ? { privateRepos: tokenRepos.length, unreadable, withCommits: privateCommits.filter(c => c.length).length, owners: [user, ...orgs] }
+        : null;
       return { commits: latestPerRepo([...searched, ...privateCommits.flat()], 6), pulls, tokenInfo };
     });
     if (my === githubSeq) renderGithub(result, user);
