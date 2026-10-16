@@ -145,6 +145,8 @@ export function deleteGroup(s, id, mode = 'move') {
     s.tiles.push(...own);
   }
   if (s.activeGroupId === id) s.activeGroupId = target;
+  // A tiles block pinned to the group goes back to following the tabs.
+  for (const c of s.prefs?.layout?.widgets ?? []) if (c.type === 'tiles' && c.settings.group === id) c.settings.group = null;
   return true;
 }
 

@@ -4,12 +4,11 @@
 import { uid } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
 import { isDay, PRIORITIES } from './tasks.js';
+import { defaultLayout, normalizeLayout } from './layout.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
-  columns: 5,
   spacing: 8,
-  width: 720,
   centerVertically: true,
   showAddButton: true,
   compact: false,
@@ -21,31 +20,35 @@ export const DEFAULT_PREFS = {
   // pattern 'ascii' is the animated letter field. An image (the upload when useUpload, else url)
   // covers it while showImage is on; picking a pattern turns showImage off and keeps the image.
   background: { pattern: 'ascii', motion: true, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
-  // Bar among the tiles. Each engine has a switch; mode is the one Enter goes to. row is how many
-  // rows of tiles are above the bar (-1 keeps it under all of them).
-  search: { enabled: true, google: true, claude: true, chatgpt: false, gemini: false, mode: 'google', row: 0 },
-  widgets: {
-    enabled: true,   // always true: an old false is turned into every widget switched off on load
-    position: 'left',
-    // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks),
-    // or 'stencil-line' | 'rounded-line' | 'serif-line' for those fonts on one line.
-    // colon: one-line faces show "15:41", or "1541" without it.
-    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic', colon: true },
-    tasks: { enabled: true },
-    notes: { enabled: true },
-    // A box that sends a message to a new chat on claude.ai.
-    claude: { enabled: false },
-    // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')
-    // and ECB currency pairs ('EUR/ILS'), in display order.
-    markets: { enabled: true, items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] },
-    // show: which lists follow the open PRs, 'commits' | 'issues' | 'both'.
-    // token is optional (read-only) and only adds private repos' commits, issues and PRs; never exported in backups.
-    github: { enabled: true, user: '', token: '', show: 'both' },
-  },
+  // The engines every search bar offers (docked in a tiles block or on its own); mode is the one
+  // Enter goes to.
+  search: { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' },
+  // One token for every GitHub widget. Optional (read-only), only adds private repos' commits,
+  // issues and PRs; never exported in backups.
+  github: { token: '' },
+  // The widget copies on the 12 × 12 canvas (see layout.js). null here: defaultState and
+  // normalizeState fill it in.
+  layout: null,
   sidebar: { enabled: true },
 };
 
-export const GITHUB_SHOW = ['commits', 'issues', 'both'];
+// Settings from before Layout mode. Read only to convert a saved state (and produced by the
+// Speed Dial 2 importer): each widget's switch and settings, and which side the clock was on.
+export const LEGACY_PREFS = {
+  columns: 5,
+  width: 720,
+  search: { enabled: true, row: 0 },
+  widgets: {
+    enabled: true,
+    position: 'left',
+    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic', colon: true },
+    tasks: { enabled: true },
+    notes: { enabled: true },
+    claude: { enabled: false },
+    markets: { enabled: true, items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] },
+    github: { enabled: true, user: '', show: 'both', token: '' },
+  },
+};
 
 // theme is 'auto' | 'light' | 'dark' | 'blue' | 'github'; these two bring their own accent.
 export const THEME_ACCENTS = { blue: '#2563eb', github: '#238636' };
@@ -74,7 +77,7 @@ export function defaultState() {
     taskHistory: [],   // finished tasks, kept for a week
     taskStats: {},     // { 'YYYY-MM-DD': tasks completed that day }, kept forever
     notes: '',
-    prefs: structuredClone(DEFAULT_PREFS),
+    prefs: { ...structuredClone(DEFAULT_PREFS), layout: defaultLayout(LEGACY_PREFS) },
   };
 }
 
@@ -140,25 +143,30 @@ export function normalizeState(raw) {
   s.taskStats = Object.fromEntries(Object.entries(isObj(raw.taskStats) ? raw.taskStats : {})
     .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isInteger(n) && n > 0));
   s.notes = str(raw.notes);
-  s.prefs = deepMerge(DEFAULT_PREFS, raw.prefs);
-  s.prefs.widgets.markets = normalizeMarkets(raw.prefs?.widgets?.markets);
-  if (!GITHUB_SHOW.includes(s.prefs.widgets.github.show)) s.prefs.widgets.github.show = DEFAULT_PREFS.widgets.github.show;
-  // Older versions had one switch that hid every widget; it becomes each widget switched off.
-  if (!s.prefs.widgets.enabled) {
-    for (const w of Object.values(s.prefs.widgets)) if (isObj(w)) w.enabled = false;
-    s.prefs.widgets.enabled = true;
+  const rp = isObj(raw.prefs) ? raw.prefs : {};
+  s.prefs = deepMerge(DEFAULT_PREFS, rp);
+  if (isObj(rp.layout)) {
+    s.prefs.layout = normalizeLayout(rp.layout, s);
+  } else {
+    // A state from before Layout mode: the page it showed becomes the layout.
+    const old = deepMerge(LEGACY_PREFS, rp);
+    old.widgets.markets.items = legacyMarketItems(rp.widgets?.markets);
+    s.prefs.layout = defaultLayout(old);
+    const token = rp.widgets?.github?.token;
+    if (typeof token === 'string' && !s.prefs.github.token) s.prefs.github.token = token;
   }
+  for (const k of ['columns', 'width', 'widgets']) delete s.prefs[k];
+  delete s.prefs.search.enabled;
+  delete s.prefs.search.row;
   return s;
 }
 
-// Older versions kept a coins text and a USD/ILS switch; those become the item list.
-function normalizeMarkets(raw) {
+// The Markets items of a state from before Layout mode. Older still kept a coins text and a
+// USD/ILS switch; those become the item list.
+function legacyMarketItems(raw) {
   const m = isObj(raw) ? raw : {};
   const legacy = typeof m.coins === 'string' ? [...parseCoins(m.coins), ...(m.fx === false ? [] : ['USD/ILS'])] : null;
-  return {
-    enabled: typeof m.enabled === 'boolean' ? m.enabled : DEFAULT_PREFS.widgets.markets.enabled,
-    items: cleanMarketItems(m.items) ?? legacy ?? [...DEFAULT_PREFS.widgets.markets.items],
-  };
+  return cleanMarketItems(m.items) ?? legacy ?? [...LEGACY_PREFS.widgets.markets.items];
 }
 
 export function pickAdapter() {

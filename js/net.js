@@ -56,25 +56,35 @@ function writeAttempt(key, error) {
   }
 }
 
-// Saved value if fetched less than ttlMs ago, else fetched and parsed fresh. Every attempt is
-// recorded before it starts, so a failure (or a fetch already running in another tab) isn't
+const inflight = new Map();   // key → the promise of a load running in this tab
+
+// Saved value if fetched less than ttlMs ago, else fetched and parsed fresh. A load already
+// running in this tab (another widget copy asking for the same thing) is shared. Every attempt
+// is recorded before it starts, so a failure (or a fetch already running in another tab) isn't
 // retried until ttlMs has passed. On failure the last good value is returned with error set.
 // ttlMs = 0 always fetches (manual refresh).
 export async function feed(key, ttlMs, load) {
   const hit = peek(key);
   const now = Date.now();
   if (hit && now - hit.at < ttlMs) return { data: hit.data, at: hit.at };
+  if (inflight.has(key)) return inflight.get(key);
   const attempt = readAttempt(key);
   if (attempt && now - attempt.at < ttlMs) {
     return { data: hit?.data ?? null, at: hit?.at ?? 0, error: attempt.error ?? undefined };
   }
   writeAttempt(key, null);
-  try {
-    const data = await load();
-    if (data != null) store(key, data);
-    return { data: data ?? hit?.data ?? null, at: Date.now() };
-  } catch (error) {
-    writeAttempt(key, error);
-    return { data: hit?.data ?? null, at: hit?.at ?? 0, error };
-  }
+  const run = (async () => {
+    try {
+      const data = await load();
+      if (data != null) store(key, data);
+      return { data: data ?? hit?.data ?? null, at: Date.now() };
+    } catch (error) {
+      writeAttempt(key, error);
+      return { data: hit?.data ?? null, at: hit?.at ?? 0, error };
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+  inflight.set(key, run);
+  return run;
 }

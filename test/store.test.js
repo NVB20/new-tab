@@ -27,12 +27,51 @@ test('deepMerge does not mutate its inputs', () => {
   assert.equal(base.b.c, 2);
 });
 
+const copies = s => Object.fromEntries(s.prefs.layout.widgets.map(c => [c.type, c]));
+
 test('normalizeState(null) returns a usable default state', () => {
   const s = normalizeState(null);
   assert.equal(s.groups.length, 1);
   assert.equal(s.activeGroupId, s.groups[0].id);
   assert.deepEqual(s.tiles, []);
-  assert.deepEqual(s.prefs, DEFAULT_PREFS);
+  const { layout, ...rest } = s.prefs;
+  const { layout: nil, ...defaults } = DEFAULT_PREFS;
+  assert.deepEqual(rest, defaults);
+  assert.deepEqual(layout.widgets.map(c => c.type), ['clock', 'tasks', 'notes', 'markets', 'github', 'tiles']);
+});
+
+test('a saved state from before Layout mode converts to the same page, and loses the old keys', () => {
+  const s = normalizeState({ prefs: {
+    columns: 7,
+    width: 900,
+    search: { enabled: true, row: 1, google: true, claude: false, chatgpt: true, gemini: false, mode: 'chatgpt' },
+    widgets: {
+      enabled: true,
+      position: 'right',
+      clock: { enabled: true, name: 'Niv', face: 'dot' },
+      notes: { enabled: false },
+      markets: { enabled: true, coins: 'btc, doge', fx: false },
+      github: { enabled: true, user: 'octo', show: 'issues', token: 'ghp_x' },
+    },
+  } });
+  const c = copies(s);
+  assert.deepEqual([c.clock.x, c.clock.settings.name, c.clock.settings.face, c.clock.settings.hour24], [9, 'Niv', 'dot', true]);
+  assert.equal(c.notes, undefined);
+  assert.deepEqual(c.markets.settings.items, ['BTC', 'DOGE']);
+  assert.deepEqual(c.github.settings, { user: 'octo', parts: ['heatmap', 'pulls', 'issues'] });
+  assert.deepEqual(c.tiles.settings, { group: null, columns: 7, bar: 1 });
+  assert.equal(s.prefs.github.token, 'ghp_x');
+  assert.deepEqual(s.prefs.search, { google: true, claude: false, chatgpt: true, gemini: false, mode: 'chatgpt' });
+  for (const k of ['columns', 'width', 'widgets']) assert.equal(k in s.prefs, false, k);
+});
+
+test('a saved layout is kept and validated; notes and tasks are untouched', () => {
+  const layout = { widgets: [{ id: 'k', type: 'notes', x: 0, y: 0, w: 2, h: 2, settings: {} }, { id: 'z', type: 'zzz' }] };
+  const s = normalizeState({ notes: 'hello', tasks: [{ id: 't', text: 'a' }], prefs: { layout, github: { token: 'keep' } } });
+  assert.deepEqual(s.prefs.layout.widgets.map(c => c.id), ['k']);
+  assert.equal(s.notes, 'hello');
+  assert.equal(s.tasks[0].text, 'a');
+  assert.equal(s.prefs.github.token, 'keep');
 });
 
 test('normalizeState reassigns orphan tiles and drops tiles without url', () => {
@@ -50,10 +89,11 @@ test('normalizeState reassigns orphan tiles and drops tiles without url', () => 
 });
 
 test('normalizeState merges saved prefs over defaults', () => {
-  const s = normalizeState({ prefs: { columns: 7, widgets: { clock: { name: 'Niv' } } } });
-  assert.equal(s.prefs.columns, 7);
-  assert.equal(s.prefs.widgets.clock.name, 'Niv');
-  assert.equal(s.prefs.widgets.clock.hour24, DEFAULT_PREFS.widgets.clock.hour24);
+  const s = normalizeState({ prefs: { spacing: 12, columns: 7, widgets: { clock: { name: 'Niv' } } } });
+  assert.equal(s.prefs.spacing, 12);
+  assert.equal(copies(s).tiles.settings.columns, 7);
+  assert.equal(copies(s).clock.settings.name, 'Niv');
+  assert.equal(copies(s).clock.settings.hour24, true);
   assert.equal(s.prefs.accent, DEFAULT_PREFS.accent);
 });
 
@@ -64,40 +104,40 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.equal(s.prefs.background.blur, 4);
   assert.equal(s.prefs.tiles.style, 'flat');
   assert.equal(s.prefs.tiles.icons, 'logo');
-  assert.deepEqual(s.prefs.widgets.markets.items, ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
-  assert.equal(s.prefs.widgets.clock.face, 'classic');
-  assert.equal(s.prefs.widgets.clock.colon, true);
-  assert.equal(s.prefs.widgets.github.user, '');
+  const c = copies(s);
+  assert.deepEqual(c.markets.settings.items, ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
+  assert.equal(c.clock.settings.face, 'classic');
+  assert.equal(c.clock.settings.colon, true);
+  assert.equal(c.github.settings.user, '');
   assert.equal(s.prefs.tiles.color, '#ffffff');
 });
 
 test('Markets coins and USD/ILS switch from older versions become the item list', () => {
-  const items = prefs => normalizeState({ prefs: { widgets: { markets: prefs } } }).prefs.widgets.markets;
-  assert.deepEqual(items({ coins: 'btc, doge', fx: true }), { enabled: true, items: ['BTC', 'DOGE', 'USD/ILS'] });
-  assert.deepEqual(items({ coins: 'ETH', fx: false, enabled: false }), { enabled: false, items: ['ETH'] });
-  assert.deepEqual(items({ items: ['eur/ils', 'BTC', 'bad!'], coins: 'SOL' }).items, ['EUR/ILS', 'BTC']);
-  assert.deepEqual(items({ items: [] }).items, []);
-  assert.deepEqual(items({ items: 'BTC' }).items, DEFAULT_PREFS.widgets.markets.items);
+  const items = markets => copies(normalizeState({ prefs: { widgets: { markets } } })).markets?.settings.items;
+  assert.deepEqual(items({ coins: 'btc, doge', fx: true }), ['BTC', 'DOGE', 'USD/ILS']);
+  assert.equal(items({ coins: 'ETH', fx: false, enabled: false }), undefined);
+  assert.deepEqual(items({ items: ['eur/ils', 'BTC', 'bad!'], coins: 'SOL' }), ['EUR/ILS', 'BTC']);
+  assert.deepEqual(items({ items: [] }), []);
+  assert.deepEqual(items({ items: 'BTC' }), ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
 });
 
-test('GitHub shows commits and issues unless the saved choice is a valid one', () => {
-  const show = github => normalizeState({ prefs: { widgets: { github } } }).prefs.widgets.github.show;
-  assert.equal(show({ user: 'octo' }), 'both');
-  assert.equal(show({ show: 'issues' }), 'issues');
-  assert.equal(show({ show: 'commits' }), 'commits');
-  assert.equal(show({ show: 'everything' }), 'both');
+test('the old GitHub Show choice becomes the parts of the copy', () => {
+  const parts = github => copies(normalizeState({ prefs: { widgets: { github } } })).github.settings.parts;
+  assert.deepEqual(parts({ user: 'octo' }), ['heatmap', 'pulls', 'issues', 'commits']);
+  assert.deepEqual(parts({ show: 'issues' }), ['heatmap', 'pulls', 'issues']);
+  assert.deepEqual(parts({ show: 'commits' }), ['heatmap', 'pulls', 'commits']);
+  assert.deepEqual(parts({ show: 'everything' }), ['heatmap', 'pulls', 'issues', 'commits']);
 });
 
-test('the old switch that hid every widget becomes each widget switched off', () => {
-  const w = normalizeState({ prefs: { widgets: { enabled: false, tasks: { enabled: true }, markets: { enabled: true } } } }).prefs.widgets;
-  assert.equal(w.enabled, true);
-  for (const name of ['clock', 'tasks', 'notes', 'markets', 'github']) assert.equal(w[name].enabled, false, name);
+test('the old switch that hid every widget leaves only the tiles', () => {
+  const s = normalizeState({ prefs: { widgets: { enabled: false, tasks: { enabled: true }, markets: { enabled: true } } } });
+  assert.deepEqual(s.prefs.layout.widgets.map(c => c.type), ['tiles']);
 });
 
-test('each widget keeps its own switch when the old master switch was on', () => {
-  const w = normalizeState({ prefs: { widgets: { enabled: true, notes: { enabled: false } } } }).prefs.widgets;
-  assert.equal(w.notes.enabled, false);
-  assert.equal(w.clock.enabled, true);
+test('each widget\'s own switch decides whether it has a copy', () => {
+  const c = copies(normalizeState({ prefs: { widgets: { enabled: true, notes: { enabled: false } } } }));
+  assert.equal(c.notes, undefined);
+  assert.ok(c.clock);
 });
 
 test('saved backgrounds from before showImage keep showing their image', () => {
@@ -283,12 +323,13 @@ test('store falls back to defaults when saved state is corrupt', async () => {
 
 test('a saved state from before the search bar gets the bar with Google and Claude on top, and no Claude widget', () => {
   const s = normalizeState({ prefs: { widgets: { tasks: { enabled: false } } } });
-  assert.deepEqual(s.prefs.search, { enabled: true, google: true, claude: true, chatgpt: false, gemini: false, mode: 'google', row: 0 });
-  assert.equal(s.prefs.widgets.claude.enabled, false);
-  assert.equal(s.prefs.widgets.tasks.enabled, false);
+  assert.deepEqual(s.prefs.search, { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' });
+  assert.equal(copies(s).tiles.settings.bar, 0);
+  assert.equal(copies(s).claude, undefined);
+  assert.equal(copies(s).tasks, undefined);
 });
 
 test('a saved bar from before ChatGPT and Gemini keeps its settings and gets the new ones off', () => {
   const s = normalizeState({ prefs: { search: { enabled: true, google: false, claude: true, mode: 'claude' } } });
-  assert.deepEqual(s.prefs.search, { enabled: true, google: false, claude: true, chatgpt: false, gemini: false, mode: 'claude', row: 0 });
+  assert.deepEqual(s.prefs.search, { google: false, claude: true, chatgpt: false, gemini: false, mode: 'claude' });
 });
