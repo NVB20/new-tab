@@ -191,3 +191,13 @@ test('moving a folder to another group takes its tiles along; moving a child tak
   assert.equal(s.tiles.find(t => t.id === 'a').folderId, undefined);
   assert.deepEqual(ids(folderChildren(s, f.id)), ['b']);
 });
+
+test('deleteGroup unpins tiles blocks that showed the group', () => {
+  const s = state();
+  s.prefs = { layout: { widgets: [
+    { id: 'w1', type: 'tiles', settings: { group: 'dev', columns: 5, bar: null } },
+    { id: 'w2', type: 'tiles', settings: { group: 'home', columns: 5, bar: null } },
+  ] } };
+  deleteGroup(s, 'dev', 'delete');
+  assert.deepEqual(s.prefs.layout.widgets.map(c => c.settings.group), [null, 'home']);
+});

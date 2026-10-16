@@ -16,9 +16,9 @@ export const HANDOFF_TTL = 2 * 60e3;
 
 export const enginesOn = search => ENGINES.filter(m => search[m]);
 
-// The engine Enter goes to: the saved one while it's on, else the first one on; null hides the bar.
+// The engine Enter goes to: the saved one while it's on, else the first one on; null when no
+// engine is on.
 export function activeMode(search) {
-  if (!search.enabled) return null;
   const on = enginesOn(search);
   return on.includes(search.mode) ? search.mode : on[0] ?? null;
 }

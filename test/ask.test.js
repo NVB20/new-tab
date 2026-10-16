@@ -5,7 +5,7 @@ import {
   BOTTOM, rowBands, gapY, nearestSlot, barSlot, slotToRow,
 } from '../js/ask.js';
 
-const search = over => ({ enabled: true, google: true, claude: true, chatgpt: false, gemini: false, mode: 'google', ...over });
+const search = over => ({ google: true, claude: true, chatgpt: false, gemini: false, mode: 'google', ...over });
 
 // ---- engines ----
 
@@ -30,7 +30,7 @@ test('activeMode treats an unknown saved mode as the first one on', () => {
 });
 
 test('activeMode is null when the bar is off or has no engine on', () => {
-  assert.equal(activeMode(search({ enabled: false })), null);
+  assert.equal(activeMode(search({ google: false, claude: false })), null);
   assert.equal(activeMode(search({ google: false, claude: false })), null);
 });
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fromSpeedDial2 } from '../js/importer.js';
-import { DEFAULT_PREFS } from '../js/store.js';
+import { DEFAULT_PREFS, LEGACY_PREFS } from '../js/store.js';
 
 function counterIds() {
   let n = 0;
@@ -106,9 +106,9 @@ test('out-of-range and wrong-typed preferences fall back or clamp', () => {
   }, counterIds());
   assert.equal(prefs.columns, 10);
   assert.equal(prefs.spacing, 0);
-  assert.equal(prefs.width, DEFAULT_PREFS.width);
+  assert.equal(prefs.width, LEGACY_PREFS.width);
   assert.equal(prefs.theme, DEFAULT_PREFS.theme);
-  assert.equal(prefs.widgets.position, DEFAULT_PREFS.widgets.position);
+  assert.equal(prefs.widgets.position, LEGACY_PREFS.widgets.position);
 });
 
 test('a 12-hour clock is mapped', () => {

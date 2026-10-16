@@ -1,7 +1,7 @@
 // Converts a Speed Dial 2 JSON export into our groups, tiles and prefs.
 // Pure: no DOM or Chrome access.
 
-import { DEFAULT_PREFS, deepMerge } from './store.js';
+import { DEFAULT_PREFS, LEGACY_PREFS, deepMerge } from './store.js';
 import { uid, clamp, hostOf } from './util.js';
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -56,7 +56,7 @@ function mapPrefs(raw) {
   const clock = isObj(w.clock) ? w.clock : {};
   const cycle = String(clock.hourCycle ?? '');
 
-  return deepMerge(DEFAULT_PREFS, {
+  return deepMerge(deepMerge(DEFAULT_PREFS, LEGACY_PREFS), {
     columns: num(p.columns, 2, 10),
     spacing: num(p.spacing, 0, 40),
     width: num(p.maxWidth, 480, 1600),

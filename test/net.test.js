@@ -54,14 +54,20 @@ test('a ttl of 0 (Refresh) always fetches', async () => {
   assert.equal(calls, 2);
 });
 
-test('an attempt already started (e.g. by another tab) is not repeated', async () => {
+test('callers in this tab share a request in flight; an attempt started by another tab is not repeated', async () => {
   let calls = 0;
   let release;
   const slow = () => new Promise(resolve => { calls++; release = () => resolve({ v: 1 }); });
   const a = feed('k', HOUR, slow);
-  const b = await feed('k', HOUR, slow);
+  const b = feed('k', HOUR, slow);
   assert.equal(calls, 1);
-  assert.equal(b.data, null);
   release();
   assert.deepEqual((await a).data, { v: 1 });
+  assert.deepEqual((await b).data, { v: 1 });
+
+  memory.clear();
+  memory.set('newtab:cache:j:attempt', JSON.stringify({ at: Date.now(), error: null }));
+  const other = await feed('j', HOUR, slow);
+  assert.equal(calls, 1);
+  assert.equal(other.data, null);
 });
