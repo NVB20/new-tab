@@ -4,6 +4,7 @@ import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
   parseEspnEvent, parseSchedule, nextPhase, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
   parseF1Season, parseF1Last, raceAwaitingResult,
+  rowState, resultFor, followedSide, dayKey, dayLabel, formatTime, isNight, longDay, timeline,
 } from '../js/sports.js';
 
 test('the team lists hold every NBA and NFL team once, and Messi\'s two teams', () => {
@@ -289,5 +290,100 @@ test('raceAwaitingResult is the latest race past its usual end, for a day', () =
   assert.equal(raceAwaitingResult(sessions, start + 3600e3), null);          // still running
   assert.equal(raceAwaitingResult(sessions, start + 3 * 3600e3).round, 18);
   assert.equal(raceAwaitingResult(sessions, start + 27 * 3600e3), null);     // a day after its end
+});
+
+const TZ = 'Asia/Jerusalem';
+
+test('rowState: start time, live, final, postponed; F1 by the clock', () => {
+  assert.equal(rowState(game({ start: NOW + 3600e3 }), NOW), 'pre');
+  assert.equal(rowState(game({ start: NOW - 3600e3 }), NOW), 'live');            // started, ESPN not told yet
+  assert.equal(rowState(game({ start: NOW - 3600e3, state: 'in' }), NOW), 'live');
+  assert.equal(rowState(game({ start: NOW - 3600e3, state: 'post' }), NOW), 'final');
+  assert.equal(rowState(game({ start: NOW - 6 * 3600e3 }), NOW), 'final');      // past twice its length
+  assert.equal(rowState(game({ off: 'Postponed' }), NOW), 'off');
+  const quali = { sport: 'f1', session: 'qualifying', minutes: 60 };
+  assert.equal(rowState({ ...quali, start: NOW + 1 }, NOW), 'pre');
+  assert.equal(rowState({ ...quali, start: NOW - 30 * 60e3 }, NOW), 'live');
+  assert.equal(rowState({ ...quali, start: NOW - 90 * 60e3 }, NOW), 'final');
+});
+
+test('resultFor gives W, L or D from the followed side', () => {
+  const final = (home, away, winners = [false, false]) => game({
+    state: 'post', home: { ...lal, score: home, winner: winners[0] }, away: { ...gs, score: away, winner: winners[1] },
+  });
+  assert.equal(resultFor(final('112', '104'), 'home'), 'W');
+  assert.equal(resultFor(final('112', '104'), 'away'), 'L');
+  assert.equal(resultFor(final('1', '1'), 'home'), 'D');
+  assert.equal(resultFor(final('1', '1', [false, true]), 'away'), 'W');   // won on penalties
+  assert.equal(resultFor(final('1', '1', [false, true]), 'home'), 'L');
+  assert.equal(resultFor(final('112', '104'), 'both'), '');
+  assert.equal(resultFor(final(null, null), 'home'), '');
+});
+
+test('followedSide names the followed side of a game', () => {
+  assert.equal(followedSide(game(), ['nba:13']), 'home');
+  assert.equal(followedSide(game(), ['nba:9']), 'away');
+  assert.equal(followedSide(game(), ['nba:13', 'nba:9']), 'both');
+  assert.equal(followedSide(game(), ['nfl:13']), null);   // the same id in another league
+});
+
+test('day keys and labels follow the local calendar, across the switch to winter time', () => {
+  assert.equal(dayKey(Date.parse('2026-10-17T23:30Z'), TZ), '2026-10-18');   // 02:30 in Israel
+  assert.equal(dayKey(Date.parse('2026-10-25T21:30Z'), TZ), '2026-10-25');   // 23:30, after the clocks went back
+  const today = dayKey(Date.parse('2026-10-24T21:30Z'), TZ);                   // 00:30 on the 25th
+  assert.equal(today, '2026-10-25');
+  assert.equal(dayLabel('2026-10-25', today), 'Today');
+  assert.equal(dayLabel('2026-10-26', today), 'Tomorrow');
+  assert.equal(dayLabel('2026-10-24', today), 'Yesterday');
+  assert.equal(dayLabel('2026-10-18', today), 'Sun 18 Oct');
+});
+
+test('times read 24- or 12-hour; night starts are noticed; long days for screen readers', () => {
+  const kc = Date.parse('2026-10-18T20:25Z');
+  assert.equal(formatTime(kc, true, TZ), '23:25');
+  assert.equal(formatTime(kc, false, TZ).replace(/\s/g, ' '), '11:25 PM');
+  assert.equal(formatTime(Date.parse('2026-10-22T02:00Z'), true, TZ), '05:00');
+  assert.equal(isNight(Date.parse('2026-10-22T02:00Z'), TZ), true);
+  assert.equal(isNight(kc, TZ), false);
+  assert.equal(longDay(kc, TZ), 'Sunday 18 October');
+});
+
+test('timeline: two weeks ahead, finished games for a day, one row per game, chosen F1 sessions', () => {
+  const kc = { id: '12', abbr: 'KC', name: 'Kansas City Chiefs', logo: '', score: null, winner: false };
+  const lv = { id: '13', abbr: 'LV', name: 'Las Vegas Raiders', logo: '', score: null, winner: false };
+  const nfl = over => game({ sport: 'nfl', league: 'nfl', tag: 'NFL', ...over });
+  const f1 = over => ({ sport: 'f1', tag: 'F1', minutes: 60, timeValid: true, state: 'pre', ...over });
+  const events = [
+    game({ id: 'opener', start: Date.parse('2026-10-22T02:00Z') }),
+    game({ id: 'opener', start: Date.parse('2026-10-22T02:00Z') }),            // the same game from the other team's schedule
+    game({ id: 'later', start: NOW + 20 * DAY, home: gs, away: lal }),          // past the window
+    nfl({ id: 'won', start: NOW - 20 * 3600e3, state: 'post', home: { ...lv, score: '27' }, away: { ...kc, score: '30', winner: true } }),
+    nfl({ id: 'old', start: NOW - 3 * DAY, state: 'post', home: lv, away: kc }),
+    nfl({ id: 'kc-far', start: NOW + 30 * DAY, home: kc, away: lv }),          // not needed: 'won' is listed
+    f1({ id: 'f1-q', session: 'qualifying', start: Date.parse('2026-10-24T21:00Z'), title: 'US GP · Qualifying' }),
+    f1({ id: 'f1-p', session: 'practice', start: Date.parse('2026-10-23T17:30Z'), title: 'US GP · Practice 1' }),
+  ];
+  const days = timeline(events, { follow: ['nba:13', 'nba:9', 'nfl:12', 'f1'], f1Sessions: ['qualifying', 'race'], now: NOW, timeZone: TZ });
+  assert.deepEqual(days.map(d => [d.label, d.events.map(e => e.id)]), [
+    ['Yesterday', ['won']],        // 19:00 on the 15th in Israel
+    ['Thu 22 Oct', ['opener']],    // 05:00
+    ['Sun 25 Oct', ['f1-q']],      // midnight, still summer time
+  ]);
+  const [won] = days[0].events;
+  assert.equal(won.side, 'away');
+  assert.equal(won.status, 'final');
+  assert.equal(days[1].events[0].side, 'both');
+  assert.equal(days[1].events[0].status, 'pre');
+});
+
+test('timeline adds the next game of a team with nothing in the window, and lists nothing unfollowed', () => {
+  const events = [
+    game({ id: 'far', start: NOW + 40 * DAY }),
+    game({ id: 'farther', start: NOW + 50 * DAY }),
+    game({ id: 'theirs', start: NOW + DAY, home: { ...lal, id: '2' }, away: { ...gs, id: '3' } }),
+  ];
+  const days = timeline(events, { follow: ['nba:13'], f1Sessions: [], now: NOW, timeZone: TZ });
+  assert.deepEqual(days.flatMap(d => d.events.map(e => e.id)), ['far']);
+  assert.deepEqual(timeline(events, { follow: [], f1Sessions: [], now: NOW, timeZone: TZ }), []);
 });
 

@@ -288,3 +288,91 @@ export function raceAwaitingResult(events, now) {
     .sort(byStart)
     .at(-1) ?? null;
 }
+
+// ---- the timeline ----
+
+// Which sides of a game the followed ids take: 'home', 'away', 'both' or null.
+export function followedSide(e, follow) {
+  if (e.sport === 'f1') return null;
+  const home = follow.includes(`${e.sport}:${e.home.id}`);
+  const away = follow.includes(`${e.sport}:${e.away.id}`);
+  return home && away ? 'both' : home ? 'home' : away ? 'away' : null;
+}
+
+// How a row reads: 'pre' (its start time), 'live', 'final' or 'off' (postponed, cancelled). A team
+// game past its start counts as live until ESPN calls it final, for at most twice its usual length.
+export function rowState(e, now) {
+  if (e.off) return 'off';
+  if (e.sport === 'f1') return now < e.start ? 'pre' : now < e.start + lengthOf(e) ? 'live' : 'final';
+  if (e.state === 'post') return 'final';
+  if (now < e.start) return 'pre';
+  return now < e.start + 2 * lengthOf(e) ? 'live' : 'final';
+}
+
+// W, L or D for the followed side of a game with a score; '' without a score or a single side.
+export function resultFor(e, side) {
+  if ((side !== 'home' && side !== 'away') || e.home.score == null || e.away.score == null) return '';
+  const mine = e[side];
+  const other = side === 'home' ? e.away : e.home;
+  const a = Number(mine.score);
+  const b = Number(other.score);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+  if (a !== b) return a > b ? 'W' : 'L';
+  return mine.winner ? 'W' : other.winner ? 'L' : 'D';   // level after extra time: penalties decide
+}
+
+// Still listed: until a day after its usual end (F1 sessions other than the race go when they
+// end), or a day after its start when postponed or cancelled.
+function shown(e, now) {
+  if (e.off) return now < e.start + DAY;
+  const end = e.start + lengthOf(e);
+  if (e.sport === 'f1' && e.session !== 'race') return now < end;
+  return now < end + DAY;
+}
+
+const follows = (e, follow, f1Sessions) =>
+  (e.sport === 'f1' ? follow.includes('f1') && f1Sessions.includes(e.session) : followedSide(e, follow) !== null);
+
+export const dayKey = ymd;
+const shiftDay = (key, days) => new Date(Date.parse(`${key}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// A day heading: 'Today', 'Tomorrow', 'Yesterday', else 'Sun 18 Oct' (the clock's short date).
+export function dayLabel(key, todayKey) {
+  if (key === todayKey) return 'Today';
+  if (key === shiftDay(todayKey, 1)) return 'Tomorrow';
+  if (key === shiftDay(todayKey, -1)) return 'Yesterday';
+  const d = new Date(`${key}T12:00:00Z`);
+  return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+// '23:25', or '11:25 PM' on a 12-hour clock.
+export const formatTime = (ms, hour24, timeZone) => new Intl.DateTimeFormat(hour24 ? 'en-GB' : 'en-US', {
+  timeZone, hour: hour24 ? '2-digit' : 'numeric', minute: '2-digit', hourCycle: hour24 ? 'h23' : 'h12',
+}).format(ms);
+// Starts from midnight to 6:59 in the morning get a moon.
+export const isNight = (ms, timeZone) => Number(new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(ms)) < 7;
+// 'Sunday 18 October', for screen readers.
+export const longDay = (ms, timeZone) => new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'long', day: 'numeric', month: 'long' }).format(ms);
+
+// The rows a copy shows, by local day: the followed teams' games and the chosen F1 sessions that
+// start within `days` or are still listed after starting; a followed team (or F1) with none of
+// those adds its next event. A game between two followed teams is one row.
+export function timeline(events, { follow, f1Sessions, now, timeZone, days = 14 }) {
+  const unique = [...new Map(events.map(e => [e.id, e])).values()].filter(e => follows(e, follow, f1Sessions));
+  const chosen = new Set(unique.filter(e => shown(e, now) && e.start < now + days * DAY));
+  for (const id of follow) {
+    const own = unique.filter(e => (id === 'f1' ? e.sport === 'f1' : followedSide(e, [id]) !== null));
+    if (own.some(e => chosen.has(e))) continue;
+    const next = own.filter(e => e.start > now).sort(byStart)[0];
+    if (next) chosen.add(next);
+  }
+  const today = dayKey(now, timeZone);
+  const groups = new Map();
+  for (const e of [...chosen].sort(byStart)) {
+    const day = dayKey(e.start, timeZone);
+    if (!groups.has(day)) groups.set(day, { day, label: dayLabel(day, today), events: [] });
+    groups.get(day).events.push({ ...e, side: followedSide(e, follow), status: rowState(e, now) });
+  }
+  return [...groups.values()];
+}
