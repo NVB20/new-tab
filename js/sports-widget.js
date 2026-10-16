@@ -1,0 +1,335 @@
+// Sports widget: the followed NBA and NFL teams' games, Messi's (Inter Miami, Argentina) and the
+// chosen F1 sessions in one list by day, with live scores and a day of results. Schedules come
+// from ESPN's site API and Jolpica F1 through the request cache, shared by every copy and tab.
+
+import { el, icon, widgetHead, widgetSub, widgetEmpty } from './ui.js';
+import { feed, fetchJson, peek, sweep } from './net.js';
+import { timeAgo } from './feeds.js';
+import { copyById, TYPES } from './layout.js';
+import {
+  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, F1_SESSIONS, F1_SESSION_LABELS, teamOf, schedulePath, parseSchedule, nextPhase,
+  parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl, etDay, parseF1Season, parseF1Last, raceAwaitingResult,
+  timeline, resultFor, formatTime, isNight, longDay,
+} from './sports.js';
+
+const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
+const JOLPICA = 'https://api.jolpi.ca/ergast/f1';
+const HOUR = 3600e3;
+const DAY = 24 * HOUR;
+const SCHEDULE_TTL = 6 * HOUR;
+const F1_TTL = DAY;
+const F1_LAST_TTL = HOUR;
+const REFRESH_MS = 30e3;
+const RECONFIGURE_MS = 800;   // wait for clicking to stop before refetching after a settings change
+const KEY = 'sports-v1';
+const F1_SEASON = `${KEY}:f1:season`;
+const F1_LAST = `${KEY}:f1:last`;
+const liveKey = b => `${KEY}:live:${b.path}:${b.day}`;
+
+// The cache keys a followed id reads: a team's schedule (soccer: upcoming games and results), or F1's season.
+function sourceKeys(id) {
+  if (id === 'f1') return [F1_SEASON];
+  const { sport, id: team } = teamOf(id);
+  return sport === 'soccer' ? [`${KEY}:soccer:${team}:next`, `${KEY}:soccer:${team}:last`] : [`${KEY}:team:${sport}:${team}`];
+}
+
+// Several cache results as one: every event, the oldest time, the first error.
+const joined = parts => ({
+  data: parts.some(p => p.data) ? parts.flatMap(p => p.data ?? []) : null,
+  at: Math.min(...parts.map(p => p.at)),
+  error: parts.find(p => p.error)?.error,
+});
+
+const trimmed = events => trimEvents(events, Date.now());
+
+async function loadSource(id) {
+  if (id === 'f1') return feed(F1_SEASON, F1_TTL, async () => parseF1Season(await fetchJson(`${JOLPICA}/current.json`)));
+  const { sport, id: team } = teamOf(id);
+  const [key, lastKey] = sourceKeys(id);
+  const url = `${ESPN}/${schedulePath(sport, team)}`;
+  if (sport === 'soccer') {
+    return joined(await Promise.all([
+      feed(key, SCHEDULE_TTL, async () => trimmed(parseSchedule(await fetchJson(`${url}?fixture=true`), sport).events)),
+      feed(lastKey, SCHEDULE_TTL, async () => trimmed(parseSchedule(await fetchJson(url), sport).events)),
+    ]));
+  }
+  return feed(key, SCHEDULE_TTL, async () => {
+    const first = parseSchedule(await fetchJson(url), sport);
+    const next = nextPhase(first);
+    const more = next ? parseSchedule(await fetchJson(`${url}?seasontype=${next}`), sport).events : [];
+    return trimmed([...first.events, ...more]);
+  });
+}
+
+const cachedSource = id => joined(sourceKeys(id).map(key => peek(key) ?? { data: null, at: 0 }));
+
+// Every scoreboard that matters: its saved copy, refreshed when boardTtl says it's due.
+async function loadLive(events) {
+  const now = Date.now();
+  const boards = await Promise.all(scoreboards(events, now).map(async b => {
+    const saved = peek(liveKey(b))?.data ?? [];
+    const ttl = boardTtl(b, events, saved, now);
+    if (ttl == null) return saved;
+    const { data } = await feed(liveKey(b), ttl,
+      async () => parseScoreboard(await fetchJson(`${ESPN}/${b.path}/scoreboard?dates=${b.day}`), b.sport, b.league));
+    return data ?? saved;
+  }));
+  return boards.flat();
+}
+
+const cachedLive = events => scoreboards(events, Date.now()).flatMap(b => peek(liveKey(b))?.data ?? []);
+
+// The podium of the race awaiting its result, once Jolpica has it.
+async function loadPodium(events) {
+  const race = raceAwaitingResult(events, Date.now());
+  if (!race) return null;
+  const isRace = r => r?.season === race.season && r.round === race.round;
+  const saved = peek(F1_LAST)?.data;
+  if (isRace(saved)) return saved;
+  const { data } = await feed(F1_LAST, F1_LAST_TTL, async () => parseF1Last(await fetchJson(`${JOLPICA}/current/last/results.json`)));
+  return isRace(data) ? data : null;
+}
+
+export function mountSports(root, store, copy) {
+  const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.sports.defaults();
+  const prefs = () => store.get().prefs;
+  const linkProps = href => (prefs().openInNewTab ? { href, target: '_blank', rel: 'noopener' } : { href });
+  // Times follow the Clock's 12/24-hour setting.
+  const hour24 = () => prefs().layout.widgets.find(c => c.type === 'clock')?.settings.hour24 ?? true;
+
+  const list = el('div', { class: 'sp-list' });
+  const notes = el('div', { class: 'sp-notes' });
+  const editor = el('div', { class: 'sp-editor', hidden: true });
+  const editButton = el('button', { type: 'button', class: 'icon-btn widget-edit', onclick: () => setEditing(!editing) });
+  const head = widgetHead('trophy', 'Sports');
+  head.append(editButton);
+  const section = el('section', { class: 'widget widget-sports' }, head, list, notes, editor);
+  root.append(section);
+
+  let sources = new Map();   // followed id → { data: events, at, error }
+  let live = [];             // scoreboard games
+  let podium = null;         // { season, round, podium } of the race awaiting its result
+  let loaded = false;
+
+  const events = () => [...sources.values()].flatMap(r => r.data ?? []);
+
+  // ---- rows ----
+
+  const logo = team => (team.logo
+    ? el('img', { class: 'sp-logo', src: team.logo, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer', onerror: e => e.target.remove() })
+    : null);
+  const abbr = (team, mine) => el(mine ? 'b' : 'span', { text: team.abbr });
+  const scored = e => e.sport !== 'f1' && (e.status === 'live' || e.status === 'final') && e.home.score != null && e.away.score != null;
+  const podiumOf = e => (podium?.season === e.season && podium.round === e.round ? podium.podium.join(' · ') : 'Results soon');
+
+  function matchup(e) {
+    if (e.sport === 'f1') return el('span', { class: 'sp-match' }, el('span', { class: 'sp-title', text: e.title }));
+    const mine = where => e.side === where || e.side === 'both';
+    return el('span', { class: 'sp-match' },
+      logo(e.away), abbr(e.away, mine('away')),
+      scored(e) ? el('span', { class: 'sp-score', text: `${e.away.score} – ${e.home.score}` }) : el('span', { class: 'sp-at', text: '@' }),
+      abbr(e.home, mine('home')), logo(e.home));
+  }
+
+  function when(e) {
+    const tv = e.tv ? el('span', { class: 'sp-tv', text: e.tv }) : null;
+    const wrap = (...children) => el('span', { class: 'sp-when' }, ...children);
+    switch (e.status) {
+      case 'off':
+        return wrap(el('span', { text: e.off }));
+      case 'live':
+        return wrap(el('span', { class: 'sp-dot', 'aria-hidden': 'true' }), el('span', { text: e.state === 'in' && e.detail ? e.detail : 'LIVE' }), tv);
+      case 'final': {
+        if (e.sport === 'f1') return wrap(el('span', { text: podiumOf(e) }));
+        const result = resultFor(e, e.side);
+        return wrap(result ? el('span', { class: `sp-res ${result}`, text: result }) : null,
+          el('span', { text: e.state === 'post' && e.detail ? e.detail : 'Final' }));
+      }
+      default:
+        return wrap(e.timeValid && isNight(e.start) ? icon('moon', 13) : null,
+          el('span', { text: e.timeValid ? formatTime(e.start, hour24()) : 'TBD' }), tv);
+    }
+  }
+
+  function label(e) {
+    const parts = [
+      e.sport === 'f1' ? `Formula 1, ${e.title}` : `${e.away.name} at ${e.home.name}`,
+      `${longDay(e.start)}, ${e.timeValid ? formatTime(e.start, hour24()) : 'time to be decided'}`,
+    ];
+    if (e.status === 'off') parts.push(e.off);
+    if (e.status === 'live') parts.push('live');
+    if (e.status === 'final') parts.push(e.sport === 'f1' ? podiumOf(e) : 'final');
+    if (scored(e)) parts.push(`${e.away.abbr} ${e.away.score}, ${e.home.abbr} ${e.home.score}`);
+    if (e.tv) parts.push(e.tv);
+    return parts.join(', ');
+  }
+
+  const row = e => el('a', { class: `sp-row ${e.status}`, 'aria-label': label(e), ...linkProps(e.url || 'https://www.espn.com/') },
+    el('span', { class: 'sp-tag', text: e.tag }), matchup(e), when(e));
+
+  // ---- list ----
+
+  const what = id => (id === 'f1' ? 'the F1 calendar' : `the schedule for ${teamOf(id).name}`);
+
+  // A line per source that failed: how old the data shown is, or what couldn't load.
+  function problems(follow) {
+    const lines = [];
+    for (const [host, ids] of [['ESPN', follow.filter(id => id !== 'f1')], ['Jolpica', follow.filter(id => id === 'f1')]]) {
+      const failed = ids.filter(id => sources.get(id)?.error);
+      const stale = failed.filter(id => sources.get(id).data);
+      if (stale.length) {
+        const ago = timeAgo(Math.min(...stale.map(id => sources.get(id).at)));
+        lines.push(ago === 'now' ? `${host} unreachable` : `${host} unreachable · data from ${ago} ago`);
+      }
+      for (const id of failed.filter(id => !sources.get(id).data)) lines.push(`Couldn't load ${what(id)}`);
+    }
+    return lines.map(text => el('p', { class: 'widget-note', text }));
+  }
+
+  const pickLink = text => el('button', { type: 'button', class: 'link-btn', text, onclick: () => setEditing(true) });
+
+  function render() {
+    const s = settings();
+    if (!s.follow.length) {
+      list.replaceChildren(widgetEmpty('Nothing chosen. ', pickLink('Choose teams')));
+      notes.replaceChildren();
+      return;
+    }
+    const days = timeline(applyLive(events(), live), { follow: s.follow, f1Sessions: s.f1Sessions, now: Date.now() });
+    list.replaceChildren(...(days.length
+      ? days.flatMap(d => [el('div', { class: 'sp-day', text: d.label }), ...d.events.map(row)])
+      : [widgetEmpty(loaded ? 'No games scheduled yet' : 'Loading…')]));
+    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl):/.test(id));
+    notes.replaceChildren(...problems(s.follow),
+      ...(hint ? [el('p', { class: 'widget-note' }, pickLink('Pick your NBA and NFL teams'))] : []));
+  }
+
+  // ---- editor: ✎ swaps the list for team buttons; changes apply as they're made ----
+
+  let editing = false;
+
+  function update(fn) {
+    store.update(s => {
+      const own = copyById(s, copy.id);
+      if (own) fn(own.settings);
+    });
+  }
+  const toggled = (ids, id, on) => [...ids.filter(x => x !== id), ...(on ? [id] : [])];
+
+  // A button that stays pressed while its item is chosen.
+  function chip(text, title, pressed, onToggle) {
+    const button = el('button', {
+      type: 'button', class: 'sp-chip', text, title, 'aria-pressed': String(pressed),
+      onclick: () => {
+        const on = button.getAttribute('aria-pressed') !== 'true';
+        button.setAttribute('aria-pressed', String(on));
+        onToggle(on);
+      },
+    });
+    return button;
+  }
+
+  function renderEditor() {
+    const s = settings();
+    const teamChip = (sport, t) => {
+      const id = `${sport}:${t.id}`;
+      return chip(t.abbr, t.name, s.follow.includes(id), on => update(own => { own.follow = toggled(own.follow, id, on); }));
+    };
+    const check = (id, text) => {
+      const input = el('input', {
+        type: 'checkbox', checked: s.follow.includes(id),
+        onchange: () => update(own => { own.follow = toggled(own.follow, id, input.checked); }),
+      });
+      return el('label', { class: 'mk-check' }, input, el('span', { text }));
+    };
+    const sessionChip = x => chip(F1_SESSION_LABELS[x], null, s.f1Sessions.includes(x),
+      on => update(own => { own.f1Sessions = F1_SESSIONS.filter(y => (y === x ? on : own.f1Sessions.includes(y))); }));
+    editor.replaceChildren(
+      widgetSub('NBA'), el('div', { class: 'sp-chips' }, NBA_TEAMS.map(t => teamChip('nba', t))),
+      widgetSub('NFL'), el('div', { class: 'sp-chips' }, NFL_TEAMS.map(t => teamChip('nfl', t))),
+      widgetSub('Messi'), el('div', { class: 'mk-checks' }, SOCCER_TEAMS.map(t => check(`soccer:${t.id}`, t.name))),
+      widgetSub('Formula 1'), el('div', { class: 'mk-checks' }, check('f1', 'Follow F1')),
+      el('div', { class: 'sp-chips' }, F1_SESSIONS.map(sessionChip)));
+  }
+
+  function setEditing(on) {
+    editing = on;
+    section.classList.toggle('editing', on);
+    editButton.replaceChildren(icon(on ? 'check' : 'edit', 15));
+    editButton.title = on ? 'Done' : 'Choose teams';
+    editButton.setAttribute('aria-label', editButton.title);
+    editButton.setAttribute('aria-pressed', String(on));
+    list.hidden = on;
+    notes.hidden = on;
+    editor.hidden = !on;
+    if (on) {
+      if (!settings().edited) update(own => { own.edited = true; });
+      renderEditor();
+    }
+  }
+
+  setEditing(false);
+
+  // ---- wiring ----
+
+  let seq = 0;
+  async function load() {
+    const my = ++seq;
+    const { follow } = settings();
+    const entries = await Promise.all(follow.map(async id => [id, await loadSource(id)]));
+    if (my !== seq) return;
+    sources = new Map(entries);
+    const [games, result] = await Promise.all([loadLive(events()), loadPodium(events())]);
+    if (my !== seq) return;
+    live = games;
+    podium = result;
+    loaded = true;
+    render();
+  }
+
+  function renderCached() {
+    sources = new Map(settings().follow.map(id => [id, cachedSource(id)]));
+    live = cachedLive(events());
+    podium = peek(F1_LAST)?.data ?? null;
+    render();
+  }
+
+  let conf = null;
+  let timer = 0;
+
+  function onPrefs(state) {
+    const own = copyById(state, copy.id);
+    if (!own) return;
+    // Under 3 cells wide there is no room for logos and channels.
+    section.classList.toggle('narrow', own.w < 3);
+    const s = own.settings;
+    const next = JSON.stringify([s.follow, s.f1Sessions, s.edited, state.prefs.openInNewTab, hour24()]);
+    if (next === conf) return;
+    const first = conf === null;
+    conf = next;
+    renderCached();
+    clearTimeout(timer);
+    timer = setTimeout(load, first ? 0 : RECONFIGURE_MS);
+  }
+
+  function refresh() {
+    if (document.visibilityState === 'visible') load();
+  }
+
+  // Scoreboards are saved per league and day: drop those more than 3 days old.
+  sweep(`${KEY}:live:`, key => key.slice(-8) >= etDay(Date.now() - 3 * DAY));
+  const unsubscribe = store.subscribe(onPrefs, ['prefs']);
+  onPrefs(store.get());
+  const interval = setInterval(refresh, REFRESH_MS);
+  document.addEventListener('visibilitychange', refresh);
+
+  return {
+    destroy() {
+      seq++;   // a load still running draws nothing
+      clearInterval(interval);
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', refresh);
+      unsubscribe();
+    },
+  };
+}

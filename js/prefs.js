@@ -311,6 +311,8 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         ];
       case 'markets':
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'sports':
+        return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
       default:
         return [row('No settings', el('span'))];
     }

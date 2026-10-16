@@ -8,6 +8,7 @@ import { mountTasks } from './task-widget.js';
 import { mountNotes, mountClaude } from './notes-widget.js';
 import { mountMarkets } from './markets-widget.js';
 import { mountGithub } from './github-widget.js';
+import { mountSports } from './sports-widget.js';
 import { mountTiles } from './grid.js';
 import { mountSearch } from './searchbar.js';
 
@@ -18,6 +19,7 @@ const MOUNTS = {
   claude: mountClaude,
   markets: mountMarkets,
   github: mountGithub,
+  sports: mountSports,
   tiles: mountTiles,
   search: mountSearch,
 };
