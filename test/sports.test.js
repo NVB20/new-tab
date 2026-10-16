@@ -178,6 +178,7 @@ test('nextPhases asks for the following parts of the season once the current one
   const at = d => ({ start: NOW0 + d * 86400e3 });
   const phases = (type, events, sport) => nextPhases({ type, events }, sport, NOW0);
   assert.deepEqual(phases(1, [at(-3), at(5)], 'nba'), [2]);          // preseason, a game still to come
+  assert.deepEqual(phases(1, [at(-3), at(20)], 'nba'), []);          // preseason, next game more than 14 days out
   assert.deepEqual(phases(2, [at(-3), at(20)], 'nba'), []);          // regular season goes on past the window
   assert.deepEqual(phases(2, [at(-3), at(10)], 'nba'), [5, 3]);   // the last game is inside the window
   assert.deepEqual(phases(2, [at(-3), at(-1)], 'nba'), [5, 3]);      // regular season ending: play-in, playoffs
@@ -412,32 +413,33 @@ test('timeline adds the next game of a team with nothing in the window, and list
   assert.deepEqual(timeline(events, { follow: [], f1Sessions: [], now: NOW, timeZone: TZ }), []);
 });
 
-
-test('M1: a final schedule game is not replaced by an unfinished scoreboard copy; timeline prefers the final copy', () => {
+test('applyLive and timeline never let a stale live copy replace a final', () => {
   const final = game({ id: '1', state: 'post', detail: 'Final', home: { ...lal, score: '100' }, away: { ...gs, score: '90' } });
   const stale = game({ id: '1', state: 'in', detail: 'Q4 1:00', home: { ...lal, score: '98' }, away: { ...gs, score: '90' } });
   assert.equal(applyLive([final], [stale])[0].state, 'post');
   assert.equal(applyLive([final], [stale])[0].home.score, '100');
-  const days = timeline([stale, final], { follow: ['nba:13'], f1Sessions: [], now: NOW, timeZone: TZ });
-  assert.equal(days[0].events[0].state, 'post');
-  assert.equal(days[0].events[0].home.score, '100');
+  for (const order of [[stale, final], [final, stale]]) {
+    const days = timeline(order, { follow: ['nba:13'], f1Sessions: [], now: NOW, timeZone: TZ });
+    assert.equal(days[0].events[0].state, 'post');
+    assert.equal(days[0].events[0].home.score, '100');
+  }
 });
 
-test('M2: resultFor needs a final game', () => {
+test('resultFor gives no chip until ESPN calls the game final', () => {
   const g = state => game({ state, home: { ...lal, score: '50' }, away: { ...gs, score: '40' } });
   assert.equal(resultFor(g('in'), 'home'), '');
   assert.equal(resultFor(g('pre'), 'home'), '');
   assert.equal(resultFor(g('post'), 'home'), 'W');
 });
 
-test('M3: a game with no set time that is still "pre" is never live', () => {
+test('a game without a set time is never live by the clock alone', () => {
   const tbd = game({ start: NOW - 3600e3, timeValid: false });
   assert.equal(rowState(tbd, NOW), 'pre');
   assert.equal(rowState({ ...tbd, state: 'in' }, NOW), 'live');
   assert.deepEqual(scoreboards([tbd], NOW), []);
 });
 
-test('M4: links must be https and logos come from ESPN CDN', () => {
+test('links must be https and logos come only from ESPN\'s CDN', () => {
   const bad = (href, logo) => ({
     ...chargersAtChiefs, links: link(href),
     competitions: [{ ...chargersAtChiefs.competitions[0], competitors: chargersAtChiefs.competitions[0].competitors.map(c => ({ ...c, team: { ...c.team, logos: [{ href: logo }] } })) }],
@@ -453,7 +455,7 @@ test('M4: links must be https and logos come from ESPN CDN', () => {
   assert.equal(ok.home.logo, 'https://a.espncdn.com/x.png');
 });
 
-test('M5: a followed id is exactly sport:id', () => {
+test('teamOf accepts only an exact sport:id', () => {
   assert.equal(teamOf('nba:13:extra'), null);
   assert.deepEqual(cleanSports({ follow: ['nba:13:extra', 'nba:13'] }).follow, ['nba:13']);
 });

@@ -73,7 +73,6 @@ Fields used from an ESPN event: `id`, `date`, `timeValid` (false = time not set 
 
 - Links must be `https:` and logos come only from `https://a.espncdn.com/`; anything else is
   dropped (no link falls back to espn.com, no logo shows nothing).
-
 - **Tag:** `NBA`, `NFL`, `F1`, or the soccer competition's short name: `usa.1` MLS,
   `concacaf.leagues.cup` Leagues Cup, `concacaf.champions` CONCACAF, `campeones.cup` Campeones
   Cup, `club.friendly` and `fifa.friendly` Friendly, `fifa.world` World Cup,
@@ -83,13 +82,15 @@ Fields used from an ESPN event: `id`, `date`, `timeValid` (false = time not set 
   is bold. F1 rows read `US GP · Qualifying` (the race name without "Grand Prix" and sponsors,
   plus the session).
 - **Time:** local start time, 24-hour unless the page's Clock is set to 12-hour. A moon icon
-  marks starts from 00:00 to 06:59 local. `timeValid: false` shows `TBD`.
+  marks starts from 00:00 to 06:59 local. `timeValid: false` shows `TBD`; such a game is never
+  live by the clock alone, so while ESPN still says `pre` it keeps showing `TBD`.
 - **TV:** the first broadcast's short name (CBS, Apple TV, ESPN), muted, at the end.
 - **States:**
   - *Live* (`state: 'in'`): red dot, the score `LAC 17 – 24 KC` and `shortDetail` ("Q3 5:21",
     "67'", "Half") in place of the time.
   - *Finished* (`state: 'post'`): dimmed, final score, and a `W` / `L` / `D` chip from the
-    followed team's side (no chip when both teams are followed). F1: after a race, the podium
+    followed team's side (no chip when both teams are followed). The chip shows only once ESPN
+    calls the game final (`state: 'post'`), never from a score alone. F1: after a race, the podium
     `VER · LEC · ANT` once Jolpica has the result, `Results soon` until then; other finished F1
     sessions just drop off.
   - *Postponed / cancelled* (`STATUS_POSTPONED`, `STATUS_CANCELED`): dimmed, `Postponed` or
