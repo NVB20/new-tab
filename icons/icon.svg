@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#1f1e1c"/>
+    <stop offset="1" stop-color="#121211"/>
+  </linearGradient>
+  <radialGradient id="halo">
+    <stop offset="0" stop-color="#d97757" stop-opacity="0.42"/>
+    <stop offset="0.5" stop-color="#d97757" stop-opacity="0.12"/>
+    <stop offset="1" stop-color="#d97757" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="bloom" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="5"/>
+  </filter>
+  <clipPath id="clip"><rect width="128" height="128" rx="28"/></clipPath>
+</defs>
+<rect width="128" height="128" rx="28" fill="url(#bg)"/>
+<g clip-path="url(#clip)">
+  <circle cx="64" cy="64" r="64" fill="url(#halo)"/>
+  <g fill="#c2c0b6" fill-opacity="0.13">
+    <circle cx="45" cy="26" r="8"/>
+    <circle cx="64" cy="26" r="8"/>
+    <circle cx="83" cy="26" r="8"/>
+    <circle cx="64" cy="45" r="8"/>
+    <circle cx="83" cy="45" r="8"/>
+    <circle cx="45" cy="64" r="8"/>
+    <circle cx="83" cy="64" r="8"/>
+    <circle cx="45" cy="83" r="8"/>
+    <circle cx="64" cy="83" r="8"/>
+    <circle cx="45" cy="102" r="8"/>
+    <circle cx="64" cy="102" r="8"/>
+    <circle cx="83" cy="102" r="8"/>
+  </g>
+  <g fill="#d97757" opacity="0.6" filter="url(#bloom)"><circle cx="26" cy="26" r="8"/><circle cx="102" cy="26" r="8"/><circle cx="26" cy="45" r="8"/><circle cx="45" cy="45" r="8"/><circle cx="102" cy="45" r="8"/><circle cx="26" cy="64" r="8"/><circle cx="64" cy="64" r="8"/><circle cx="102" cy="64" r="8"/><circle cx="26" cy="83" r="8"/><circle cx="83" cy="83" r="8"/><circle cx="102" cy="83" r="8"/><circle cx="26" cy="102" r="8"/><circle cx="102" cy="102" r="8"/></g>
+  <circle cx="26" cy="26" r="8" fill="#cf6e4e"/>
+  <circle cx="102" cy="26" r="8" fill="#cf6e4e"/>
+  <circle cx="26" cy="45" r="8" fill="#d97757"/>
+  <circle cx="45" cy="45" r="8" fill="#ea9a78"/>
+  <circle cx="102" cy="45" r="8" fill="#d97757"/>
+  <circle cx="26" cy="64" r="8" fill="#de8060"/>
+  <circle cx="64" cy="64" r="8" fill="#f6c2a6"/>
+  <circle cx="102" cy="64" r="8" fill="#de8060"/>
+  <circle cx="26" cy="83" r="8" fill="#d97757"/>
+  <circle cx="83" cy="83" r="8" fill="#ea9a78"/>
+  <circle cx="102" cy="83" r="8" fill="#d97757"/>
+  <circle cx="26" cy="102" r="8" fill="#cf6e4e"/>
+  <circle cx="102" cy="102" r="8" fill="#cf6e4e"/>
+</g>
+<rect x="0.5" y="0.5" width="127" height="127" rx="27.5" fill="none" stroke="#faf9f5" stroke-opacity="0.09"/>
+</svg>
