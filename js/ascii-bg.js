@@ -11,23 +11,30 @@ const CELL_W = 7;
 const CELL_H = 14;
 const FIELD_LEVELS = 6;
 const GLOW_LEVELS = 8;
+const BLUE_LEVELS = 8;
 const GLOW_MIN = 0.1;           // below this a lit letter falls back to the resting field
 const FIELD_MS = 160;          // how often the drifting field is recomputed
 const HOVER_RADIUS = 90;       // px around the cursor that brightens
 const HOVER_DECAY_MS = 280;    // how fast hover light fades
-const RIPPLE_DECAY_MS = 80;    // ripple light fades fast, so the wave reads as a ring
+const RIPPLE_DECAY_MS = 170;   // ripple light fades quickly behind the wave, so it reads as a ring
 const IDLE_AFTER_MS = 2500;    // a still mouse stops lighting cells
 const ACTIVE_FRAME_MS = 1000 / 40;
 const IDLE_FRAME_MS = 1000 / 10;
-const RIPPLE = { speed: 520, maxRadius: 440, thickness: 40 };
+const RIPPLE = { speed: 240, maxRadius: 480, thickness: 48 }; // px/s, px, px
 // Clicks on these start no ripple.
 const NO_RIPPLE = 'a, button, input, textarea, select, label, summary, dialog, .menu, .sidebar, .widgets';
 
 // Resting letters are the theme's text colour at very low opacity, so they melt into the
-// background; lit letters (hover, ripple) get brighter and slightly cooler.
+// background; hover light makes them brighter and slightly cooler; the click ripple is blue.
 const PALETTES = {
-  dark: { ink: [250, 249, 245], field: [0.03, 0.12], glowTo: [196, 224, 244], glow: [0.06, 0.5] },
-  light: { ink: [20, 20, 19], field: [0.04, 0.15], glowTo: [24, 92, 140], glow: [0.07, 0.55] },
+  dark: {
+    ink: [250, 249, 245], field: [0.03, 0.12], glowTo: [196, 224, 244], glow: [0.06, 0.5],
+    blueFrom: [25, 134, 194], blueTo: [150, 206, 242], blue: [0.14, 0.8],
+  },
+  light: {
+    ink: [20, 20, 19], field: [0.04, 0.15], glowTo: [24, 92, 140], glow: [0.07, 0.55],
+    blueFrom: [24, 120, 176], blueTo: [10, 82, 140], blue: [0.16, 0.8],
+  },
 };
 
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -41,7 +48,7 @@ export function mountAsciiBackground(canvas, store) {
   const startTime = performance.now();
 
   let cols = 0, rows = 0, cw = 0, ch = 0, cwPx = 0, chPx = 0;
-  let chars, base, glow, fadeMs, drawn;
+  let chars, base, glow, fadeMs, blue, drawn;
   let atlas = null;
   let mode = null;
   let enabled = false;
@@ -58,7 +65,7 @@ export function mountAsciiBackground(canvas, store) {
     const p = PALETTES[mode];
     atlas = document.createElement('canvas');
     atlas.width = CHARSET.length * cwPx;
-    atlas.height = (FIELD_LEVELS + GLOW_LEVELS) * chPx;
+    atlas.height = (FIELD_LEVELS + GLOW_LEVELS + BLUE_LEVELS) * chPx;
     const g = atlas.getContext('2d');
     g.font = `${FONT_SIZE * dpr}px ${FONT}`;
     g.textAlign = 'center';
@@ -74,11 +81,21 @@ export function mountAsciiBackground(canvas, store) {
       const t = l / (GLOW_LEVELS - 1);
       row(FIELD_LEVELS + l, rgba(mix(p.ink, p.glowTo, t * t), g0 + (g1 - g0) * t));
     }
+    const [b0, b1] = p.blue;
+    for (let l = 0; l < BLUE_LEVELS; l++) {
+      const t = l / (BLUE_LEVELS - 1);
+      row(FIELD_LEVELS + GLOW_LEVELS + l, rgba(mix(p.blueFrom, p.blueTo, t * t), b0 + (b1 - b0) * t));
+    }
   }
 
-  // Atlas row for a cell: a glow level while lit, else a field level, or -1 for blank.
+  // Atlas row for a cell: a blue (ripple) or glow (hover) level while lit, else a field level,
+  // or -1 for blank.
   function rowFor(i) {
-    if (glow[i] >= GLOW_MIN) return FIELD_LEVELS + level(glow[i], GLOW_LEVELS);
+    if (glow[i] >= GLOW_MIN) {
+      return blue[i]
+        ? FIELD_LEVELS + GLOW_LEVELS + level(glow[i], BLUE_LEVELS)
+        : FIELD_LEVELS + level(glow[i], GLOW_LEVELS);
+    }
     return base[i] > 0 ? level(base[i], FIELD_LEVELS) : -1;
   }
 
@@ -122,6 +139,7 @@ export function mountAsciiBackground(canvas, store) {
     base = new Float32Array(n);
     glow = new Float32Array(n);
     fadeMs = new Float32Array(n);
+    blue = new Uint8Array(n);
     drawn = new Int16Array(n).fill(-2);
     active.clear();
     ripples.length = 0;
@@ -130,10 +148,11 @@ export function mountAsciiBackground(canvas, store) {
     updateField(performance.now());
   }
 
-  function light(i, strength, decayMs) {
+  function light(i, strength, decayMs, isBlue = 0) {
     if (strength <= glow[i]) return;
     glow[i] = strength;
     fadeMs[i] = decayMs;
+    blue[i] = isBlue;
     active.add(i);
   }
 
@@ -174,7 +193,7 @@ export function mountAsciiBackground(canvas, store) {
           if (off < 0) continue;
           const i = r * cols + c;
           const strength = Math.sin(Math.PI * off) * fade * (0.55 + 0.25 * Math.random());
-          light(i, strength, RIPPLE_DECAY_MS);
+          light(i, strength, RIPPLE_DECAY_MS, 1);
           if (Math.random() < strength * 0.12) chars[i] = randomGlyph();
         }
       }
