@@ -8,7 +8,8 @@ import { parseCommits, latestCommits, parseIssues, timeAgo, parseContributions, 
 import { copyById, TYPES } from './layout.js';
 
 const GITHUB_TTL = 60 * 60e3;   // GitHub is fetched at most once an hour
-const COMMITS = 6;              // latest commits shown
+const COMMITS = 6;              // latest commits always shown; a taller frame fits more
+const MAX_COMMITS = 30;         // latest commits fetched, for frames with room for more
 const ISSUES = 5;               // open issues shown
 const REFRESH_MS = 30e3;
 const RECONFIGURE_MS = 800;     // wait for typing to stop before refetching after a settings change
@@ -61,6 +62,25 @@ export function mountGithub(root, store, copy, ctx) {
   const section = el('section', { class: 'widget widget-github' }, el('h2', { class: 'widget-head' }, link, status, edit), body);
   root.append(section);
 
+  // The commit rows drawn last. Six always show (a short frame scrolls them); a taller frame shows
+  // as many more as fit, so the list runs to its bottom. Stacked on a narrow window a frame grows
+  // with its content, so it keeps six.
+  let commitRows = [];
+  function fitCommits() {
+    const rows = commitRows;
+    let n = Math.min(rows.length, COMMITS);
+    if (rows.length > COMMITS && getComputedStyle(section).overflowY !== 'visible') {
+      for (const r of rows) r.hidden = false;
+      const excess = section.scrollHeight - section.clientHeight;
+      const bottom = i => rows[i].getBoundingClientRect().bottom;
+      n = rows.length;
+      while (n > COMMITS && bottom(rows.length - 1) - bottom(n - 1) < excess) n--;
+    }
+    rows.forEach((r, i) => { r.hidden = i >= n; });
+  }
+  const sizes = new ResizeObserver(fitCommits);
+  sizes.observe(section);
+
   function githubRow({ href, iconName, name, meta, title }) {
     return el('a', { class: 'gh-row', title, ...linkProps(href) },
       icon(iconName, 14),
@@ -78,6 +98,7 @@ export function mountGithub(root, store, copy, ctx) {
   });
 
   function renderSetup() {
+    commitRows = [];
     body.replaceChildren(
       widgetEmpty('Shows a year of your activity, your open pull requests, and your open issues and latest commits.'),
       el('div', { class: 'gh-setup' }, el('button', { type: 'button', class: 'btn', text: 'Set up GitHub', onclick: openAccount })));
@@ -106,6 +127,7 @@ export function mountGithub(root, store, copy, ctx) {
 
   function renderGithub({ data, at, error }, user, calendar) {
     const parts = settings().parts;
+    commitRows = [];
     if (!parts.length) {
       body.replaceChildren(widgetEmpty('Nothing chosen. ',
         el('button', { type: 'button', class: 'link-btn', text: 'Choose what to show', onclick: openSettings })));
@@ -131,7 +153,8 @@ export function mountGithub(root, store, copy, ctx) {
       out.push(widgetSub('Open issues'), ...(data.issues.length ? data.issues.map(issue => searchRow(issue, 'issue')) : [widgetEmpty('No open issues.')]));
     }
     if (data && parts.includes('commits')) {
-      out.push(widgetSub('Latest commits'), ...(data.commits.length ? data.commits.map(c => commitRow(c, user)) : [widgetEmpty('No commits found.')]));
+      commitRows = data.commits.map(c => commitRow(c, user));
+      out.push(widgetSub('Latest commits'), ...(commitRows.length ? commitRows : [widgetEmpty('No commits found.')]));
       // Only speak up about the token when it isn't working.
       const t = data.tokenInfo;
       if (t && (!t.privateRepos || t.unreadable)) {
@@ -144,6 +167,7 @@ export function mountGithub(root, store, copy, ctx) {
       }
     }
     body.replaceChildren(...out.filter(Boolean));
+    fitCommits();
     // GitHub is checked at most once an hour; Refresh skips the wait (e.g. after changing the token).
     const when = lists ? at : calendar.at;
     status.replaceChildren(
@@ -181,7 +205,7 @@ export function mountGithub(root, store, copy, ctx) {
     // Pull requests, issues and commits come from one fetch whichever of them are shown, so
     // switching parts never waits.
     const activity = parts.some(p => p !== 'heatmap')
-      ? feed(`github-v6:${user}:${tok ? 'token' : 'public'}`, ttl, () => fetchActivity(user, tok, headers))
+      ? feed(`github-v7:${user}:${tok ? 'token' : 'public'}`, ttl, () => fetchActivity(user, tok, headers))
       : Promise.resolve({ data: null, at: 0 });
     const [result, cal] = await Promise.all([activity, calendar]);
     if (my !== seq) return;
@@ -220,7 +244,7 @@ export function mountGithub(root, store, copy, ctx) {
     // 409 means an empty repo; other failures (usually missing Contents access) are counted.
     let unreadable = 0;
     const privateCommits = await Promise.all(tokenRepos.map(r => fetchJson(
-      `${GITHUB}/repos/${r.full_name}/commits?author=${encodeURIComponent(user)}&per_page=${COMMITS}`, headers,
+      `${GITHUB}/repos/${r.full_name}/commits?author=${encodeURIComponent(user)}&per_page=${MAX_COMMITS}`, headers,
     )
       .then(list => parseCommits({ items: (Array.isArray(list) ? list : []).map(i => ({ ...i, repository: { full_name: r.full_name, private: true } })) }))
       .catch(err => {
@@ -230,7 +254,7 @@ export function mountGithub(root, store, copy, ctx) {
     const tokenInfo = tok
       ? { privateRepos: tokenRepos.length, unreadable, withCommits: privateCommits.filter(c => c.length).length, owners: [user, ...orgs] }
       : null;
-    return { commits: latestCommits([...searched, ...privateCommits.flat()], COMMITS), pulls, issues, tokenInfo };
+    return { commits: latestCommits([...searched, ...privateCommits.flat()], MAX_COMMITS), pulls, issues, tokenInfo };
   }
 
   // ---- wiring ----
@@ -264,6 +288,7 @@ export function mountGithub(root, store, copy, ctx) {
       seq++;
       clearInterval(interval);
       clearTimeout(timer);
+      sizes.disconnect();
       document.removeEventListener('visibilitychange', refresh);
       unsubscribe();
     },
