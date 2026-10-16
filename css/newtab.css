@@ -712,6 +712,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .folder-name:hover { border-color: var(--border); }
 .folder-name:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .folder-grid {
+  display: grid;
   grid-template-columns: repeat(var(--folder-cols, 3), 104px);
   gap: 6px 10px;
   justify-content: center;
