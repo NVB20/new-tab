@@ -25,9 +25,8 @@ widgets: { …, claude: { enabled: false } },
 ```
 
 `mode` is written by the bar. A saved mode that is switched off (or invalid) falls back to the
-first mode that is on, so `normalizeState` needs no change. Preferences: General gets a "Search
-bar" heading with Search bar, Google and Claude switches, and Widgets a Claude switch after Notes.
-The Preferences redesign (being built in parallel) moves the first three to Page → Search bar.
+first mode that is on, so `normalizeState` needs no change. Preferences: Page → Search bar has the
+Search bar switch with Google and Claude under it, and Widgets has a Claude switch after Notes.
 
 ## Handing a message to claude.ai
 

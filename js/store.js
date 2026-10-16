@@ -21,6 +21,8 @@ export const DEFAULT_PREFS = {
   // pattern 'ascii' is the animated letter field. An image (the upload when useUpload, else url)
   // covers it while showImage is on; picking a pattern turns showImage off and keeps the image.
   background: { pattern: 'ascii', motion: true, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
+  // Bar above the tiles. mode ('google' | 'claude') is where Enter goes while both are on.
+  search: { enabled: true, google: true, claude: true, mode: 'google' },
   widgets: {
     enabled: true,   // always true: an old false is turned into every widget switched off on load
     position: 'left',
@@ -30,6 +32,8 @@ export const DEFAULT_PREFS = {
     clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic', colon: true },
     tasks: { enabled: true },
     notes: { enabled: true },
+    // A box that sends a message to a new chat on claude.ai.
+    claude: { enabled: false },
     // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')
     // and ECB currency pairs ('EUR/ILS'), in display order.
     markets: { enabled: true, items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] },

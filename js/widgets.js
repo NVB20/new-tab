@@ -1,6 +1,7 @@
-// Widget column: clock with greeting, tasks and notes.
+// Widget column: clock with greeting, tasks, notes and a box that sends to Claude.
 
 import { el, icon } from './ui.js';
+import { askClaude } from './chrome-api.js';
 import { playClockIntro } from './clock-intro.js';
 import { mountTasks } from './task-widget.js';
 
@@ -81,7 +82,38 @@ export function mountWidgets(root, store) {
   });
   const notes = el('section', { class: 'widget widget-notes' }, heading('note', 'Notes'), notesArea);
 
-  root.append(clock, tasks, notes);
+  // Claude: Enter sends to a new chat on claude.ai, Shift+Enter starts a new line.
+  const claudeInput = el('textarea', {
+    class: 'notes-input claude-input',
+    placeholder: 'Ask Claude…',
+    dir: 'auto',
+    rows: 1,
+    'aria-label': 'Message for Claude',
+    onkeydown: e => {
+      if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+      e.preventDefault();
+      sendToClaude(e.ctrlKey || e.metaKey);
+    },
+  });
+  const claudeSend = el('button', {
+    type: 'button',
+    class: 'icon-btn claude-send',
+    title: 'Send to Claude (Enter)',
+    'aria-label': 'Send to Claude',
+    onclick: e => sendToClaude(e.ctrlKey || e.metaKey),
+  }, icon('arrow-up', 16));
+  const claude = el('section', { class: 'widget widget-claude' },
+    heading('claude', 'Claude'),
+    el('div', { class: 'claude-box' }, claudeInput, claudeSend));
+
+  function sendToClaude(ctrl) {
+    const text = claudeInput.value.trim();
+    if (!text) return;
+    claudeInput.value = '';
+    askClaude(text, { newTab: ctrl || store.get().prefs.openInNewTab });
+  }
+
+  root.append(clock, tasks, notes, claude);
 
   let shownMinute = '';
   function renderClock(force = false) {
@@ -112,10 +144,11 @@ export function mountWidgets(root, store) {
 
   function render(state) {
     const w = state.prefs.widgets;
-    root.hidden = !w.enabled || !(w.clock.enabled || w.tasks.enabled || w.notes.enabled);
+    root.hidden = !w.enabled || !(w.clock.enabled || w.tasks.enabled || w.notes.enabled || w.claude.enabled);
     clock.hidden = !w.clock.enabled;
     tasks.hidden = !w.tasks.enabled;
     notes.hidden = !w.notes.enabled;
+    claude.hidden = !w.claude.enabled;
     // Don't overwrite the textarea while typing in it (it would move the cursor).
     if (document.activeElement !== notesArea) notesArea.value = state.notes;
     renderClock(true);

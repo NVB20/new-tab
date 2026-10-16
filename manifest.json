@@ -19,5 +19,12 @@
   "host_permissions": [
     "https://github.com/*",
     "https://*.speeddial2.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["content/claude.js"],
+      "run_at": "document_start"
+    }
   ]
 }

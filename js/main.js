@@ -3,6 +3,7 @@ import { icon } from './ui.js';
 import { mountTheme } from './theme.js';
 import { mountGroups } from './groups.js';
 import { mountGrid } from './grid.js';
+import { mountSearchBar } from './searchbar.js';
 import { mountWidgets } from './widgets.js';
 import { mountSideWidgets } from './side-widgets.js';
 import { startIconCache } from './icon-cache.js';
@@ -12,6 +13,7 @@ await store.load();
 
 mountTheme(store);
 mountGroups(document.getElementById('groups'), store);
+mountSearchBar(document.getElementById('search'), store);
 mountGrid(document.getElementById('grid'), store);
 startIconCache(store);
 mountWidgets(document.getElementById('widgets'), store);

@@ -280,3 +280,10 @@ test('store falls back to defaults when saved state is corrupt', async () => {
   await store.load();
   assert.equal(store.get().groups.length, 1);
 });
+
+test('a saved state from before the search bar gets the bar with both modes, and no Claude widget', () => {
+  const s = normalizeState({ prefs: { widgets: { tasks: { enabled: false } } } });
+  assert.deepEqual(s.prefs.search, { enabled: true, google: true, claude: true, mode: 'google' });
+  assert.equal(s.prefs.widgets.claude.enabled, false);
+  assert.equal(s.prefs.widgets.tasks.enabled, false);
+});

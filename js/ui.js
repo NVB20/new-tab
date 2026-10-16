@@ -70,6 +70,9 @@ const ICONS = {
   calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
   dot: '<circle cx="12" cy="12" r="5" fill="currentColor"/>',
   circle: '<circle cx="12" cy="12" r="5"/>',
+  google: '<path d="M17.7 6.3A8 8 0 1 0 20 12h-7.5"/>',
+  claude: '<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>',
+  'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>',
 };
 
 const iconCache = new Map();

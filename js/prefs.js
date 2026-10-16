@@ -136,10 +136,9 @@ export function setupPrefs(store) {
       ], pickBackground)),
       sub(shown === 'ascii', toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations')),
       sub(shown === 'image', imageRows(image)),
-      // The search bar's prefs arrive with the search feature; until then there is nothing to set.
-      p.search && title('Search bar'),
-      p.search && toggle('Search bar', 'search.enabled', 'Above the tiles. With Google and Claude both on, a switch picks one'),
-      p.search && sub(p.search.enabled,
+      title('Search bar'),
+      toggle('Search bar', 'search.enabled', 'Above the tiles. With Google and Claude both on, a switch picks one'),
+      sub(p.search.enabled,
         toggle('Google', 'search.google'),
         toggle('Claude', 'search.claude', 'Sends what you type to claude.ai and runs it')),
       title('Top bar'),
@@ -240,8 +239,7 @@ export function setupPrefs(store) {
           switchInput('Greeting', 'widgets.clock.greeting')), 'Good morning, and your name')),
       toggle('Tasks', 'widgets.tasks.enabled'),
       toggle('Notes', 'widgets.notes.enabled'),
-      // Arrives with the search feature, like the search bar's prefs.
-      w.claude && toggle('Claude', 'widgets.claude.enabled', 'A box that sends a message to a new chat on claude.ai'),
+      toggle('Claude', 'widgets.claude.enabled', 'A box that sends a message to a new chat on claude.ai'),
       title(`${far} column`),
       toggle('Markets', 'widgets.markets.enabled', 'Use ✎ on the widget to choose coins and currency pairs'),
       row('GitHub', el('button', { type: 'button', class: 'btn', onclick: () => show('github') }, 'Settings'),
