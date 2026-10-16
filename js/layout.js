@@ -4,6 +4,7 @@
 
 import { uid, clamp } from './util.js';
 import { cleanMarketItems } from './feeds.js';
+import { siteUrl, siteDomain } from './website.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -58,6 +59,12 @@ export const TYPES = {
   },
   // The one search bar on the page, a widget of its own.
   search: { label: 'Search bar', icon: 'search', size: [6, 1], min: [3, 1], max: 1, prefs: 'search', defaults: () => ({}), clean: () => ({}) },
+  // url: the start address as typed ('' until one is set); zoom: the percent the site is drawn at.
+  website: {
+    label: 'Website', icon: 'globe', size: [4, 6], min: [2, 3], max: 5,
+    defaults: () => ({ url: '', zoom: 100 }),
+    clean: s => ({ url: str(s.url).slice(0, 2000), zoom: clamp(int(s.zoom, 100), 50, 100) }),
+  },
 };
 
 // The Preferences section that holds a type's settings: 'layout' (the copy's own group), another
@@ -268,5 +275,9 @@ export function copyTitle(copy, groups = []) {
     return `${label} · ${group ? group.title : 'follows the tabs'}`;
   }
   if (copy.type === 'github') return `${label} · ${copy.settings.parts.map(p => PART_LABELS[p]).join(' + ') || 'nothing chosen'}`;
+  if (copy.type === 'website') {
+    const url = siteUrl(copy.settings.url);
+    return `${label} · ${url ? siteDomain(url) : 'no address'}`;
+  }
   return label;
 }

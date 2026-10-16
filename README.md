@@ -53,6 +53,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist. |
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
+| **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
@@ -215,6 +216,28 @@ written into backup files.
 | "Token sees N private repos but can't read commits in …" | Give it *Contents: Read-only*. |
 | Private issues or pull requests don't show | Give it *Issues* or *Pull requests: Read-only*. A fine-grained token only sees repos of its own owner. |
 
+## Website
+
+The Website widget shows a page from any site, live, the way it looks in a tab: your Pinterest
+feed, a GitHub repo, a dashboard. Add it from the Layout mode tray (up to five), type an address
+in it and press **Show**.
+
+- **Access, once per site.** Most sites refuse to be shown inside another page, so the extension
+  lifts that refusal for its own widgets, and only for sites you give it access to: Show opens
+  Chrome's prompt (*Read and change your data on …pinterest.com*). Everywhere else in Chrome the
+  site keeps its protection. If you decline, the widget offers **Allow access** again.
+  chrome://extensions → New Tab → Details → Site access lists the sites, and removing one there
+  takes it off the widget too.
+- **Logged in as you are.** The widget uses your Chrome cookies, so log in to the site once in a
+  normal tab and the widget shows your own feed.
+- **The head:** **Home** goes back to the start address, **Reload** reloads the page the widget is
+  on, **Open** opens that page in a tab (a new one if *Open links in a new tab* is on), and the
+  gear opens its settings.
+- **Settings** (Preferences → Layout → *Website · pinterest.com*): the **Address** it starts on,
+  and **Zoom** (50–100%). Sites lay themselves out for the widget's width, so a narrow widget gets
+  the phone layout; at 60% a site is drawn as if the widget were two thirds wider, so more fits.
+- Only in the extension: on the Live Server preview the widget is a link to the site.
+
 ## Search bar and AI chats
 
 The bar searches Google or sends your message to **Claude**, **ChatGPT** or **Gemini**. Choose
@@ -257,7 +280,7 @@ rearrange them.
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
-  and the search bar are single; Markets, GitHub, tiles blocks and Claude allow five each. A
+  and the search bar are single; Markets, GitHub, Website, tiles blocks and Claude allow five each. A
   chip is greyed out at the limit or when nothing fits. **Reset layout** puts one copy of each
   widget back in its default place, keeping its settings.
 - **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its
@@ -318,6 +341,7 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
+| Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |
 
 Remove a widget in Layout mode and it stops fetching.
 
@@ -331,6 +355,10 @@ Remove a widget in Layout mode and it stops fetching.
 - Claude, ChatGPT, Gemini: if you're signed out of the site, nothing is sent; sign in and send it
   again. If a site changes its page and the send button can't be found, your message is left in
   the box and you press Enter yourself.
+- Website: some sign-ins refuse to run inside a widget (Google's, among others), so log in to the
+  site in a normal tab. A few sites notice they're in a widget and stay blank; **Open** shows them
+  in a tab. A link to another site loads in the widget only if that site allows it. The page's
+  shortcuts (Ctrl+K, …) don't work while the site has the cursor; click outside it first.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development

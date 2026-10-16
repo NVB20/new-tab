@@ -10,6 +10,7 @@ import { mountMarkets } from './markets-widget.js';
 import { mountGithub } from './github-widget.js';
 import { mountTiles } from './grid.js';
 import { mountSearch } from './searchbar.js';
+import { mountWebsite } from './website-widget.js';
 
 const MOUNTS = {
   clock: mountClock,
@@ -20,6 +21,7 @@ const MOUNTS = {
   github: mountGithub,
   tiles: mountTiles,
   search: mountSearch,
+  website: mountWebsite,
 };
 
 export const WIDGETS = Object.fromEntries(Object.entries(TYPES).map(([type, t]) => [type, { ...t, mount: MOUNTS[type] }]));
