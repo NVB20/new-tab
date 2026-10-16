@@ -85,6 +85,31 @@ Keep the extension in the same folder. Chrome ties your saved data to the folder
 copy loaded from somewhere else starts empty. If you need to move it, download a backup first and
 import it afterwards.
 
+### Safari (Mac only)
+
+Safari runs the extension on a Mac with one code change and a few features missing. There's no
+Safari for Windows, and an iPhone needs an Xcode build.
+
+1. In `js/main.js`, use `setTimeout` where `requestIdleCallback` isn't available. Safari doesn't
+   have `requestIdleCallback`, and without the fallback Jump, Preferences and the sidebar don't
+   load.
+2. In Safari, open **Settings → Advanced** and tick **Show features for web developers**.
+3. Open **Settings → Developer**, click **Add Temporary Extension…** and pick the folder that
+   contains `manifest.json`.
+4. In **Settings → General**, choose the extension under **New tabs open with**.
+5. Allow the extension on the sites Safari asks about: github.com for the heatmap, and claude.ai,
+   chatgpt.com and gemini.google.com for sending messages from the search bar.
+
+Safari removes a temporary extension when you quit it or after 24 hours, so download a backup now
+and then (Preferences → **Backup**) in case it comes back empty. To keep it installed, package it
+as a Mac app with Xcode (`xcrun safari-web-extension-packager /path/to/new-tab`) and run the app.
+Without an Apple Developer account, tick **Allow unsigned extensions** in Settings → Developer each
+time you open Safari.
+
+Safari has no extension APIs for bookmarks, history or recently closed tabs, so Jump and the
+sidebar don't show them. Tiles show their own logo or a letter instead of the site's icon, and
+searches go to google.com rather than the browser's search engine.
+
 ## Folders
 
 - **Make one:** drag a tile onto the middle of another tile. Both go into a new folder and its name
