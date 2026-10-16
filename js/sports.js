@@ -229,3 +229,62 @@ export function boardTtl(board, events, live, now) {
   if (!open.length) return null;
   return open.some(e => now < e.start + 2 * lengthOf(e)) ? 30e3 : 3600e3;
 }
+
+// ---- Jolpica F1 ----
+
+// Jolpica's session fields → the setting that shows them, their name and usual length (minutes).
+const F1_PARTS = [
+  ['FirstPractice', 'practice', 'Practice 1', 60],
+  ['SecondPractice', 'practice', 'Practice 2', 60],
+  ['ThirdPractice', 'practice', 'Practice 3', 60],
+  ['SprintQualifying', 'sprint', 'Sprint Qualifying', 45],
+  ['Sprint', 'sprint', 'Sprint', 60],
+  ['Qualifying', 'qualifying', 'Qualifying', 60],
+];
+
+// The season (/current.json) → every session as an event, oldest first; null when it isn't one.
+// A session without a time yet sits at noon UTC with timeValid false.
+export function parseF1Season(json) {
+  const table = json?.MRData?.RaceTable;
+  if (!Array.isArray(table?.Races)) return null;
+  const out = [];
+  for (const r of table.Races) {
+    const season = String(r.season ?? table.season ?? '');
+    const round = Number(r.round);
+    const race = raceShort(r.raceName);
+    const add = (when, key, session, label, minutes) => {
+      const start = Date.parse(`${when.date}T${when.time ?? '12:00:00Z'}`);
+      if (!Number.isFinite(start)) return;
+      out.push({
+        id: `f1:${season}-${round}-${key}`, sport: 'f1', tag: 'F1', session, season, round,
+        title: `${race} · ${label}`, start, timeValid: !!when.time, minutes, state: 'pre',
+        url: `https://www.formula1.com/en/racing/${season}`,
+      });
+    };
+    for (const [key, session, label, minutes] of F1_PARTS) if (r[key]) add(r[key], key, session, label, minutes);
+    add({ date: r.date, time: r.time }, 'Race', 'race', 'Race', 120);
+  }
+  return out.sort(byStart);
+}
+
+// The last race's result (/current/last/results.json) → { season, round, podium: ['VER', …] }, or null.
+export function parseF1Last(json) {
+  const table = json?.MRData?.RaceTable;
+  const race = table?.Races?.[0];
+  const results = Array.isArray(race?.Results) ? race.Results : [];
+  const podium = [...results]
+    .sort((a, b) => Number(a.position) - Number(b.position))
+    .slice(0, 3)
+    .map(r => String(r.Driver?.code ?? r.Driver?.familyName ?? ''))
+    .filter(Boolean);
+  return podium.length ? { season: String(race.season ?? table.season ?? ''), round: Number(race.round), podium } : null;
+}
+
+// The race whose result the widget shows: the latest one past its usual end and still listed
+// (for a day after that), or null.
+export function raceAwaitingResult(events, now) {
+  return events
+    .filter(e => e.sport === 'f1' && e.session === 'race' && e.start + lengthOf(e) <= now && now < e.start + lengthOf(e) + DAY)
+    .sort(byStart)
+    .at(-1) ?? null;
+}

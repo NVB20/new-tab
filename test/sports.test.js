@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
   parseEspnEvent, parseSchedule, nextPhase, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
+  parseF1Season, parseF1Last, raceAwaitingResult,
 } from '../js/sports.js';
 
 test('the team lists hold every NBA and NFL team once, and Messi\'s two teams', () => {
@@ -236,5 +237,57 @@ test('boardTtl: 30 s while a game may be on, hourly once it ended by the clock, 
   assert.equal(boardTtl(board(['b']), [ended], [], NOW), 3600e3);
   assert.equal(boardTtl(board(['b']), [ended], [{ ...ended, state: 'post' }], NOW), null);
   assert.equal(boardTtl(board(['a']), [live], [{ ...live, state: 'in' }], NOW), 30e3);
+});
+
+// Jolpica's season as sent on 2026-10-16, trimmed: the US GP (round 18) and a sprint weekend.
+const season = { MRData: { RaceTable: { season: '2026', Races: [
+  { season: '2026', round: '18', raceName: 'United States Grand Prix', date: '2026-10-25', time: '20:00:00Z',
+    FirstPractice: { date: '2026-10-23', time: '17:30:00Z' }, SecondPractice: { date: '2026-10-23', time: '21:00:00Z' },
+    ThirdPractice: { date: '2026-10-24', time: '17:30:00Z' }, Qualifying: { date: '2026-10-24', time: '21:00:00Z' } },
+  { season: '2026', round: '2', raceName: 'Chinese Grand Prix', date: '2026-03-15', time: '07:00:00Z',
+    FirstPractice: { date: '2026-03-13', time: '03:30:00Z' }, Qualifying: { date: '2026-03-14', time: '07:00:00Z' },
+    Sprint: { date: '2026-03-14', time: '03:00:00Z' }, SprintQualifying: { date: '2026-03-13', time: '07:30:00Z' } },
+] } } };
+
+test('parseF1Season lists every session with its name, setting and usual length, oldest first', () => {
+  const sessions = parseF1Season(season);
+  assert.equal(sessions[0].round, 2);
+  assert.deepEqual(sessions.filter(s => s.round === 18).map(s => [s.title, s.session, s.minutes]), [
+    ['US GP · Practice 1', 'practice', 60], ['US GP · Practice 2', 'practice', 60], ['US GP · Practice 3', 'practice', 60],
+    ['US GP · Qualifying', 'qualifying', 60], ['US GP · Race', 'race', 120],
+  ]);
+  assert.deepEqual(sessions.at(-1), {
+    id: 'f1:2026-18-Race', sport: 'f1', tag: 'F1', session: 'race', season: '2026', round: 18, title: 'US GP · Race',
+    start: Date.parse('2026-10-25T20:00:00Z'), timeValid: true, minutes: 120, state: 'pre', url: 'https://www.formula1.com/en/racing/2026',
+  });
+  assert.deepEqual(sessions.filter(s => s.round === 2 && s.session === 'sprint').map(s => [s.title, s.minutes]),
+    [['Chinese GP · Sprint Qualifying', 45], ['Chinese GP · Sprint', 60]]);
+});
+
+test('parseF1Season keeps a session without a time as TBD and rejects junk', () => {
+  const [race] = parseF1Season({ MRData: { RaceTable: { season: '2027', Races: [{ season: '2027', round: '1', raceName: 'Australian Grand Prix', date: '2027-03-07' }] } } });
+  assert.equal(race.timeValid, false);
+  assert.equal(race.start, Date.parse('2027-03-07T12:00:00Z'));
+  assert.equal(parseF1Season({}), null);
+});
+
+test('parseF1Last reads the podium of the latest race', () => {
+  const json = { MRData: { RaceTable: { season: '2026', round: '17', Races: [{ season: '2026', round: '17', raceName: 'Singapore Grand Prix',
+    Results: [
+      { position: '2', Driver: { code: 'LEC', familyName: 'Leclerc' } },
+      { position: '1', Driver: { code: 'VER', familyName: 'Verstappen' } },
+      { position: '3', Driver: { code: 'ANT', familyName: 'Antonelli' } },
+      { position: '4', Driver: { code: 'NOR', familyName: 'Norris' } },
+    ] }] } } };
+  assert.deepEqual(parseF1Last(json), { season: '2026', round: 17, podium: ['VER', 'LEC', 'ANT'] });
+  assert.equal(parseF1Last({ MRData: { RaceTable: { Races: [] } } }), null);
+});
+
+test('raceAwaitingResult is the latest race past its usual end, for a day', () => {
+  const sessions = parseF1Season(season);
+  const start = Date.parse('2026-10-25T20:00:00Z');
+  assert.equal(raceAwaitingResult(sessions, start + 3600e3), null);          // still running
+  assert.equal(raceAwaitingResult(sessions, start + 3 * 3600e3).round, 18);
+  assert.equal(raceAwaitingResult(sessions, start + 27 * 3600e3), null);     // a day after its end
 });
 
