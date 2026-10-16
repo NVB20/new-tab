@@ -41,6 +41,32 @@ export function fxCurrencies(items) {
   return [...set].sort();
 }
 
+// CNBC quotes for several symbols → { [symbol]: { price, change, name, time } } for the ones it
+// knows, with change as a fraction. Its numbers come formatted: '52,002.41', '-1.11%', 'UNCH'.
+export function parseCnbcQuotes(json) {
+  const list = json?.FormattedQuoteResult?.FormattedQuote;
+  const num = v => finite(parseFloat(String(v).replace(/,/g, '')));
+  const quotes = {};
+  for (const q of Array.isArray(list) ? list : []) {
+    const price = q?.code === 0 ? num(q.last) : null;
+    if (price == null) continue;
+    quotes[q.symbol] = { price, change: (num(q.change_pct) ?? 0) / 100, name: String(q.name ?? q.symbol), time: String(q.last_timedate ?? '') };
+  }
+  return quotes;
+}
+
+// CNBC price bars (New York time, oldest first) → the closes of the latest regular session,
+// 9:30 to 16:00, which is the session a quote's change is measured over.
+export function parseCnbcSession(json) {
+  const bars = json?.barData?.priceBars;
+  if (!Array.isArray(bars)) return [];
+  const session = bars
+    .map(b => ({ day: String(b?.tradeTime).slice(0, 8), time: String(b?.tradeTime).slice(8, 12), close: Number(b?.close) }))
+    .filter(b => b.time >= '0930' && b.time < '1600' && Number.isFinite(b.close));
+  const last = session.at(-1)?.day;
+  return session.filter(b => b.day === last).map(b => b.close);
+}
+
 // GitHub commit search results → commit rows, newest first, with the message's first line.
 export function parseCommits(json) {
   if (!Array.isArray(json?.items)) return [];

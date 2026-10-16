@@ -36,7 +36,8 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
      Never ask me to paste the token into this chat.
    - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
-     heading; any Bybit spot coin, priced in USDT, plus pairs such as USD/ILS and EUR/ILS).
+     heading; any Bybit spot coin, priced in USDT, the SPY, QQQ and DJIA indexes, plus pairs such as
+     USD/ILS and EUR/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
    on the extension's card in chrome://extensions.
 ```
@@ -50,7 +51,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
+| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist. |
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
@@ -103,15 +104,19 @@ A folder moves with its tiles when you move it to another group. Folders can't g
 The Markets widget starts on the right of the page; Layout mode moves it anywhere, and up to five
 copies can each follow their own list (say, coins in one and currencies in another).
 
-- **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins
-  and currency pairs you want and untick the rest; the list updates as you go. To follow a coin
-  that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're done.
-  New picks go to the bottom of the list.
+- **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins,
+  indexes and currency pairs you want and untick the rest; the list updates as you go. To follow a
+  coin that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're
+  done. New picks go to the bottom of the list.
 - **Coins:** BTC, SOL, XRP and ETH by default, as Bybit spot prices in USDT. Each row shows the
   price, its 24h change and a sparkline of the last 24 hours. A coin Bybit doesn't list shows a dash.
+- **US indexes:** SPY, QQQ and the Dow (DJIA), as CNBC quotes. Each row shows the last
+  regular-session price, its change on the day and a sparkline of that session; outside market
+  hours that's the last close.
 - **Currency pairs:** USD/ILS by default; EUR/ILS, GBP/ILS, EUR/USD, GBP/USD, USD/JPY and USD/CHF
   are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
-- **Click a row** to open the coin's chart on Bybit (or the pair on Google Finance).
+- **Click a row** to open the coin's chart on Bybit (the index on CNBC, or the pair on Google
+  Finance); the candles icon at the end opens it on TradingView.
 
 Prices refresh every 30 seconds while the tab is open and visible, and all open new tabs share one
 copy, so having many tabs open doesn't multiply the requests.
@@ -308,6 +313,7 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Widget | Talks to | How often |
 | --- | --- | --- |
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
+| Markets (indexes) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |

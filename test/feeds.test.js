@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCommits, latestCommits, parseIssues,
+  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCommits, latestCommits, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
   parseContributions, heatmapLayout,
 } from '../js/feeds.js';
@@ -40,6 +40,36 @@ test('parseFxPair turns EUR-based rates into any pair, with its change and serie
 test('fxCurrencies lists the non-EUR currencies the chosen pairs need', () => {
   assert.deepEqual(fxCurrencies(['BTC', 'USD/ILS', 'EUR/ILS', 'GBP/USD']), ['GBP', 'ILS', 'USD']);
   assert.deepEqual(fxCurrencies(['BTC']), []);
+});
+
+test('parseCnbcQuotes reads each known symbol\'s price and change, skipping unknown ones', () => {
+  const json = { FormattedQuoteResult: { FormattedQuote: [
+    { symbol: 'SPY', code: 0, name: 'SPDR S&P 500 ETF Trust', last: '763.25', change_pct: '-1.11%', last_timedate: '4:10 PM EDT' },
+    { symbol: 'ZZZZQ', code: 1 },
+    { symbol: '.DJI', code: 0, name: 'Dow Jones Industrial Average', last: '52,002.41', change_pct: '+0.34%', last_timedate: '4:20 PM EDT' },
+    { symbol: 'QQQ', code: 0, name: 'Invesco QQQ Trust', last: '709.80', change_pct: 'UNCH', last_timedate: '4:15 PM EDT' },
+  ] } };
+  assert.deepEqual(parseCnbcQuotes(json), {
+    SPY: { price: 763.25, change: -1.11 / 100, name: 'SPDR S&P 500 ETF Trust', time: '4:10 PM EDT' },
+    '.DJI': { price: 52002.41, change: 0.34 / 100, name: 'Dow Jones Industrial Average', time: '4:20 PM EDT' },
+    QQQ: { price: 709.8, change: 0, name: 'Invesco QQQ Trust', time: '4:15 PM EDT' },
+  });
+  assert.deepEqual(parseCnbcQuotes({}), {});
+});
+
+test('parseCnbcSession keeps the closes of the latest regular session', () => {
+  const bar = (tradeTime, close) => ({ tradeTime, close: String(close) });
+  const json = { barData: { priceBars: [
+    bar('20261015093000', 100), bar('20261015155000', 101),
+    bar('20261016040000', 99), bar('20261016092000', 98),
+    bar('20261016093000', 102), bar('20261016094000', 103), bar('20261016155000', 104),
+    bar('20261016160000', 105), bar('20261016163000', 106),
+  ] } };
+  assert.deepEqual(parseCnbcSession(json), [102, 103, 104]);
+  // Before the bell the last session is the previous day's.
+  json.barData.priceBars = json.barData.priceBars.filter(b => b.tradeTime < '20261016093000');
+  assert.deepEqual(parseCnbcSession(json), [100, 101]);
+  assert.deepEqual(parseCnbcSession({ status: 'ERROR' }), []);
 });
 
 test('cleanMarketItems keeps valid coins and pairs once, in order', () => {
