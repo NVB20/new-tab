@@ -1,8 +1,9 @@
 // Animated ASCII background in the style of the Claude Code app: faint streaks of letters that
 // drift slowly, brighten softly around the mouse, and ripple outwards from a click on the page.
-// Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
+// Only cells whose look changed are redrawn, using a pre-rendered glyph atlas, and at rest the
+// loop sleeps on a timer between its 10 drawings a second.
 
-import { GLYPHS, hash2, streakField, streakBlend, streakSway, falloff, ringOffset, level } from './ascii-field.js';
+import { GLYPHS, hash2, streakGrid, streakBlend, streakSway, falloff, ringOffset, level } from './ascii-field.js';
 import { backgroundImage } from './util.js';
 
 const CHARSET = GLYPHS;
@@ -61,7 +62,7 @@ export function mountAsciiBackground(canvas, store) {
   const seed = Math.floor(Math.random() * 1e6);
 
   let cols = 0, rows = 0, cw = 0, ch = 0, cwPx = 0, chPx = 0;
-  let chars, base, glow, fadeMs, blue, drawn, blend, sway;
+  let chars, base, next, glow, fadeMs, blue, drawn, blend, sway;
   let atlas = null;
   let mode = null;
   let enabled = false;
@@ -73,6 +74,8 @@ export function mountAsciiBackground(canvas, store) {
   let flowTime = 0;   // seconds of flow so far, advanced faster while idle
   let flowSpeed = 1;
   let raf = 0;
+  let idleTimer = 0;
+  let woken = false;
   const active = new Set();
   const ripples = [];
 
@@ -130,13 +133,11 @@ export function mountAsciiBackground(canvas, store) {
   function updateField() {
     const t = motion ? flowTime : 0;
     for (let c = 0; c < cols; c++) sway[c] = streakSway(c, t);
-    for (let r = 0, i = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++, i++) {
-        const v = streakField(c, r, t, seed, blend[i], sway[c]);
-        if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
-        base[i] = v;
-        drawCell(i);
-      }
+    streakGrid(cols, rows, t, seed, blend, sway, next);
+    for (let i = 0; i < next.length; i++) {
+      if (base[i] === 0 && next[i] > 0) chars[i] = randomGlyph();
+      base[i] = next[i];
+      drawCell(i);
     }
   }
 
@@ -155,6 +156,7 @@ export function mountAsciiBackground(canvas, store) {
     const n = cols * rows;
     chars = new Uint8Array(n);
     base = new Float32Array(n);
+    next = new Float32Array(n);
     glow = new Float32Array(n);
     fadeMs = new Float32Array(n);
     blue = new Uint8Array(n);
@@ -223,11 +225,40 @@ export function mountAsciiBackground(canvas, store) {
     }
   }
 
-  function frame(now) {
+  const isBusy = () => pointer || ripples.length || active.size > 40;
+
+  // While something moves, every display frame (drawn at 40 fps). At rest a timer waits out the
+  // 100 ms between drawings, so the page isn't woken 60+ times a second to draw 10.
+  function schedule() {
+    if (raf || idleTimer) return;
+    if (isBusy()) {
+      raf = requestAnimationFrame(frame);
+    } else {
+      idleTimer = setTimeout(() => {
+        idleTimer = 0;
+        woken = true;
+        raf = requestAnimationFrame(frame);
+      }, IDLE_FRAME_MS - (performance.now() - lastFrame));
+    }
+  }
+
+  // The mouse or a click wakes a resting loop at once.
+  function wake() {
+    if (!idleTimer) return;
+    clearTimeout(idleTimer);
+    idleTimer = 0;
     raf = requestAnimationFrame(frame);
+  }
+
+  function frame(now) {
+    raf = 0;
     if (pointer && now - lastMove > IDLE_AFTER_MS) pointer = null;
-    const busy = pointer || ripples.length || active.size > 40;
-    if (now - lastFrame < (busy ? ACTIVE_FRAME_MS : IDLE_FRAME_MS)) return;
+    if (woken || now - lastFrame >= (isBusy() ? ACTIVE_FRAME_MS : IDLE_FRAME_MS)) step(now);
+    woken = false;
+    schedule();
+  }
+
+  function step(now) {
     const dt = Math.min(120, now - lastFrame);
     lastFrame = now;
 
@@ -236,7 +267,9 @@ export function mountAsciiBackground(canvas, store) {
     flowSpeed += (targetSpeed - flowSpeed) * Math.min(1, dt / FLOW_EASE_MS);
     flowTime += (dt / 1000) * flowSpeed;
 
-    if (now - lastField >= FIELD_MS) {
+    // A step the resting timer woke is the next 100 ms one, even if the frame's timestamp is a
+    // little early.
+    if (woken || now - lastField >= FIELD_MS) {
       lastField = now;
       updateField();
       // Now and then a single visible letter changes.
@@ -265,12 +298,14 @@ export function mountAsciiBackground(canvas, store) {
   }
 
   function start() {
-    if (!raf) raf = requestAnimationFrame(frame);
+    if (!raf && !idleTimer) raf = requestAnimationFrame(frame);
   }
 
   function stop() {
     cancelAnimationFrame(raf);
+    clearTimeout(idleTimer);
     raf = 0;
+    idleTimer = 0;
   }
 
   function sync() {
@@ -304,6 +339,7 @@ export function mountAsciiBackground(canvas, store) {
     if (!motion) return;
     pointer = { x: e.clientX, y: e.clientY };
     lastMove = performance.now();
+    wake();
   }, { passive: true });
   document.addEventListener('pointerout', e => {
     if (!e.relatedTarget) pointer = null;
@@ -312,6 +348,7 @@ export function mountAsciiBackground(canvas, store) {
     if (!motion || e.button !== 0 || e.target.closest?.(NO_RIPPLE)) return;
     ripples.push({ x: e.clientX, y: e.clientY, start: performance.now() });
     if (ripples.length > 4) ripples.shift();
+    wake();
   });
 
   let resizeTimer = 0;
