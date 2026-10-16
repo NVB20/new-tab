@@ -29,13 +29,14 @@ export (`.json`). Groups, tiles and layout settings come over; tasks and notes h
   recently closed tabs.
 - **Markets** — BTC, SOL, XRP and ETH (Bybit spot, USDT) with a 24h sparkline, plus the USD/ILS
   daily ECB rate. Change the coins in Preferences → Widgets; click a row to open its chart.
-- **GitHub** — type your username into the widget. It lists your latest commits in any repo or
-  organisation (from GitHub's commit search, which covers default branches) and your open PRs.
-  Without a token only public repos show. To include private ones (e.g. eitan-capital), create a
-  fine-grained token on GitHub (Settings → Developer settings → Personal access tokens →
-  Fine-grained) with read-only *Contents*, *Metadata* and *Pull requests* access to those repos or
-  orgs (an org may need to approve it), and paste it into Preferences → Widgets → Access token. The
-  token stays in this browser and is never written into backup files.
+- **GitHub** — type your username into the widget. It shows the latest commit in each repo you've
+  committed to, in any account or organisation (default branches), and your open PRs. Without a
+  token only public repos show. To include private ones (e.g. eitan-capital), create a fine-grained
+  token at <https://github.com/settings/personal-access-tokens/new>: resource owner = the
+  organisation, repository access = all (or the ones you want), permissions = *Contents* and
+  *Pull requests* read-only. If the org requires approval, an owner approves it under the org's
+  Settings → Personal access tokens. Paste it into Preferences → Widgets → Access token. The token
+  stays in this browser and is never written into backup files.
 - **Background** — Preferences → Appearance: ASCII or Plain, animation on/off, or upload a
   wallpaper (a wallpaper replaces the ASCII field while it's set).
 - **Backup** — Preferences → Backup → **Download backup** saves everything (including the

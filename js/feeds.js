@@ -45,6 +45,15 @@ export function parseCommits(json) {
     .sort((a, b) => b.at - a.at);
 }
 
+// The newest commit of each repo, repos ordered by that commit (newest first).
+export function latestPerRepo(commits, limit) {
+  const seen = new Set();
+  return [...commits]
+    .sort((a, b) => b.at - a.at)
+    .filter(c => !seen.has(c.repo) && seen.add(c.repo))
+    .slice(0, limit);
+}
+
 // GitHub issue search results (is:pr) → PR rows.
 export function parsePulls(json) {
   if (!Array.isArray(json?.items)) return [];

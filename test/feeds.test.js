@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseTicker, parseKline, parseFxSeries, parseCommits, parsePulls,
+  parseTicker, parseKline, parseFxSeries, parseCommits, latestPerRepo, parsePulls,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins,
 } from '../js/feeds.js';
 
@@ -38,6 +38,14 @@ test('parseCommits reads commit search results, newest first, first line of the 
     { sha: 'edf33f2', message: 'Step 01: echo bot', repo: 'NVB20/devops-ai', url: 'https://github.com/NVB20/devops-ai/commit/edf33f2c', at: Date.parse('2026-10-15T21:46:28.000+03:00'), private: false },
   ]);
   assert.deepEqual(parseCommits({ message: 'Validation Failed' }), []);
+});
+
+test('latestPerRepo keeps only the newest commit of each repo, newest repos first', () => {
+  const c = (repo, at, sha) => ({ repo, at, sha });
+  const commits = [c('a/one', 5, 'x'), c('b/two', 9, 'y'), c('a/one', 7, 'z'), c('c/three', 1, 'w'), c('b/two', 2, 'v')];
+  assert.deepEqual(latestPerRepo(commits, 10).map(x => x.sha), ['y', 'z', 'w']);
+  assert.deepEqual(latestPerRepo(commits, 2).map(x => x.repo), ['b/two', 'a/one']);
+  assert.deepEqual(latestPerRepo([], 3), []);
 });
 
 test('parsePulls reads search results into PR rows', () => {
