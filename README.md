@@ -109,7 +109,8 @@ time you open Safari.
 
 Safari has no extension APIs for bookmarks, history or recently closed tabs, so Jump and the
 sidebar don't show them. Tiles show their own logo or a letter instead of the site's icon, and
-searches go to google.com rather than the browser's search engine.
+searches go to google.com rather than the browser's search engine. The Website widget hasn't been
+tried in Safari.
 
 ## Folders
 
