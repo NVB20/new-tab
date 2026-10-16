@@ -30,9 +30,13 @@ timing is paid and Jolpica already has the calendar).
 
 - **NBA / NFL team schedule:** `/{basketball/nba | football/nfl}/teams/{id}/schedule`. It returns
   the current part of the season only (`requestedSeason.type`: 1 preseason, 2 regular, 3
-  playoffs), with finished games' scores. When it has no game still to come and the type is below
-  3, the loader also asks `?seasontype={type + 1}` and merges both (today the Lakers' default is a
-  finished preseason; `seasontype=2` has their 80+ regular-season games).
+  playoffs, 5 the NBA play-in), with finished games' scores. When the current part has no game
+  later than 14 days ahead (the timeline window), the loader also asks `?seasontype=N` for the next
+  part and merges them: type 1 asks for 2; type 2 asks for the NBA play-in (5) and playoffs (3), the
+  NFL playoffs (3); type 5 asks for 3 (`nextPhases`). An extra part that fails, or answers with an
+  unexpected shape, counts as empty and doesn't discard the first response. Today the Lakers'
+  default is the preseason with one game left, so the regular season is fetched at once;
+  ESPN answers 200 with no events for a part a team isn't in.
 - **Soccer team, upcoming:** `/soccer/all/teams/{id}/schedule?fixture=true`. **Results:** the same
   without `fixture=true`. The `all` path covers every competition (seen for Inter Miami: MLS,
   Leagues Cup, CONCACAF Champions Cup, Campeones Cup, club friendlies; for Argentina: World Cup,
@@ -56,7 +60,7 @@ Fields used from an ESPN event: `id`, `date`, `timeValid` (false = time not set 
 
 ### The timeline
 
-- One list, oldest first, under day headings: **Yesterday** (finished games only), **Today**,
+- One list, oldest first, under day headings: **Yesterday** (games that started yesterday), **Today**,
   **Tomorrow**, then `Sun 18 Oct` (the clock's short date style). Days are the computer's local
   days.
 - **Window:** games starting in the next 14 days, games in progress, and finished games until 24
@@ -66,6 +70,9 @@ Fields used from an ESPN event: `id`, `date`, `timeValid` (false = time not set 
 - Several copies of the widget each have their own list; data is shared (see Caching).
 
 ### A row
+
+- Links must be `https:` and logos come only from `https://a.espncdn.com/`; anything else is
+  dropped (no link falls back to espn.com, no logo shows nothing).
 
 - **Tag:** `NBA`, `NFL`, `F1`, or the soccer competition's short name: `usa.1` MLS,
   `concacaf.leagues.cup` Leagues Cup, `concacaf.champions` CONCACAF, `campeones.cup` Campeones
@@ -104,13 +111,15 @@ or `Final` when none is known.
 ### Empty and error states
 
 - Nothing followed: "Nothing chosen. **Choose teams**" (opens the editor), as Markets does.
-- Followed, but no event known at all: "No games scheduled yet".
+- Followed, but no event known at all: "No games scheduled yet", unless every followed source
+  failed with nothing saved; then the list stays empty and the notes below say what couldn't load.
 - A copy that follows no NBA and no NFL team shows a muted last line "**Pick your NBA and NFL
   teams**" (opens the editor) until its editor has been opened once (`settings.edited`).
 - A source that fails keeps its last data and adds one muted line under the list: "ESPN
   unreachable · data from 3h ago" (or "Jolpica …"). With no saved data, the line names what's
   missing ("Couldn't load the schedule for Los Angeles Lakers", "Couldn't load the F1
-  calendar"). Other sources are unaffected.
+  calendar"). Other sources are unaffected. A response with an unexpected shape (not a schedule,
+  scoreboard or season) counts as a failure: the last good data stays and the note appears.
 
 ### Narrow widget
 
@@ -185,7 +194,7 @@ and a failure isn't retried before the TTL.
 ## Code
 
 - `js/sports.js` (pure, unit-tested in Node): team lists; settings cleaning; ESPN schedule,
-  results and scoreboard parsers; the season-phase rule; Jolpica season and last-result parsers;
+  results and scoreboard parsers; the season-phase rule (`nextPhases`); `joinParts`; Jolpica season and last-result parsers;
   competition short names; F1 race short names; and `timeline(events, { now, follow, ... })`,
   which applies the window, the next-event rule, de-duplication, W/L/D and grouping by local day.
 - `js/sports-widget.js`: `mountSports(root, store, copy)`; fetching, timers, rendering and the
@@ -199,7 +208,7 @@ and a failure isn't retried before the TTL.
 ## Testing
 
 - `test/sports.test.js` with trimmed real responses (saved 2026-10-16) as fixtures: schedule
-  parsing; the preseason → regular-season merge; soccer upcoming + results; scoreboard live state;
+  parsing; the season-phase rule (preseason → regular season → play-in → playoffs); soccer upcoming + results; scoreboard live state;
   postponed and TBD games; Jolpica sessions and the podium; competition and race short names;
   settings cleaning; and `timeline`: the 14-day window, the next-event rule, a game between two
   followed teams, W/L/D, the 24-hour finished window, day labels, and day grouping across Israel's

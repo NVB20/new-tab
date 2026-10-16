@@ -224,7 +224,7 @@ you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's 
   teams with yours in bold, the start time and the TV channel. A moon marks games that start
   between midnight and 7 in the morning. Times follow the Clock's 12/24-hour setting.
 - **Live:** a red dot, the score and the clock (Q3 5:21, 67'). Scores refresh every 30 seconds
-  while the tab is open. F1 sessions read LIVE while they're scheduled to run.
+  while the tab is in view. F1 sessions read LIVE while they're scheduled to run.
 - **Results:** a finished game stays for a day with its score and W, L or D for your team; after
   a race, the podium.
 - **Click a row** to open the game on ESPN (F1: the season on formula1.com).
