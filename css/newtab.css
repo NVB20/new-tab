@@ -205,6 +205,47 @@ body.widgets-off .layout { grid-template-columns: minmax(0, 1fr) minmax(0, var(-
 .grid-wrap { grid-column: 2; grid-row: 1; }
 body.center-v .grid-wrap { align-self: center; }
 
+/* ---------- Search bar ---------- */
+
+.searchbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  margin: 0 0 24px;
+  padding: 0 14px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 23px;
+  background: var(--surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.searchbar:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(12px); }
+.sb-mode {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
+  transition: background 0.12s;
+}
+.sb-mode:not(:disabled):hover { background: var(--hover); }
+.sb-mode:disabled { cursor: default; }
+.sb-mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.searchbar[data-mode="claude"] .sb-mode { color: var(--accent); }
+.sb-input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; outline: none; font-size: 15px; color: var(--text); }
+.sb-input::placeholder { color: var(--muted); }
+.sb-hint { opacity: 0; transition: opacity 0.15s; }
+.searchbar:focus-within .sb-hint { opacity: 1; }
+
 /* ---------- Widgets ---------- */
 
 .widgets {
@@ -438,6 +479,11 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
   line-height: 1.5;
   field-sizing: content;
 }
+
+.claude-box { display: flex; align-items: flex-end; gap: 8px; }
+.claude-input { min-height: 0; padding: 5px 0; }
+.claude-send { width: 28px; height: 28px; border-radius: 8px; color: var(--accent); }
+.widget-claude .widget-head .icon { color: var(--accent); }
 
 /* ---------- Tiles ---------- */
 
@@ -805,6 +851,13 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .pref-sub .pref-row { padding: 8px 0; border-bottom: 0; }
 .pref-off { opacity: 0.5; }   /* found by a search, but its switch is off */
 .pref-input.wide { flex: 1; width: auto; }
+
+/* A short how-to under the setting it explains (getting a GitHub token). */
+.pref-row:has(+ .pref-help) { border-bottom: 0; }
+.pref-help { margin: 0 0 4px; padding: 10px 14px; border-radius: 10px; background: var(--hover); font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.pref-help-title { margin-bottom: 2px; font-weight: 600; color: var(--text); }
+.pref-help ol { margin: 0 0 4px; padding-left: 18px; }
+.pref-help a { color: var(--accent); }
 .range-value { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }

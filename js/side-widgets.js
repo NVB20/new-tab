@@ -85,7 +85,7 @@ export function mountSideWidgets(root, store, openPrefs) {
   const githubLink = el('a', { class: 'widget-head-link', title: 'Open your GitHub profile' },
     icon('branch', 18), el('span', { text: 'GitHub' }), icon('external', 13));
   const githubStatus = el('span', { class: 'widget-head-status', title: 'Checked at most once an hour' });
-  const openGithubPrefs = () => openPrefs('widgets', 'github');
+  const openGithubPrefs = () => openPrefs('github', 'github');
   const githubEdit = el('button', {
     type: 'button', class: 'icon-btn widget-edit', title: 'GitHub settings', 'aria-label': 'GitHub settings', onclick: openGithubPrefs,
   }, icon('edit', 15));
@@ -292,8 +292,8 @@ export function mountSideWidgets(root, store, openPrefs) {
     if (error && !data) {
       parts.push(empty(error.rateLimited
         ? 'GitHub’s hourly limit is used up. The widget tries again in an hour (or press Refresh later).'
-        : error.status === 401 ? 'GitHub rejected the token (it may have expired). Check it in Preferences → Widgets → GitHub.'
-          : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → Widgets → GitHub.'
+        : error.status === 401 ? 'GitHub rejected the token (it may have expired). Check it in Preferences → GitHub.'
+          : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → GitHub.'
             : 'Couldn’t reach GitHub.'));
     } else if (!data) {
       parts.push(empty('Loading…'));

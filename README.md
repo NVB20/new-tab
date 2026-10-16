@@ -28,8 +28,8 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: everything is in Preferences → Widgets → GitHub (the ✎ on the widget opens
-     it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
+   - GitHub widget: everything is in the GitHub section of Preferences (the ✎ on the widget
+     opens it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
      making a token as described under "Tokens for private repos" in the README: usually a
      fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
@@ -52,6 +52,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **GitHub** | Your contribution heatmap, open pull requests, and your open issues, latest commits or both, including private repos with a token. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
+| **Search bar and Claude** | Search Google, or type a message that runs in a new Claude chat on claude.ai. Also as a Claude box in the widget column. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -114,9 +115,10 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-All of the widget's settings are in one place: **Preferences → Widgets → GitHub**. That's your
-username, what to show and an optional access token. Hover the widget and click **✎** to go
-straight there; a widget without a username has a **Set up GitHub** button that does the same.
+All of the widget's settings are in one place, the **GitHub** section of Preferences: the widget's
+switch, your username, what to show and an optional access token, with a short how-to for getting
+one. Hover the widget and click **✎** to go straight there; a widget without a username has a
+**Set up GitHub** button that does the same.
 
 The widget shows:
 
@@ -189,7 +191,7 @@ repos, also allows changes. Treat it like a password.
 
 #### Add the token
 
-Paste it into Preferences → Widgets → GitHub → **Access token**, then press **Refresh** on the
+Paste it into Preferences → GitHub → **Access token**, then press **Refresh** on the
 widget (otherwise it checks again within the hour). The token stays in this browser and is never
 written into backup files.
 
@@ -201,6 +203,28 @@ written into backup files.
 | "Token works but sees no private repos in …" | Fine-grained: check the resource owner, the repositories it can access and *Contents*; an organisation may still have to approve it. Classic: authorise SSO. |
 | "Token sees N private repos but can't read commits in …" | Give it *Contents: Read-only*. |
 | Private issues or pull requests don't show | Give it *Issues* or *Pull requests: Read-only*. A fine-grained token only sees repos of its own owner. |
+
+## Search bar and Claude
+
+The bar above the tiles searches Google or asks Claude. The icon on its left shows which, **G** or
+**✳**. Click it, or press **Tab** in the bar, to switch; the bar remembers the one you used last.
+
+- **Google:** Enter opens the Google results.
+- **Claude:** Enter opens a new chat on claude.ai and sends your message, so the answer starts
+  straight away. You need to be signed in to claude.ai in this browser.
+- Enter opens in this tab, or in a new tab when *Open tiles in a new tab* is on. Ctrl+Enter always
+  opens a new tab.
+- In Preferences → Page → **Search bar** you can turn the bar off, or keep just one of Google
+  and Claude (then there's nothing to switch).
+
+The **Claude** widget (Preferences → Widgets, off by default) does the same from a box under Notes,
+with room for longer messages: Enter sends, Shift+Enter starts a new line.
+
+How the message gets there: it waits in the extension's own storage, and a small script the
+extension runs on claude.ai types it into the message box and presses send. Only a random id goes
+in the address, so your message isn't in your history, and the script leaves alone any claude.ai
+page the new tab didn't open. That script is why Chrome lists the extension as able to read and
+change your data on claude.ai.
 
 ## Everything else
 
@@ -251,8 +275,9 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
+| Search bar | `google.com` or `claude.ai`, opened like any link | only when you press Enter |
 
-Turn a widget off in Preferences → Widgets and it stops fetching.
+Turn a widget off in Preferences (Widgets, or GitHub for the GitHub widget) and it stops fetching.
 
 ## Known limits
 
@@ -261,6 +286,9 @@ Turn a widget off in Preferences → Widgets and it stops fetching.
 - A tile logo from a site that doesn't allow saving it (no CORS headers) still loads from its link.
   If one stops showing, right-click → Edit and clear the icon field (uses the site's own icon) or
   paste another image link.
+- Claude: if you're signed out of claude.ai, nothing is sent; sign in and send it again. If Claude
+  changes its page and the send button can't be found, your message is left in the box and you
+  press Enter yourself.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development
