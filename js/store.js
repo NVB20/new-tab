@@ -30,11 +30,14 @@ export const DEFAULT_PREFS = {
     // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')
     // and ECB currency pairs ('EUR/ILS'), in display order.
     markets: { enabled: true, items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] },
-    // token is optional (read-only) and only adds private repos' commits and PRs; never exported in backups.
-    github: { enabled: true, user: '', token: '' },
+    // show: which lists follow the open PRs, 'commits' | 'issues' | 'both'.
+    // token is optional (read-only) and only adds private repos' commits, issues and PRs; never exported in backups.
+    github: { enabled: true, user: '', token: '', show: 'both' },
   },
   sidebar: { enabled: true },
 };
+
+export const GITHUB_SHOW = ['commits', 'issues', 'both'];
 
 // theme is 'auto' | 'light' | 'dark' | 'blue' | 'github'; these two bring their own accent.
 export const THEME_ACCENTS = { blue: '#2563eb', github: '#238636' };
@@ -130,6 +133,7 @@ export function normalizeState(raw) {
   s.notes = str(raw.notes);
   s.prefs = deepMerge(DEFAULT_PREFS, raw.prefs);
   s.prefs.widgets.markets = normalizeMarkets(raw.prefs?.widgets?.markets);
+  if (!GITHUB_SHOW.includes(s.prefs.widgets.github.show)) s.prefs.widgets.github.show = DEFAULT_PREFS.widgets.github.show;
   return s;
 }
 

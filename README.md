@@ -28,10 +28,12 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: I type my username into the widget. For private repos, help me create a
-     fine-grained token at https://github.com/settings/personal-access-tokens/new with
-     Contents and Pull requests set to read-only, which I paste into Preferences → Widgets →
-     Access token myself. Never ask me to paste the token into this chat.
+   - GitHub widget: everything is in Preferences → Widgets → GitHub (the ✎ on the widget opens
+     it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
+     making a token as described under "Tokens for private repos" in the README: usually a
+     fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
+     Issues and Pull requests set to read-only. I paste it into the Access token box myself.
+     Never ask me to paste the token into this chat.
    - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
      heading; any Bybit spot coin, priced in USDT, plus pairs such as USD/ILS and EUR/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
@@ -47,7 +49,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
-| **GitHub** | Your contribution heatmap, latest commits and open pull requests, including private repos with a token. |
+| **GitHub** | Your contribution heatmap, open pull requests, and your open issues, latest commits or both, including private repos with a token. |
 | **Clock** | Five One UI–style faces, from a slim classic clock to big stacked stencil digits. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
@@ -112,15 +114,24 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-Type your GitHub username into the widget and it shows:
+All of the widget's settings are in one place: **Preferences → Widgets → GitHub**. That's your
+username, what to show and an optional access token. Hover the widget and click **✎** to go
+straight there; a widget without a username has a **Set up GitHub** button that does the same.
+
+The widget shows:
 
 - **Your contribution heatmap:** the past year as on your profile, with the yearly total. Hover a
   square for that day's count; click the map to open your profile. Private contributions count if
   you've switched on *Include private contributions on my profile* in your GitHub settings.
-- **Your open pull requests**: the most recently updated ones you opened, are assigned to,
-  commented on or are mentioned in.
-- **Your latest commits**: the six newest, across every repo and organisation you've committed
+- **Your open pull requests:** the four most recently updated ones you opened, are assigned to,
+  commented on or are mentioned in. They're always at the top.
+- **Your open issues:** the five most recently updated open issues you opened, are assigned to,
+  commented on or are mentioned in, in any repo (archived repos are left out).
+- **Your latest commits:** the six newest, across every repo and organisation you've committed
   to (default branches). Private repos get a lock icon.
+
+**Show** picks what comes under the pull requests: **Commits**, **Issues**, or **Both** (the
+default, issues first). Both lists are fetched either way, so switching is instant.
 
 The heatmap is read from `github.com/users/<you>/contributions`, which is why the extension asks
 for access to github.com. After updating from an older version, press the extension's reload
@@ -129,21 +140,67 @@ button on `chrome://extensions` once so Chrome grants it.
 The heading opens your GitHub profile. GitHub is checked at most once an hour to stay well inside
 its rate limit; **Refresh** next to the heading fetches straight away.
 
-### Private repos
+### Tokens for private repos
 
-Without a token only public repos show. To include private ones, add a read-only token:
+Without a token the widget shows public repos only. To add your private repos' commits, issues and
+pull requests, give it a personal access token. GitHub has two kinds:
 
-1. Create a fine-grained token at <https://github.com/settings/personal-access-tokens/new>.
-2. **Resource owner:** you, or the organisation whose private repos you want to see. A
-   fine-grained token covers one owner.
-3. **Repository access:** all repositories, or just the ones you want.
-4. **Permissions:** *Contents* and *Pull requests*, both read-only.
-5. If the organisation requires approval, an owner approves it under the organisation's
-   **Settings → Personal access tokens**.
-6. Paste it into Preferences → Widgets → **Access token**, then press **Refresh** on the widget.
+- **Fine-grained token** (recommended): read-only and limited to the repos you pick. One token
+  covers one owner: your own account *or* one organisation.
+- **Classic token**: only if your private repos belong to more than one owner (say, your account
+  and an organisation). It reaches every repo your account can.
 
-The token stays in this browser and is never written into backup files. If it can't see what it
-should, the widget says why (for example, missing *Contents* access or org approval still pending).
+#### Fine-grained token
+
+1. Open <https://github.com/settings/personal-access-tokens/new> (your avatar → **Settings** →
+   **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new
+   token**). If GitHub asks, verify your email address first.
+2. **Token name:** anything, e.g. `New Tab`. **Expiration:** up to you; when it runs out the widget
+   says GitHub rejected the token, and you make a new one.
+3. **Resource owner:** you, or the organisation whose private repos you want to see.
+4. **Repository access:** **All repositories**, or **Only select repositories** and pick them.
+5. **Permissions:** add these repository permissions, each set to **Read-only**. *Metadata*
+   (read-only) is added on its own; leave everything else out.
+
+   | Permission | Lets the widget show |
+   | --- | --- |
+   | Contents | your commits in private repos |
+   | Issues | open issues in private repos |
+   | Pull requests | open pull requests in private repos |
+
+6. Click **Generate token** and copy it. GitHub shows it only once.
+7. If the owner is an organisation that requires approval, the token is *pending* and sees only
+   public repos until an organisation owner approves it under the organisation's **Settings →
+   Personal access tokens**. Organisation owners are approved automatically.
+
+#### Classic token
+
+A classic token can't be limited to reading: the `repo` scope, the only one that opens private
+repos, also allows changes. Treat it like a password.
+
+1. Open <https://github.com/settings/tokens/new> (**Settings** → **Developer settings** →
+   **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**).
+2. **Note:** e.g. `New Tab`. Pick an **Expiration**.
+3. Tick **repo** and nothing else.
+4. Click **Generate token** and copy it.
+5. If an organisation uses SAML single sign-on, click **Configure SSO** next to the token on the
+   tokens page and **Authorize** it for that organisation. Until you do, its private repos stay
+   hidden.
+
+#### Add the token
+
+Paste it into Preferences → Widgets → GitHub → **Access token**, then press **Refresh** on the
+widget (otherwise it checks again within the hour). The token stays in this browser and is never
+written into backup files.
+
+#### If something is missing
+
+| What you see | What to do |
+| --- | --- |
+| "GitHub rejected the token" | It expired, was deleted or was pasted incompletely. Make a new one. |
+| "Token works but sees no private repos in …" | Fine-grained: check the resource owner, the repositories it can access and *Contents*; an organisation may still have to approve it. Classic: authorise SSO. |
+| "Token sees N private repos but can't read commits in …" | Give it *Contents: Read-only*. |
+| Private issues or pull requests don't show | Give it *Issues* or *Pull requests: Read-only*. A fine-grained token only sees repos of its own owner. |
 
 ## Everything else
 

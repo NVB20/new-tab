@@ -79,6 +79,14 @@ test('Markets coins and USD/ILS switch from older versions become the item list'
   assert.deepEqual(items({ items: 'BTC' }).items, DEFAULT_PREFS.widgets.markets.items);
 });
 
+test('GitHub shows commits and issues unless the saved choice is a valid one', () => {
+  const show = github => normalizeState({ prefs: { widgets: { github } } }).prefs.widgets.github.show;
+  assert.equal(show({ user: 'octo' }), 'both');
+  assert.equal(show({ show: 'issues' }), 'issues');
+  assert.equal(show({ show: 'commits' }), 'commits');
+  assert.equal(show({ show: 'everything' }), 'both');
+});
+
 test('normalizeState keeps task timestamps, history and daily counts, dropping junk', () => {
   const s = normalizeState({
     tasks: [{ id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9 }, { id: 'u', text: 'old task' }],

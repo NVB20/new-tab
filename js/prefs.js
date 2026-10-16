@@ -24,7 +24,8 @@ export function setupPrefs(store) {
 
   // ---- control builders ----
 
-  const title = text => el('h3', { class: 'pref-section-title', text });
+  // anchor lets open() scroll straight to this title, e.g. from a widget's ✎.
+  const title = (text, anchor) => el('h3', { class: 'pref-section-title', text, 'data-anchor': anchor });
 
   const row = (label, control, hint) => el('div', { class: 'pref-row' },
     el('div', { class: 'pref-text' }, el('div', { text: label }), hint && el('div', { class: 'pref-hint', text: hint })),
@@ -189,13 +190,18 @@ export function setupPrefs(store) {
       toggle('Markets', 'widgets.markets.enabled', 'Shown in the column opposite the clock'),
       textInput('Coins', 'widgets.markets.coins', 'BTC, SOL, XRP, ETH', { hint: 'Bybit spot tickers, priced in USDT' }),
       toggle('USD/ILS rate', 'widgets.markets.fx', 'Daily ECB reference rate'),
-      title('GitHub'),
-      toggle('GitHub', 'widgets.github.enabled', 'Your latest commits in any repo, and open pull requests'),
+      title('GitHub', 'github'),
+      toggle('GitHub', 'widgets.github.enabled', 'A year of activity, open pull requests, and your issues and commits'),
       textInput('Username', 'widgets.github.user', 'NVB20'),
+      segmented('Show', 'widgets.github.show', [
+        { value: 'commits', label: 'Commits' },
+        { value: 'issues', label: 'Issues' },
+        { value: 'both', label: 'Both' },
+      ], 'Listed under your open pull requests'),
       textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
         type: 'password',
         maxLength: 300,
-        hint: 'A read-only token adds commits and PRs in private repos (e.g. eitan-capital). Kept only in this browser and left out of backups.',
+        hint: 'Adds private repos (e.g. eitan-capital). A fine-grained token with Contents, Issues and Pull requests set to read-only. Kept only in this browser and left out of backups.',
       }),
     ];
   }
@@ -326,10 +332,20 @@ export function setupPrefs(store) {
   }
 
   return {
-    open(id = current) {
+    // anchor scrolls to that section title; if the section's first text box is empty, it gets the cursor.
+    open(id = current, anchor) {
       show(id);
       dialog.showModal();
       content.scrollTop = 0;
+      const target = anchor && content.querySelector(`[data-anchor="${anchor}"]`);
+      if (!target) return;
+      target.scrollIntoView({ block: 'start' });
+      for (let node = target.nextElementSibling; node && !node.matches('.pref-section-title'); node = node.nextElementSibling) {
+        const input = node.querySelector('input[type="text"]');
+        if (!input) continue;
+        if (!input.value) input.focus();
+        break;
+      }
     },
   };
 }

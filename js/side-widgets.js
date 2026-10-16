@@ -1,10 +1,10 @@
 // Second widget column (opposite the clock): live crypto prices and exchange rates, and GitHub
-// activity (contribution heatmap, open PRs, latest commits).
+// activity (contribution heatmap, open PRs, then open issues and/or latest commits).
 
 import { el, icon } from './ui.js';
 import { feed, fetchJson, fetchText, peek } from './net.js';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, isPair, parseCommits, latestCommits, parsePulls,
+  parseTicker, parseKline, parseFxPair, fxCurrencies, isPair, parseCommits, latestCommits, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins,
   parseContributions, heatmapLayout, MONTHS,
 } from './feeds.js';
@@ -14,6 +14,7 @@ const KLINE_TTL = 5 * 60e3;
 const FX_TTL = 60 * 60e3;
 const GITHUB_TTL = 60 * 60e3;   // GitHub is fetched at most once an hour
 const COMMITS = 6;              // latest commits shown
+const ISSUES = 5;               // open issues shown
 const REFRESH_MS = 30e3;
 const RECONFIGURE_MS = 800;   // wait for typing to stop before refetching after a settings change
 const SPARK = { w: 64, h: 18 };
@@ -71,7 +72,8 @@ function heatmapSvg(days, total) {
   return svg;
 }
 
-export function mountSideWidgets(root, store) {
+// openPrefs(section, anchor) opens Preferences there; every GitHub setting lives in one place.
+export function mountSideWidgets(root, store, openPrefs) {
   const marketList = el('div', { class: 'mk-list' });
   const marketEditor = el('div', { class: 'mk-editor', hidden: true });
   const editButton = el('button', { type: 'button', class: 'icon-btn widget-edit', onclick: () => setEditing(!editing) });
@@ -83,7 +85,11 @@ export function mountSideWidgets(root, store) {
   const githubLink = el('a', { class: 'widget-head-link', title: 'Open your GitHub profile' },
     icon('branch', 18), el('span', { text: 'GitHub' }), icon('external', 13));
   const githubStatus = el('span', { class: 'widget-head-status', title: 'Checked at most once an hour' });
-  const githubHead = el('h2', { class: 'widget-head' }, githubLink, githubStatus);
+  const openGithubPrefs = () => openPrefs('widgets', 'github');
+  const githubEdit = el('button', {
+    type: 'button', class: 'icon-btn widget-edit', title: 'GitHub settings', 'aria-label': 'GitHub settings', onclick: openGithubPrefs,
+  }, icon('edit', 15));
+  const githubHead = el('h2', { class: 'widget-head' }, githubLink, githubStatus, githubEdit);
   const github = el('section', { class: 'widget widget-github' }, githubHead, githubBody);
   root.append(markets, github);
 
@@ -254,17 +260,20 @@ export function mountSideWidgets(root, store) {
       el('span', { class: 'gh-meta', text: meta }));
   }
 
+  // A search result row: an open pull request or issue.
+  const searchRow = (item, iconName) => githubRow({
+    href: item.url,
+    iconName,
+    name: item.title,
+    meta: `#${item.number} · ${timeAgo(item.updatedAt)}`,
+    title: `${item.repo} #${item.number}${item.draft ? ' (draft)' : ''}\n${item.title}`,
+  });
+
   function renderGithubSetup() {
-    const input = el('input', { type: 'text', class: 'pref-input gh-input', placeholder: 'GitHub username', spellcheck: false, autocomplete: 'off', 'aria-label': 'GitHub username' });
-    const form = el('form', {
-      class: 'gh-setup',
-      onsubmit: e => {
-        e.preventDefault();
-        const user = input.value.trim();
-        if (user) store.update(s => { s.prefs.widgets.github.user = user; });
-      },
-    }, input, el('button', { class: 'btn', type: 'submit', text: 'Show' }));
-    githubBody.replaceChildren(form, empty('Shows your latest commits in any repo, and your open pull requests.'));
+    githubBody.replaceChildren(
+      empty('Shows a year of your activity, your open pull requests, and your open issues and latest commits.'),
+      el('div', { class: 'gh-setup' }, el('button', { type: 'button', class: 'btn', text: 'Set up GitHub', onclick: openGithubPrefs })));
+    githubStatus.replaceChildren();
   }
 
   function heatmap(calendar, user) {
@@ -283,22 +292,21 @@ export function mountSideWidgets(root, store) {
     if (error && !data) {
       parts.push(empty(error.rateLimited
         ? 'GitHub’s hourly limit is used up. The widget tries again in an hour (or press Refresh later).'
-        : error.status === 401 ? 'GitHub rejected the token. Check it in Preferences → Widgets.'
-          : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → Widgets.'
+        : error.status === 401 ? 'GitHub rejected the token (it may have expired). Check it in Preferences → Widgets → GitHub.'
+          : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → Widgets → GitHub.'
             : 'Couldn’t reach GitHub.'));
     } else if (!data) {
       parts.push(empty('Loading…'));
     }
-    if (data) {
-      if (data.pulls.length) {
-        parts.push(sub('Open pull requests'), ...data.pulls.map(pr => githubRow({
-          href: pr.url,
-          iconName: 'pr',
-          name: pr.title,
-          meta: `#${pr.number} · ${timeAgo(pr.updatedAt)}`,
-          title: `${pr.repo} #${pr.number}${pr.draft ? ' (draft)' : ''}\n${pr.title}`,
-        })));
-      }
+    // Open PRs always come first; Show picks what follows: issues, commits or both.
+    const show = prefs().widgets.github.show;
+    if (data && data.pulls.length) parts.push(sub('Open pull requests'), ...data.pulls.map(pr => searchRow(pr, 'pr')));
+    if (data && show !== 'commits') {
+      parts.push(sub('Open issues'), ...(data.issues.length
+        ? data.issues.map(issue => searchRow(issue, 'issue'))
+        : [empty('No open issues.')]));
+    }
+    if (data && show !== 'issues') {
       parts.push(sub('Latest commits'), ...(data.commits.length
         ? data.commits.map(c => githubRow({
           href: c.url,
@@ -328,6 +336,7 @@ export function mountSideWidgets(root, store) {
   }
 
   let githubSeq = 0;
+  let shownGithub = null;   // what was last drawn, redrawn as is when Show changes
   async function loadGithub(force = false) {
     const g = prefs().widgets.github;
     const user = g.user.trim();
@@ -337,6 +346,7 @@ export function mountSideWidgets(root, store) {
     if (profile.target) githubLink.target = profile.target;
     else githubLink.removeAttribute('target');
     if (!user) {
+      shownGithub = null;
       renderGithubSetup();
       return;
     }
@@ -351,16 +361,20 @@ export function mountSideWidgets(root, store) {
     // the extension's github.com host permission lets it be read across origins.
     const calendar = feed(`github-cal:${user}`, ttl, async () => parseContributions(
       await fetchText(`https://github.com/users/${encodeURIComponent(user)}/contributions`)));
-    const activity = feed(`github-v5:${user}:${token ? 'token' : 'public'}`, ttl, async () => {
+    // Issues and commits are both fetched whatever Show says, so switching it never waits.
+    const activity = feed(`github-v6:${user}:${token ? 'token' : 'public'}`, ttl, async () => {
       // Commit search finds the user's commits in every repo and organisation (default branches);
       // GitHub's events feed returns nothing for this account. The 100 newest also tell which
       // organisations to ask for private repos.
       const commitQuery = encodeURIComponent(`author:${user}`);
       const prQuery = encodeURIComponent(`is:pr is:open involves:${user}`);
+      // Issues the user opened, is assigned to, is mentioned in or commented on.
+      const issueQuery = encodeURIComponent(`is:issue is:open involves:${user} archived:false`);
       const asList = list => (Array.isArray(list) ? list : []);
-      const [searched, pulls, ownPrivate] = await Promise.all([
+      const [searched, pulls, issues, ownPrivate] = await Promise.all([
         fetchJson(`${GITHUB}/search/commits?q=${commitQuery}&sort=author-date&order=desc&per_page=100`, headers).then(parseCommits),
-        fetchJson(`${GITHUB}/search/issues?q=${prQuery}&sort=updated&per_page=4`, headers).then(parsePulls),
+        fetchJson(`${GITHUB}/search/issues?q=${prQuery}&sort=updated&per_page=4`, headers).then(parseIssues),
+        fetchJson(`${GITHUB}/search/issues?q=${issueQuery}&sort=updated&per_page=${ISSUES}`, headers).then(parseIssues),
         token
           ? fetchJson(`${GITHUB}/user/repos?visibility=private&sort=pushed&per_page=30`, headers).then(asList).catch(() => [])
           : [],
@@ -389,16 +403,19 @@ export function mountSideWidgets(root, store) {
       const tokenInfo = token
         ? { privateRepos: tokenRepos.length, unreadable, withCommits: privateCommits.filter(c => c.length).length, owners: [user, ...orgs] }
         : null;
-      return { commits: latestCommits([...searched, ...privateCommits.flat()], COMMITS), pulls, tokenInfo };
+      return { commits: latestCommits([...searched, ...privateCommits.flat()], COMMITS), pulls, issues, tokenInfo };
     });
     const [result, cal] = await Promise.all([activity, calendar]);
-    if (my === githubSeq) renderGithub(result, user, cal);
+    if (my !== githubSeq) return;
+    shownGithub = [result, user, cal];
+    renderGithub(...shownGithub);
   }
 
   // ---- wiring ----
 
   let marketsConf = null;
   let githubConf = null;
+  let githubShow = null;
   let marketsTimer = 0;
   let githubTimer = 0;
 
@@ -417,11 +434,15 @@ export function mountSideWidgets(root, store) {
       marketsTimer = setTimeout(loadMarkets, first ? 0 : RECONFIGURE_MS);
     }
     const nextGithub = JSON.stringify([w.github.user, w.github.token, state.prefs.openInNewTab]);
+    const showChanged = w.github.show !== githubShow;
+    githubShow = w.github.show;
     if (w.github.enabled && nextGithub !== githubConf) {
       const first = githubConf === null;
       githubConf = nextGithub;
       clearTimeout(githubTimer);
       githubTimer = setTimeout(loadGithub, first ? 0 : RECONFIGURE_MS);
+    } else if (showChanged && shownGithub) {
+      renderGithub(...shownGithub);   // Show only changes what's drawn, so no fetch
     }
   }
 

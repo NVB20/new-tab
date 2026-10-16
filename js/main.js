@@ -20,7 +20,7 @@ mountGroups(document.getElementById('groups'), store);
 mountGrid(document.getElementById('grid'), store);
 startIconCache(store);
 mountWidgets(document.getElementById('widgets'), store);
-mountSideWidgets(document.getElementById('side-widgets'), store);
+mountSideWidgets(document.getElementById('side-widgets'), store, (id, anchor) => prefs.open(id, anchor));
 const prefs = setupPrefs(store);
 const jump = setupJump(store);
 const sidebar = setupSidebar();
