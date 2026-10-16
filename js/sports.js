@@ -51,7 +51,9 @@ const DEFAULT_SESSIONS = ['sprint', 'qualifying', 'race'];
 
 // A followed id ('nba:13', 'soccer:202') → { sport, id, abbr, name }; 'f1' and unknown ids → null.
 export function teamOf(followId) {
-  const [sport, id] = String(followId).split(':');
+  const parts = String(followId).split(':');
+  if (parts.length !== 2) return null;
+  const [sport, id] = parts;
   const team = TEAMS[sport]?.find(t => t.id === id);
   return team ? { sport, ...team } : null;
 }
@@ -103,6 +105,10 @@ const scoreOf = s => {
   return v == null || v === '' ? null : String(v);
 };
 
+// Links and logos come from a response we don't control: keep only https links, and logos from ESPN's CDN.
+const onlyFrom = (prefix, url) => (typeof url === 'string' && url.startsWith(prefix) ? url : '');
+const https = url => onlyFrom('https://', url);
+
 function side(competitors, where) {
   const c = competitors.find(x => x?.homeAway === where);
   const t = c?.team;
@@ -111,7 +117,7 @@ function side(competitors, where) {
     id: String(t.id),
     abbr: String(t.abbreviation ?? ''),
     name: String(t.displayName ?? t.abbreviation ?? ''),
-    logo: String(t.logo ?? t.logos?.[0]?.href ?? ''),
+    logo: onlyFrom('https://a.espncdn.com/', t.logo ?? t.logos?.[0]?.href),
     score: scoreOf(c.score),
     winner: c.winner === true,
   };
@@ -144,27 +150,36 @@ export function parseEspnEvent(e, sport, league) {
     home: { ...home, score: scored ? home.score : null },
     away: { ...away, score: scored ? away.score : null },
     tv: String(tv?.media?.shortName ?? tv?.names?.[0] ?? ''),
-    url: String(e.links?.find(l => l?.rel?.includes('summary') && l.rel.includes('desktop'))?.href ?? ''),
+    url: https(e.links?.find(l => l?.rel?.includes('summary') && l.rel.includes('desktop'))?.href),
   };
 }
 
-// A team's schedule → { type, events }. type is the part of the season ESPN sent: for NBA and
-// NFL, 1 preseason, 2 regular season, 3 playoffs.
+// A team's schedule → { type, events }, or null when the response isn't a schedule (events not a
+// list, or none of them readable). type is the part of the season ESPN sent: for NBA and NFL,
+// 1 preseason, 2 regular season, 3 playoffs, 5 the NBA play-in.
 export function parseSchedule(json, sport) {
-  const events = Array.isArray(json?.events) ? json.events.map(e => parseEspnEvent(e, sport)).filter(Boolean) : [];
-  const type = Number.isInteger(json?.requestedSeason?.type) ? json.requestedSeason.type : null;
+  if (!Array.isArray(json?.events)) return null;
+  const events = json.events.map(e => parseEspnEvent(e, sport)).filter(Boolean);
+  if (json.events.length && !events.length) return null;
+  const type = Number.isInteger(json.requestedSeason?.type) ? json.requestedSeason.type : null;
   return { type, events };
 }
 
-// ESPN sends only the current part of the season, so a schedule with no game still to come asks
-// for the next part too: the season type to add, else null.
-export function nextPhase({ type, events }) {
-  if (type !== 1 && type !== 2) return null;
-  return events.some(e => e.state !== 'post') ? null : type + 1;
+// ESPN sends only the current part of the season, so a schedule whose last game is within the
+// timeline's two weeks (or past) asks for the parts after it too: the season types to add.
+export function nextPhases({ type, events }, sport, now) {
+  if (events.some(e => e.start > now + 14 * DAY)) return [];
+  if (type === 1) return [2];
+  if (type === 2) return sport === 'nba' ? [5, 3] : sport === 'nfl' ? [3] : [];
+  return type === 5 ? [3] : [];
 }
 
-export const parseScoreboard = (json, sport, league) =>
-  (Array.isArray(json?.events) ? json.events.map(e => parseEspnEvent(e, sport, league)).filter(Boolean) : []);
+// A scoreboard's games, or null when the response isn't one.
+export function parseScoreboard(json, sport, league) {
+  if (!Array.isArray(json?.events)) return null;
+  const games = json.events.map(e => parseEspnEvent(e, sport, league)).filter(Boolean);
+  return json.events.length && !games.length ? null : games;
+}
 
 // What a source keeps in the cache: games from 3 days ago to 60 days ahead, and its next game
 // when there's none sooner.
@@ -181,7 +196,7 @@ export function applyLive(events, live) {
   const byId = new Map(live.map(g => [g.id, g]));
   return events.map(e => {
     const g = e.sport === 'f1' ? null : byId.get(e.id);
-    if (!g) return e;
+    if (!g || (e.state === 'post' && g.state !== 'post')) return e;
     return {
       ...e,
       state: g.state,
@@ -210,7 +225,7 @@ export const etDay = ms => ymd(ms, 'America/New_York').replaceAll('-', '');
 export function scoreboards(events, now) {
   const out = new Map();
   for (const e of events) {
-    if (e.sport === 'f1' || e.off || e.state === 'post' || e.start > now || now >= e.start + lengthOf(e) + DAY) continue;
+    if (e.sport === 'f1' || e.off || e.state === 'post' || (!e.timeValid && e.state === 'pre') || e.start > now || now >= e.start + lengthOf(e) + DAY) continue;
     if (e.sport === 'soccer' && !e.league) continue;
     const path = leaguePath(e.sport, e.league);
     const day = etDay(e.start);
@@ -305,13 +320,13 @@ export function rowState(e, now) {
   if (e.off) return 'off';
   if (e.sport === 'f1') return now < e.start ? 'pre' : now < e.start + lengthOf(e) ? 'live' : 'final';
   if (e.state === 'post') return 'final';
-  if (now < e.start) return 'pre';
+  if (now < e.start || (!e.timeValid && e.state === 'pre')) return 'pre';
   return now < e.start + 2 * lengthOf(e) ? 'live' : 'final';
 }
 
 // W, L or D for the followed side of a game with a score; '' without a score or a single side.
 export function resultFor(e, side) {
-  if ((side !== 'home' && side !== 'away') || e.home.score == null || e.away.score == null) return '';
+  if (e.state !== 'post' || (side !== 'home' && side !== 'away') || e.home.score == null || e.away.score == null) return '';
   const mine = e[side];
   const other = side === 'home' ? e.away : e.home;
   const a = Number(mine.score);
@@ -359,7 +374,9 @@ export const longDay = (ms, timeZone) => new Intl.DateTimeFormat('en-GB', { time
 // start within `days` or are still listed after starting; a followed team (or F1) with none of
 // those adds its next event. A game between two followed teams is one row.
 export function timeline(events, { follow, f1Sessions, now, timeZone, days = 14 }) {
-  const unique = [...new Map(events.map(e => [e.id, e])).values()].filter(e => follows(e, follow, f1Sessions));
+  const byId = new Map();
+  for (const e of events) if (!byId.has(e.id) || (e.state === 'post' && byId.get(e.id).state !== 'post')) byId.set(e.id, e);
+  const unique = [...byId.values()].filter(e => follows(e, follow, f1Sessions));
   const chosen = new Set(unique.filter(e => shown(e, now) && e.start < now + days * DAY));
   for (const id of follow) {
     const own = unique.filter(e => (id === 'f1' ? e.sport === 'f1' : followedSide(e, [id]) !== null));
@@ -375,4 +392,15 @@ export function timeline(events, { follow, f1Sessions, now, timeZone, days = 14 
     groups.get(day).events.push({ ...e, side: followedSide(e, follow), status: rowState(e, now) });
   }
   return [...groups.values()];
+}
+
+// Several cache results as one: every event, the oldest time among the parts that have data, the
+// first error. A part that failed with nothing saved has at 0 and doesn't date the rest.
+export function joinParts(parts) {
+  const have = parts.filter(p => p.data);
+  return {
+    data: have.length ? parts.flatMap(p => p.data ?? []) : null,
+    at: have.length ? Math.min(...have.map(p => p.at)) : 0,
+    error: parts.find(p => p.error)?.error,
+  };
 }

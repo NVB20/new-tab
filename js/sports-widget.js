@@ -7,7 +7,7 @@ import { feed, fetchJson, peek, sweep } from './net.js';
 import { timeAgo } from './feeds.js';
 import { copyById, TYPES } from './layout.js';
 import {
-  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, F1_SESSIONS, F1_SESSION_LABELS, teamOf, schedulePath, parseSchedule, nextPhase,
+  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, F1_SESSIONS, F1_SESSION_LABELS, teamOf, schedulePath, parseSchedule, nextPhases, joinParts,
   parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl, etDay, parseF1Season, parseF1Last, raceAwaitingResult,
   timeline, resultFor, formatTime, isNight, longDay,
 } from './sports.js';
@@ -33,35 +33,36 @@ function sourceKeys(id) {
   return sport === 'soccer' ? [`${KEY}:soccer:${team}:next`, `${KEY}:soccer:${team}:last`] : [`${KEY}:team:${sport}:${team}`];
 }
 
-// Several cache results as one: every event, the oldest time, the first error.
-const joined = parts => ({
-  data: parts.some(p => p.data) ? parts.flatMap(p => p.data ?? []) : null,
-  at: Math.min(...parts.map(p => p.at)),
-  error: parts.find(p => p.error)?.error,
-});
-
 const trimmed = events => trimEvents(events, Date.now());
 
+// A parser's null means the response wasn't what we expect: fail, so feed() keeps the last good data.
+const must = (value, source) => {
+  if (value == null) throw new Error(`Unexpected ${source} response`);
+  return value;
+};
+
 async function loadSource(id) {
-  if (id === 'f1') return feed(F1_SEASON, F1_TTL, async () => parseF1Season(await fetchJson(`${JOLPICA}/current.json`)));
+  if (id === 'f1') return feed(F1_SEASON, F1_TTL, async () => must(parseF1Season(await fetchJson(`${JOLPICA}/current.json`)), 'Jolpica'));
   const { sport, id: team } = teamOf(id);
   const [key, lastKey] = sourceKeys(id);
   const url = `${ESPN}/${schedulePath(sport, team)}`;
+  const schedule = async from => must(parseSchedule(await fetchJson(from), sport), 'ESPN');
   if (sport === 'soccer') {
-    return joined(await Promise.all([
-      feed(key, SCHEDULE_TTL, async () => trimmed(parseSchedule(await fetchJson(`${url}?fixture=true`), sport).events)),
-      feed(lastKey, SCHEDULE_TTL, async () => trimmed(parseSchedule(await fetchJson(url), sport).events)),
+    return joinParts(await Promise.all([
+      feed(key, SCHEDULE_TTL, async () => trimmed((await schedule(`${url}?fixture=true`)).events)),
+      feed(lastKey, SCHEDULE_TTL, async () => trimmed((await schedule(url)).events)),
     ]));
   }
   return feed(key, SCHEDULE_TTL, async () => {
-    const first = parseSchedule(await fetchJson(url), sport);
-    const next = nextPhase(first);
-    const more = next ? parseSchedule(await fetchJson(`${url}?seasontype=${next}`), sport).events : [];
-    return trimmed([...first.events, ...more]);
+    const first = await schedule(url);
+    // The later parts of the season: one that fails or isn't what we expect counts as empty.
+    const more = await Promise.all(nextPhases(first, sport, Date.now()).map(
+      phase => schedule(`${url}?seasontype=${phase}`).then(x => x.events, () => [])));
+    return trimmed([...first.events, ...more.flat()]);
   });
 }
 
-const cachedSource = id => joined(sourceKeys(id).map(key => peek(key) ?? { data: null, at: 0 }));
+const cachedSource = id => joinParts(sourceKeys(id).map(key => peek(key) ?? { data: null, at: 0 }));
 
 // Every scoreboard that matters: its saved copy, refreshed when boardTtl says it's due.
 async function loadLive(events) {
@@ -71,7 +72,7 @@ async function loadLive(events) {
     const ttl = boardTtl(b, events, saved, now);
     if (ttl == null) return saved;
     const { data } = await feed(liveKey(b), ttl,
-      async () => parseScoreboard(await fetchJson(`${ESPN}/${b.path}/scoreboard?dates=${b.day}`), b.sport, b.league));
+      async () => must(parseScoreboard(await fetchJson(`${ESPN}/${b.path}/scoreboard?dates=${b.day}`), b.sport, b.league), 'ESPN'));
     return data ?? saved;
   }));
   return boards.flat();
@@ -80,13 +81,14 @@ async function loadLive(events) {
 const cachedLive = events => scoreboards(events, Date.now()).flatMap(b => peek(liveKey(b))?.data ?? []);
 
 // The podium of the race awaiting its result, once Jolpica has it.
-async function loadPodium(events) {
+async function loadPodium(events, f1Sessions) {
+  if (!f1Sessions.includes('race')) return null;
   const race = raceAwaitingResult(events, Date.now());
   if (!race) return null;
   const isRace = r => r?.season === race.season && r.round === race.round;
   const saved = peek(F1_LAST)?.data;
   if (isRace(saved)) return saved;
-  const { data } = await feed(F1_LAST, F1_LAST_TTL, async () => parseF1Last(await fetchJson(`${JOLPICA}/current/last/results.json`)));
+  const { data } = await feed(F1_LAST, F1_LAST_TTL, async () => must(parseF1Last(await fetchJson(`${JOLPICA}/current/last/results.json`)), 'Jolpica'));
   return isRace(data) ? data : null;
 }
 
@@ -188,6 +190,9 @@ export function mountSports(root, store, copy) {
 
   const pickLink = text => el('button', { type: 'button', class: 'link-btn', text, onclick: () => setEditing(true) });
 
+  // Every followed source failed with nothing saved: the notes say so, "no games" would be a guess.
+  const nothingLoaded = follow => follow.every(id => sources.get(id)?.error && !sources.get(id).data);
+
   function render() {
     const s = settings();
     if (!s.follow.length) {
@@ -198,7 +203,7 @@ export function mountSports(root, store, copy) {
     const days = timeline(applyLive(events(), live), { follow: s.follow, f1Sessions: s.f1Sessions, now: Date.now() });
     list.replaceChildren(...(days.length
       ? days.flatMap(d => [el('div', { class: 'sp-day', text: d.label }), ...d.events.map(row)])
-      : [widgetEmpty(loaded ? 'No games scheduled yet' : 'Loading…')]));
+      : loaded && nothingLoaded(s.follow) ? [] : [widgetEmpty(loaded ? 'No games scheduled yet' : 'Loading…')]));
     const hint = !s.edited && !s.follow.some(id => /^(nba|nfl):/.test(id));
     notes.replaceChildren(...problems(s.follow),
       ...(hint ? [el('p', { class: 'widget-note' }, pickLink('Pick your NBA and NFL teams'))] : []));
@@ -275,14 +280,20 @@ export function mountSports(root, store, copy) {
   let seq = 0;
   async function load() {
     const my = ++seq;
-    const { follow } = settings();
-    const entries = await Promise.all(follow.map(async id => [id, await loadSource(id)]));
+    try {
+      const { follow, f1Sessions } = settings();
+      const entries = await Promise.all(follow.map(async id => [id, await loadSource(id)]));
+      if (my !== seq) return;
+      sources = new Map(entries);
+      const [games, result] = await Promise.all([loadLive(events()), loadPodium(events(), f1Sessions)]);
+      if (my !== seq) return;
+      live = games;
+      podium = result;
+    } catch (error) {
+      // feed() reports its own failures; this is anything else going wrong. Draw what we have.
+      console.error('Sports widget', error);
+    }
     if (my !== seq) return;
-    sources = new Map(entries);
-    const [games, result] = await Promise.all([loadLive(events()), loadPodium(events())]);
-    if (my !== seq) return;
-    live = games;
-    podium = result;
     loaded = true;
     render();
   }

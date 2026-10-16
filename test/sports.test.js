@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
-  parseEspnEvent, parseSchedule, nextPhase, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
+  parseEspnEvent, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
   parseF1Season, parseF1Last, raceAwaitingResult,
   rowState, resultFor, followedSide, dayKey, dayLabel, formatTime, isNight, longDay, timeline,
 } from '../js/sports.js';
@@ -158,18 +158,43 @@ test('parseScoreboard reads live games; a soccer scoreboard is told its competit
   assert.equal(game.away.score, '67');
   const [match] = parseScoreboard({ events: [{ ...miamiAtAtlanta, league: undefined }] }, 'soccer', 'usa.1');
   assert.equal(match.tag, 'MLS');
-  assert.deepEqual(parseScoreboard({}, 'nba'), []);
+  assert.equal(parseScoreboard({}, 'nba'), null);
 });
 
-test('nextPhase asks for the next part of the season once one is over, never past the playoffs', () => {
-  const pre = parseSchedule({ requestedSeason: { type: 1 }, events: [chiefsAtRaiders] }, 'nfl');
-  assert.equal(pre.type, 1);
-  assert.equal(nextPhase(pre), 2);
-  assert.equal(nextPhase(parseSchedule({ requestedSeason: { type: 2 }, events: [chiefsAtRaiders, chargersAtChiefs] }, 'nfl')), null);
-  assert.equal(nextPhase(parseSchedule({ requestedSeason: { type: 2 }, events: [] }, 'nfl')), 3);
-  assert.equal(nextPhase(parseSchedule({ requestedSeason: { type: 3 }, events: [] }, 'nfl')), null);
-  assert.equal(nextPhase(parseSchedule({ requestedSeason: { type: 13846 }, events: [] }, 'soccer')), null);   // MLS season types
-  assert.deepEqual(parseSchedule(null, 'nba'), { type: null, events: [] });
+test('parseSchedule and parseScoreboard return null for a response that is not a schedule, so it never replaces saved data', () => {
+  assert.equal(parseSchedule(null, 'nba'), null);
+  assert.equal(parseSchedule({ events: 'x' }, 'nba'), null);
+  assert.equal(parseSchedule({ events: [{ id: '1' }, null] }, 'nba'), null);   // events, none readable
+  assert.deepEqual(parseSchedule({ requestedSeason: { type: 2 }, events: [] }, 'nba'), { type: 2, events: [] });   // a real empty schedule
+  assert.equal(parseSchedule({ events: [chiefsAtRaiders] }, 'nfl').events.length, 1);
+  assert.equal(parseScoreboard(null, 'nba'), null);
+  assert.equal(parseScoreboard({ events: {} }, 'nba'), null);
+  assert.equal(parseScoreboard({ events: [{}] }, 'nba'), null);
+  assert.deepEqual(parseScoreboard({ events: [] }, 'nba'), []);
+});
+
+test('nextPhases asks for the following parts of the season once the current one has no game in the next two weeks', () => {
+  const NOW0 = Date.parse('2026-10-16T12:00Z');
+  const at = d => ({ start: NOW0 + d * 86400e3 });
+  const phases = (type, events, sport) => nextPhases({ type, events }, sport, NOW0);
+  assert.deepEqual(phases(1, [at(-3), at(5)], 'nba'), [2]);          // preseason, a game still to come
+  assert.deepEqual(phases(2, [at(-3), at(20)], 'nba'), []);          // regular season goes on past the window
+  assert.deepEqual(phases(2, [at(-3), at(10)], 'nba'), [5, 3]);   // the last game is inside the window
+  assert.deepEqual(phases(2, [at(-3), at(-1)], 'nba'), [5, 3]);      // regular season ending: play-in, playoffs
+  assert.deepEqual(phases(2, [], 'nba'), [5, 3]);
+  assert.deepEqual(phases(2, [at(-3)], 'nfl'), [3]);
+  assert.deepEqual(phases(5, [at(-3)], 'nba'), [3]);
+  assert.deepEqual(phases(3, [], 'nba'), []);
+  assert.deepEqual(phases(13846, [], 'soccer'), []);                  // MLS season types
+  assert.deepEqual(phases(null, [], 'nba'), []);
+});
+
+test('joinParts: every part events, the oldest time among parts with data, the first error', () => {
+  const error = new Error('HTTP 500');
+  assert.deepEqual(joinParts([{ data: [{ id: 'a' }], at: 1000 }, { data: null, at: 0, error }]), { data: [{ id: 'a' }], at: 1000, error });
+  assert.deepEqual(joinParts([{ data: [{ id: 'a' }], at: 3000 }, { data: [{ id: 'b' }], at: 2000 }]),
+    { data: [{ id: 'a' }, { id: 'b' }], at: 2000, error: undefined });
+  assert.deepEqual(joinParts([{ data: null, at: 0, error }, { data: null, at: 0 }]), { data: null, at: 0, error });
 });
 
 // Parsed games for the logic below.
@@ -387,3 +412,48 @@ test('timeline adds the next game of a team with nothing in the window, and list
   assert.deepEqual(timeline(events, { follow: [], f1Sessions: [], now: NOW, timeZone: TZ }), []);
 });
 
+
+test('M1: a final schedule game is not replaced by an unfinished scoreboard copy; timeline prefers the final copy', () => {
+  const final = game({ id: '1', state: 'post', detail: 'Final', home: { ...lal, score: '100' }, away: { ...gs, score: '90' } });
+  const stale = game({ id: '1', state: 'in', detail: 'Q4 1:00', home: { ...lal, score: '98' }, away: { ...gs, score: '90' } });
+  assert.equal(applyLive([final], [stale])[0].state, 'post');
+  assert.equal(applyLive([final], [stale])[0].home.score, '100');
+  const days = timeline([stale, final], { follow: ['nba:13'], f1Sessions: [], now: NOW, timeZone: TZ });
+  assert.equal(days[0].events[0].state, 'post');
+  assert.equal(days[0].events[0].home.score, '100');
+});
+
+test('M2: resultFor needs a final game', () => {
+  const g = state => game({ state, home: { ...lal, score: '50' }, away: { ...gs, score: '40' } });
+  assert.equal(resultFor(g('in'), 'home'), '');
+  assert.equal(resultFor(g('pre'), 'home'), '');
+  assert.equal(resultFor(g('post'), 'home'), 'W');
+});
+
+test('M3: a game with no set time that is still "pre" is never live', () => {
+  const tbd = game({ start: NOW - 3600e3, timeValid: false });
+  assert.equal(rowState(tbd, NOW), 'pre');
+  assert.equal(rowState({ ...tbd, state: 'in' }, NOW), 'live');
+  assert.deepEqual(scoreboards([tbd], NOW), []);
+});
+
+test('M4: links must be https and logos come from ESPN CDN', () => {
+  const bad = (href, logo) => ({
+    ...chargersAtChiefs, links: link(href),
+    competitions: [{ ...chargersAtChiefs.competitions[0], competitors: chargersAtChiefs.competitions[0].competitors.map(c => ({ ...c, team: { ...c.team, logos: [{ href: logo }] } })) }],
+  });
+  const g = parseEspnEvent(bad('javascript:alert(1)', 'https://evil.example/x.png'), 'nfl');
+  assert.equal(g.url, '');
+  assert.equal(g.home.logo, '');
+  const http = parseEspnEvent(bad('http://www.espn.com/x', 'http://a.espncdn.com/x.png'), 'nfl');
+  assert.equal(http.url, '');
+  assert.equal(http.home.logo, '');
+  const ok = parseEspnEvent(bad('https://www.espn.com/x', 'https://a.espncdn.com/x.png'), 'nfl');
+  assert.equal(ok.url, 'https://www.espn.com/x');
+  assert.equal(ok.home.logo, 'https://a.espncdn.com/x.png');
+});
+
+test('M5: a followed id is exactly sport:id', () => {
+  assert.equal(teamOf('nba:13:extra'), null);
+  assert.deepEqual(cleanSports({ follow: ['nba:13:extra', 'nba:13'] }).follow, ['nba:13']);
+});
