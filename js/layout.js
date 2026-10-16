@@ -6,6 +6,7 @@ import { uid, clamp } from './util.js';
 import { cleanMarketItems } from './feeds.js';
 import { cleanSports } from './sports.js';
 import { siteUrl, siteDomain } from './website.js';
+import { VIEWS as TASK_VIEWS } from './tasks.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -36,7 +37,11 @@ export const TYPES = {
       colon: bool(s.colon, true),
     }),
   },
-  tasks: { label: 'Tasks', icon: 'check-circle', size: [3, 4], min: [2, 3], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
+  tasks: {
+    label: 'Tasks', icon: 'check-circle', size: [3, 4], min: [2, 3], max: 1, prefs: null,
+    defaults: () => ({ view: 'all', showDone: false }),
+    clean: s => ({ view: TASK_VIEWS.includes(s.view) ? s.view : 'all', showDone: bool(s.showDone, false) }),
+  },
   notes: { label: 'Notes', icon: 'note', size: [3, 3], min: [2, 2], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
   claude: { label: 'Claude', icon: 'claude', size: [3, 2], min: [2, 2], max: 5, prefs: null, defaults: () => ({}), clean: () => ({}) },
   markets: {
@@ -166,7 +171,7 @@ export function defaultLayout(old) {
   // The bar used to sit among the tiles; a bar under them all (-1) stays at the bottom.
   if (old.search.enabled !== false) types.push('search');
   const widgets = defaultPositions([...types, 'tiles'], w.position, old.search.row === -1 ? 'bottom' : 'top').map(p => ({
-    id: uid(), ...p, settings: settings[p.type] ? settings[p.type]() : {},
+    id: uid(), ...p, settings: settings[p.type] ? settings[p.type]() : TYPES[p.type].defaults(),
   }));
   return { cols: COLS, rows: ROWS, widgets };
 }

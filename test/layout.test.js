@@ -38,6 +38,7 @@ test('the default conversion mirrors today\'s page', () => {
   assert.deepEqual(t.clock.settings, { hour24: true, name: 'Niv', greeting: true, face: 'serif', colon: true });
   assert.deepEqual(t.tiles.settings, { group: null, columns: 5 });
   assert.deepEqual(t.search.settings, {});
+  assert.deepEqual(t.tasks.settings, { view: 'all', showDone: false });
   assert.deepEqual(t.markets.settings, { items: ['BTC', 'USD/ILS'] });
   assert.deepEqual(t.github.settings, { parts: GITHUB_PARTS });
   assert.ok(l.widgets.every(c => typeof c.id === 'string' && c.id));
@@ -257,6 +258,13 @@ test('prefsSection says where Preferences keeps a type’s settings', () => {
   assert.equal(prefsSection('search'), 'search');
   for (const type of ['tasks', 'notes', 'claude']) assert.equal(prefsSection(type), null, type);
   assert.equal(prefsSection('weather'), 'layout');   // an unknown type falls back to its own group
+});
+
+test('Tasks: a view and whether Finished is open, cleaned to valid values', () => {
+  assert.deepEqual(TYPES.tasks.defaults(), { view: 'all', showDone: false });
+  assert.deepEqual(TYPES.tasks.clean({}), { view: 'all', showDone: false });
+  assert.deepEqual(TYPES.tasks.clean({ view: 'upcoming', showDone: true }), { view: 'upcoming', showDone: true });
+  assert.deepEqual(TYPES.tasks.clean({ view: 'someday', showDone: 'yes' }), { view: 'all', showDone: false });
 });
 
 test('Sports: its own settings, never added to an old page, kept by Reset layout under Markets and GitHub', () => {

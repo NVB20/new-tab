@@ -3,7 +3,7 @@
 
 import { uid } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
-import { isDay, PRIORITIES } from './tasks.js';
+import { isDay, PRIORITIES, REPEATS } from './tasks.js';
 import { defaultLayout, normalizeLayout } from './layout.js';
 
 export const DEFAULT_PREFS = {
@@ -136,6 +136,10 @@ export function normalizeState(raw) {
       doneAt: t.done ? time(t.doneAt) : null,
       due: isDay(t.due) ? t.due : null,
       priority: PRIORITIES.includes(t.priority) ? t.priority : null,
+      repeat: REPEATS.includes(t.repeat) && isDay(t.due) ? t.repeat : null,
+      subtasks: (Array.isArray(t.subtasks) ? t.subtasks : [])
+        .filter(st => isObj(st) && typeof st.text === 'string' && st.text.trim())
+        .map(st => ({ id: str(st.id) || uid(), text: st.text, done: !!st.done })),
     }));
   s.taskHistory = (Array.isArray(raw.taskHistory) ? raw.taskHistory : [])
     .filter(t => isObj(t) && typeof t.text === 'string' && Number.isFinite(t.clearedAt))

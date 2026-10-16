@@ -1,29 +1,135 @@
-// Tasks widget: add and tick tasks, right-click for due date, priority, edit and delete, drag to
-// reorder, and Sort / Clear done in the heading.
+// Tasks widget: tabs (All, Today, Upcoming, High), search, rows with a flag and a details tray
+// (task-row.js), an add bar that reads quick-add shorthand (task-parse.js), finished tasks folded
+// at the bottom of All, and drag to reorder.
 
-import { el, icon, showMenu, openDialog, field } from './ui.js';
+import { el, icon, showMenu, openDialog, field, widgetEmpty } from './ui.js';
+import { copyById, TYPES } from './layout.js';
 import {
-  addTask, toggleTask, deleteTask, clearDone, pruneHistory,
-  setDue, setPriority, editTask, moveTask, sortTasks, dueLabel, dayKey, isDay, PRIORITIES,
+  addTask, clearDone, pruneHistory, moveTask, sortTasks, viewTasks, todayCount,
+  dueLabel, dayKey, addDays, isDay, firstDue,
 } from './tasks.js';
+import { parseTask } from './task-parse.js';
+import { taskRow, priorityMenu, PRIORITY_LABEL } from './task-row.js';
 
 // Own drag type, so the tile grid and group tabs ignore dragged tasks.
 const TASK_MIME = 'application/x-newtab-task';
-const PRIORITY_LABEL = { high: 'High', medium: 'Medium', low: 'Low' };
+const TABS = [
+  { view: 'all', label: 'All' },
+  { view: 'today', label: 'Today' },
+  { view: 'upcoming', label: 'Upcoming' },
+  { view: 'high', label: 'High', icon: 'flag' },
+];
+const EMPTY = { today: 'Nothing due today', upcoming: 'Nothing coming up', high: 'No high-importance tasks' };
 
-function dayFromNow(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return dayKey(d.getTime());
+// What the add bar starts with in each view, so a new task stays in sight.
+function preset(view) {
+  const today = dayKey(Date.now());
+  return {
+    priority: view === 'high' ? 'high' : null,
+    due: view === 'today' ? today : view === 'upcoming' ? addDays(today, 1) : null,
+  };
 }
 
-const longDate = day => new Date(day + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+export function mountTasks(root, store, copy) {
+  const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.tasks.defaults();
+  const setSetting = (key, value) => store.update(s => {
+    const own = copyById(s, copy.id);
+    if (own) own.settings[key] = value;
+  });
 
-export function mountTasks(root, store) {
-  let editingId = null;
+  const ui = { editing: null, draft: '', openId: null, rolledId: null, focus: null, select: false, rendering: false };
+  let searching = false;
+  let query = '';
+  let shownView = null;
+  let shownDay = '';
+  let draft = preset('all');   // the add bar's own choices
   let dragId = null;
   let marked = null;   // the row showing a drop line
-  let shownDay = '';
+
+  // ---- heading: search, tabs, Sort ----
+
+  const searchButton = el('button', {
+    type: 'button',
+    class: 'icon-btn task-search-btn',
+    title: 'Search tasks',
+    'aria-label': 'Search tasks',
+    onclick: () => openSearch(),
+  }, icon('search', 16));
+  const counts = new Map();
+  const tabButtons = TABS.map(t => {
+    const count = el('span', { class: 'task-count', hidden: true });
+    counts.set(t.view, count);
+    return el('button', {
+      type: 'button',
+      class: 'task-tab',
+      dataset: { view: t.view },
+      // A narrow widget shows High as its flag alone.
+      title: t.icon ? `${t.label} importance` : null,
+      'aria-label': t.icon ? t.label : null,
+      onclick: () => setSetting('view', t.view),
+    }, t.icon && icon(t.icon, 12), el('span', { class: 'task-tab-label', text: t.label }), count);
+  });
+  const sortButton = el('button', {
+    type: 'button',
+    class: 'link-btn',
+    text: 'Sort',
+    title: 'Sort by due date, then importance',
+    onclick: () => store.update(sortTasks),
+  });
+  const tabs = el('div', { class: 'task-tabs', role: 'group', 'aria-label': 'Show' }, tabButtons, sortButton);
+
+  const searchInput = el('input', {
+    type: 'search',
+    placeholder: 'Search tasks',
+    'aria-label': 'Search tasks',
+    oninput: () => {
+      query = searchInput.value;
+      render();
+    },
+    onkeydown: e => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSearch();
+      }
+    },
+  });
+  const searchBar = el('div', { class: 'task-search', hidden: true },
+    icon('search', 14), searchInput,
+    el('button', { type: 'button', class: 'icon-btn', title: 'Close search', 'aria-label': 'Close search', onclick: () => closeSearch() }, icon('x', 12)));
+
+  function openSearch() {
+    searching = true;
+    render();
+    searchInput.focus();
+  }
+  function closeSearch() {
+    searching = false;
+    query = '';
+    searchInput.value = '';
+    render();
+    searchButton.focus();
+  }
+
+  // ---- list, empty line, Finished fold ----
+
+  const list = el('ul', { class: 'task-list' });
+  const empty = widgetEmpty();
+  const foldButton = el('button', {
+    type: 'button',
+    class: 'task-fold',
+    onclick: () => setSetting('showDone', !settings().showDone),
+  });
+  const clearButton = el('button', {
+    type: 'button',
+    class: 'link-btn',
+    text: 'Clear',
+    title: 'Remove finished tasks (kept in history for a week)',
+    onclick: () => store.update(s => { clearDone(s, Date.now()); }),
+  });
+  const foldHead = el('div', { class: 'task-fold-head' }, foldButton, clearButton);
+  const doneList = el('ul', { class: 'task-list task-done-list' });
+
+  // ---- add bar ----
 
   const input = el('input', {
     class: 'task-input',
@@ -32,149 +138,136 @@ export function mountTasks(root, store) {
     dir: 'auto',
     maxLength: 300,
     'aria-label': 'Add a task',
+    oninput: () => showDraft(),
     onkeydown: e => {
-      const text = input.value.trim();
-      if (e.key !== 'Enter' || !text) return;
+      if (e.key !== 'Enter') return;
+      const next = planned();
+      if (!next.text) return;
       input.value = '';
-      store.update(s => { addTask(s, text, Date.now()); });
+      draft = preset(settings().view);
+      showDraft();
+      store.update(s => { addTask(s, next.text, Date.now(), next); });
     },
   });
-  const list = el('ul', { class: 'task-list' });
-  const sortButton = el('button', {
+  const flagButton = el('button', {
     type: 'button',
-    class: 'link-btn',
-    text: 'Sort',
-    title: 'Sort by due date, then priority (finished tasks last)',
-    onclick: () => store.update(sortTasks),
+    class: 'task-add-btn',
+    onclick: () => priorityMenu(flagButton, planned().priority, level => {
+      draft.priority = level;
+      showDraft();
+      input.focus();
+    }),
   });
-  // Finished tasks move to a one-week history; the per-day completion counts stay.
-  const clearButton = el('button', {
+  const dateButton = el('button', {
     type: 'button',
-    class: 'link-btn',
-    title: 'Remove finished tasks (kept in history for a week)',
-    onclick: () => store.update(s => { clearDone(s, Date.now()); }),
+    class: 'task-add-btn',
+    onclick: () => {
+      const r = dateButton.getBoundingClientRect();
+      const set = day => () => {
+        draft.due = day;
+        showDraft();
+        input.focus();
+      };
+      const today = dayKey(Date.now());
+      showMenu(r.left, r.bottom + 4, [
+        { label: 'Today', icon: 'calendar', action: set(today) },
+        { label: 'Tomorrow', icon: 'calendar', action: set(addDays(today, 1)) },
+        { label: 'Pick a date…', icon: 'calendar', action: pickDate },
+        { label: 'No date', icon: 'x', action: set(null) },
+      ]);
+    },
   });
-  const section = el('section', { class: 'widget widget-tasks' },
-    el('h2', { class: 'widget-head' }, icon('check-circle', 18), el('span', { text: 'Tasks' }),
-      el('span', { class: 'widget-head-status task-actions' }, sortButton, clearButton)),
-    list,
-    el('label', { class: 'task-add' }, icon('plus', 16), input));
 
-  async function pickDate(task) {
-    const date = el('input', { type: 'date', value: task.due ?? dayKey(Date.now()) });
+  async function pickDate() {
+    const date = el('input', { type: 'date', value: draft.due ?? dayKey(Date.now()) });
     const ok = await openDialog({
       title: 'Due date',
       body: [field('Date', date)],
       actions: [{ label: 'Cancel', value: false }, { label: 'Set', primary: true, value: true }],
       validate: () => isDay(date.value),
     });
-    if (ok) store.update(s => setDue(s, task.id, date.value));
+    if (ok) draft.due = date.value;
+    showDraft();
+    input.focus();
   }
 
-  function taskMenu(e, task) {
-    const due = day => () => store.update(s => setDue(s, task.id, day));
-    showMenu(e.clientX, e.clientY, [
-      { label: 'Due today', icon: 'calendar', action: due(dayFromNow(0)) },
-      { label: 'Due tomorrow', icon: 'calendar', action: due(dayFromNow(1)) },
-      { label: 'Pick a date…', icon: 'calendar', action: () => pickDate(task) },
-      ...(task.due ? [{ label: 'Clear due date', icon: 'x', action: due(null) }] : []),
-      { separator: true },
-      { heading: 'Priority' },
-      ...[...PRIORITIES, null].map(level => ({
-        label: level ? PRIORITY_LABEL[level] : 'None',
-        icon: level ? 'dot' : 'circle',
-        className: level ? `prio-${level}` : '',
-        checked: task.priority === level,
-        action: () => store.update(s => setPriority(s, task.id, level)),
-      })),
-      { separator: true },
-      { label: 'Edit text', icon: 'edit', action: () => startEdit(task.id) },
-      { label: 'Delete', icon: 'trash', danger: true, action: () => store.update(s => deleteTask(s, task.id, Date.now())) },
-    ]);
+  // What Enter would add: the shorthand typed so far wins over the bar's own choices.
+  function planned() {
+    const p = parseTask(input.value, Date.now());
+    return { text: p.text, priority: p.priority ?? draft.priority, due: p.due ?? draft.due, repeat: p.repeat };
   }
 
-  function startEdit(id) {
-    editingId = id;
-    render();
-    const box = list.querySelector('.task-edit');
-    box?.focus();
-    box?.select();
+  function showDraft() {
+    const now = Date.now();
+    const { priority, due, repeat } = planned();
+    const day = due ?? (repeat ? firstDue(repeat, dayKey(now)) : null);
+    const label = day && dueLabel(day, now).text;
+    flagButton.className = 'task-add-btn' + (priority ? ` prio-${priority}` : '');
+    flagButton.title = priority ? `${PRIORITY_LABEL[priority]} importance` : 'Importance';
+    flagButton.setAttribute('aria-label', flagButton.title);
+    flagButton.replaceChildren(icon('flag', 14));
+    dateButton.title = label ? `Due ${label}` : 'Due date';
+    dateButton.setAttribute('aria-label', dateButton.title);
+    dateButton.replaceChildren(icon('calendar', 14), label || '', repeat ? icon('repeat', 12) : '');
   }
 
-  function finishEdit(id, text) {
-    if (editingId !== id) return;   // Enter already saved; this is the blur that follows
-    editingId = null;
-    if (text != null) store.update(s => editTask(s, id, text));
-    render();
-  }
+  const section = el('section', { class: 'widget widget-tasks' },
+    el('h2', { class: 'widget-head' }, icon('check-circle', 18), el('span', { text: 'Tasks' }), searchButton),
+    tabs,
+    searchBar,
+    list,
+    empty,
+    el('label', { class: 'task-add' }, icon('plus', 16), input, flagButton, dateButton),
+    foldHead,
+    doneList);
 
-  function textNode(task) {
-    if (task.id !== editingId) return el('span', { class: 'task-text', dir: 'auto', text: task.text });
-    const edit = el('input', {
-      class: 'task-edit',
-      type: 'text',
-      value: task.text,
-      dir: 'auto',
-      maxLength: 300,
-      'aria-label': 'Task text',
-      onkeydown: e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          finishEdit(task.id, edit.value);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          finishEdit(task.id, null);
-        }
-      },
-      onblur: () => finishEdit(task.id, edit.value),
-    });
-    return edit;
-  }
-
-  function row(task, now) {
-    const due = task.due && dueLabel(task.due, now);
-    return el('li', {
-      class: 'task' + (task.done ? ' done' : '') + (task.priority ? ` prio-${task.priority}` : ''),
-      dataset: { id: task.id },
-      draggable: task.id !== editingId,
-      oncontextmenu: e => {
-        e.preventDefault();
-        taskMenu(e, task);
-      },
-    },
-      el('button', {
-        class: 'task-check',
-        type: 'button',
-        role: 'checkbox',
-        'aria-checked': String(task.done),
-        'aria-label': task.done ? 'Mark as not done' : 'Mark as done',
-        title: task.priority ? `${PRIORITY_LABEL[task.priority]} priority` : null,
-        onclick: () => store.update(s => toggleTask(s, task.id, Date.now())),
-      }, task.done && icon('check', 12)),
-      textNode(task),
-      due && el('span', {
-        class: 'task-due' + (due.overdue && !task.done ? ' overdue' : ''),
-        text: due.text,
-        title: `Due ${longDate(task.due)}`,
-      }),
-      el('button', {
-        class: 'task-del icon-btn',
-        type: 'button',
-        title: 'Delete task',
-        'aria-label': 'Delete task',
-        onclick: () => store.update(s => deleteTask(s, task.id, Date.now())),
-      }, icon('x', 14)));
-  }
+  // ---- render ----
 
   function render() {
     const { tasks } = store.get();
+    const { view, showDone } = settings();
     const now = Date.now();
-    shownDay = dayKey(now);
-    list.replaceChildren(...tasks.map(t => row(t, now)));
-    const done = tasks.filter(t => t.done).length;
-    sortButton.hidden = tasks.length < 2;
-    clearButton.hidden = !done;
-    clearButton.textContent = `Clear done (${done})`;
+    const today = dayKey(now);
+    shownDay = today;
+    const active = section.contains(document.activeElement) ? document.activeElement.dataset.focus : null;
+
+    const { open, finished } = viewTasks(tasks, view, searching ? query : '', today);
+    const ctx = { store, ui, render, now, today, draggable: !searching && view !== 'upcoming' };
+    ui.rendering = true;
+    list.replaceChildren(...open.map(t => taskRow(t, ctx)), ...(searching ? finished.map(t => taskRow(t, ctx)) : []));
+    doneList.replaceChildren(...(!searching && showDone ? finished.map(t => taskRow(t, { ...ctx, draggable: false })) : []));
+    ui.rendering = false;
+    ui.rolledId = null;
+
+    // heading
+    tabs.hidden = searching;
+    searchBar.hidden = !searching;
+    searchButton.hidden = searching;
+    for (const b of tabButtons) b.setAttribute('aria-pressed', String(b.dataset.view === view));
+    const due = todayCount(tasks, today);
+    const count = counts.get('today');
+    count.hidden = !due.count;
+    count.textContent = String(due.count);
+    count.classList.toggle('overdue', due.overdue);
+    sortButton.hidden = view !== 'all' || open.length < 2;
+
+    // empty line and Finished fold
+    const nothing = searching ? !open.length && !finished.length : !open.length && view !== 'all';
+    empty.hidden = !nothing;
+    empty.textContent = searching ? 'No matches' : (EMPTY[view] ?? '');
+    foldHead.hidden = searching || view !== 'all' || !finished.length;
+    foldButton.setAttribute('aria-expanded', String(showDone));
+    foldButton.replaceChildren(icon('chevron', 12), `Finished (${finished.length})`);
+
+    // focus: a control asked for (ui.focus), else whichever had it before the rebuild
+    const want = ui.focus ?? active;
+    ui.focus = null;
+    if (want) {
+      const target = section.querySelector(`[data-focus="${CSS.escape(want)}"]`);
+      target?.focus({ preventScroll: true });
+      if (ui.select && want === 'edit') target?.select();
+    }
+    ui.select = false;
   }
 
   // ---- drag to reorder: the top half of a row drops above it, the bottom half below ----
@@ -222,16 +315,41 @@ export function mountTasks(root, store) {
     store.update(s => moveTask(s, id, beforeId));
   });
 
+  // ---- wiring ----
+
+  // A new view resets the add bar to that view's preset; other prefs changes only redraw when
+  // this copy's settings changed.
+  let conf = null;
+  function onPrefs(state) {
+    const own = copyById(state, copy.id);
+    if (!own) return;
+    section.classList.toggle('narrow', own.w < 3);
+    const next = JSON.stringify([own.settings.view, own.settings.showDone]);
+    if (next === conf) return;
+    conf = next;
+    if (own.settings.view !== shownView) {
+      shownView = own.settings.view;
+      draft = preset(shownView);
+      showDraft();
+    }
+    render();
+  }
+
   root.append(section);
   store.update(s => pruneHistory(s, Date.now()));
-  const unsubscribe = store.subscribe(render, ['tasks']);
-  // Due labels are relative to today, so redraw once the date changes.
-  const timer = setInterval(() => { if (dayKey(Date.now()) !== shownDay) render(); }, 60_000);
-  render();
+  const unsubscribe = [store.subscribe(render, ['tasks']), store.subscribe(onPrefs, ['prefs'])];
+  onPrefs(store.get());
+  // Due labels and the presets are relative to today, so redraw once the date changes.
+  const timer = setInterval(() => {
+    if (dayKey(Date.now()) === shownDay) return;
+    draft = preset(settings().view);
+    showDraft();
+    render();
+  }, 60_000);
   return {
     destroy() {
       clearInterval(timer);
-      unsubscribe();
+      unsubscribe.forEach(fn => fn());
     },
   };
 }
