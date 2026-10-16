@@ -62,8 +62,11 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
 
   // ---- drag: reorder inside, or drop outside the window to take the tile out ----
   let dragId = null;
-  const clearMarks = () => grid.querySelectorAll('.drop-before, .drop-after')
-    .forEach(n => n.classList.remove('drop-before', 'drop-after'));
+  let marked = null;   // the tile showing a drop mark
+  const clearMarks = () => {
+    marked?.classList.remove('drop-before', 'drop-after');
+    marked = null;
+  };
   const setOutside = on => {
     dialog.classList.toggle('drag-out', on);
   };
@@ -95,6 +98,7 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
     if (!tile || tile.dataset.id === dragId) return;
     const r = tile.getBoundingClientRect();
     tile.classList.add(e.clientX < r.left + r.width / 2 ? 'drop-before' : 'drop-after');
+    marked = tile;
   });
   dialog.addEventListener('drop', async e => {
     if (!dragId) return;
@@ -107,7 +111,7 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
       await settleFolder(store, folderId, left);
       return;
     }
-    const mark = grid.querySelector('.drop-before, .drop-after');
+    const mark = marked;
     if (!mark) return;
     const beforeId = mark.classList.contains('drop-after') ? (mark.nextElementSibling?.dataset?.id ?? null) : mark.dataset.id;
     clearMarks();

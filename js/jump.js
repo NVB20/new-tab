@@ -28,18 +28,23 @@ export function setupJump(store) {
   document.body.append(dialog);
 
   let items = [];
+  let nodes = [];   // the rendered row of each item
   let selected = 0;
   let seq = 0;
   let tabs = [];
   let closed = [];
 
+  // Only the old and the new row change.
+  function mark(node, on) {
+    node?.classList.toggle('selected', on);
+    node?.setAttribute('aria-selected', String(on));
+  }
+
   function select(i) {
+    mark(nodes[selected], false);
     selected = i;
-    list.querySelectorAll('.jump-item').forEach((node, j) => {
-      node.classList.toggle('selected', j === i);
-      node.setAttribute('aria-selected', String(j === i));
-    });
-    list.querySelectorAll('.jump-item')[i]?.scrollIntoView({ block: 'nearest' });
+    mark(nodes[i], true);
+    nodes[i]?.scrollIntoView({ block: 'nearest' });
   }
 
   async function activate(item, newTab) {
@@ -53,16 +58,16 @@ export function setupJump(store) {
 
   function render(sections) {
     items = sections.flatMap(s => s.items);
+    nodes = [];
     if (!items.length) {
       list.replaceChildren(el('p', { class: 'jump-empty', text: input.value.trim() ? 'No matches' : 'Type to search' }));
       return;
     }
-    let index = 0;
     list.replaceChildren(...sections.filter(s => s.items.length).map(s => el('div', { class: 'jump-group', role: 'group', 'aria-label': s.label },
       el('div', { class: 'jump-section', text: s.label }),
       s.items.map(item => {
-        const i = index++;
-        return el('div', {
+        const i = nodes.length;
+        return nodes[i] = el('div', {
           class: 'jump-item', role: 'option', 'aria-selected': 'false',
           onmousemove: () => { if (selected !== i) select(i); },
           onclick: e => activate(item, e.ctrlKey || e.metaKey),
@@ -80,10 +85,10 @@ export function setupJump(store) {
     const my = ++seq;
     const q = input.value.trim();
     const s = store.get();
-    const groupName = id => s.groups.find(g => g.id === id)?.title ?? '';
+    const groupNames = new Map(s.groups.map(g => [g.id, g.title]));
     // Folders have no address; the tiles inside them are listed like any other tile.
     const tileItems = s.tiles.filter(t => t.kind !== 'folder')
-      .map(t => ({ title: t.title, url: t.url, icon: t.icon, kind: groupName(t.groupId), groupId: t.groupId }));
+      .map(t => ({ title: t.title, url: t.url, icon: t.icon, kind: groupNames.get(t.groupId) ?? '', groupId: t.groupId }));
     const tabItems = tabs.map(t => ({ title: t.title, url: t.url, kind: 'Open tab', tab: t }));
     const closedItems = closed.map(c => ({ title: c.title, url: c.url, kind: 'Closed', sessionId: c.sessionId }));
 

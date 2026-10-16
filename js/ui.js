@@ -71,10 +71,19 @@ const ICONS = {
   circle: '<circle cx="12" cy="12" r="5"/>',
 };
 
+const iconCache = new Map();
+
+// Each icon's markup is parsed once per size; later calls clone it.
 export function icon(name, size = 18) {
-  const wrap = document.createElement('span');
-  wrap.innerHTML = `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] ?? ''}</svg>`;
-  return wrap.firstElementChild;
+  const key = `${name}:${size}`;
+  let svg = iconCache.get(key);
+  if (!svg) {
+    const wrap = document.createElement('span');
+    wrap.innerHTML = `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] ?? ''}</svg>`;
+    svg = wrap.firstElementChild;
+    iconCache.set(key, svg);
+  }
+  return svg.cloneNode(true);
 }
 
 // Image for a tile or link: custom icon → Chrome favicon → letter avatar.

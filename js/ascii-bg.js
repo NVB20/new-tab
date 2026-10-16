@@ -2,7 +2,7 @@
 // drift slowly, brighten softly around the mouse, and ripple outwards from a click on the page.
 // Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
 
-import { GLYPHS, hash2, streakField, falloff, ringOffset, level } from './ascii-field.js';
+import { GLYPHS, hash2, streakField, streakBlend, streakSway, falloff, ringOffset, level } from './ascii-field.js';
 
 const CHARSET = GLYPHS;
 const FONT = '"Cascadia Mono", Consolas, "SF Mono", Menlo, monospace';
@@ -58,7 +58,7 @@ export function mountAsciiBackground(canvas, store) {
   const seed = Math.floor(Math.random() * 1e6);
 
   let cols = 0, rows = 0, cw = 0, ch = 0, cwPx = 0, chPx = 0;
-  let chars, base, glow, fadeMs, blue, drawn;
+  let chars, base, glow, fadeMs, blue, drawn, blend, sway;
   let atlas = null;
   let mode = null;
   let enabled = false;
@@ -126,11 +126,14 @@ export function mountAsciiBackground(canvas, store) {
   // Recomputes the flowing streaks; letters that newly appear get a fresh glyph.
   function updateField() {
     const t = motion ? flowTime : 0;
-    for (let i = 0; i < cols * rows; i++) {
-      const v = streakField(i % cols, Math.floor(i / cols), t, seed);
-      if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
-      base[i] = v;
-      drawCell(i);
+    for (let c = 0; c < cols; c++) sway[c] = streakSway(c, t);
+    for (let r = 0, i = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++, i++) {
+        const v = streakField(c, r, t, seed, blend[i], sway[c]);
+        if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
+        base[i] = v;
+        drawCell(i);
+      }
     }
   }
 
@@ -153,9 +156,14 @@ export function mountAsciiBackground(canvas, store) {
     fadeMs = new Float32Array(n);
     blue = new Uint8Array(n);
     drawn = new Int16Array(n).fill(-2);
+    blend = new Float32Array(n);
+    sway = new Float32Array(cols);
     active.clear();
     ripples.length = 0;
-    for (let i = 0; i < n; i++) chars[i] = Math.floor(hash2(i % cols, Math.floor(i / cols), seed) * GLYPHS.length);
+    for (let i = 0; i < n; i++) {
+      chars[i] = Math.floor(hash2(i % cols, Math.floor(i / cols), seed) * GLYPHS.length);
+      blend[i] = streakBlend(i % cols, Math.floor(i / cols), seed);
+    }
     buildAtlas(dpr);
     updateField();
   }

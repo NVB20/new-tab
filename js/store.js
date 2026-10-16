@@ -111,7 +111,8 @@ export function normalizeState(raw) {
   for (const t of tiles) {
     if (t.folderId && (t.kind === 'folder' || folders.get(t.folderId)?.groupId !== t.groupId)) delete t.folderId;
   }
-  s.tiles = tiles.filter(t => t.kind !== 'folder' || tiles.some(c => c.folderId === t.id));
+  const used = new Set(tiles.map(t => t.folderId));
+  s.tiles = tiles.filter(t => t.kind !== 'folder' || used.has(t.id));
 
   s.activeGroupId = ids.has(raw.activeGroupId) ? raw.activeGroupId : s.groups[0].id;
   s.tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])
@@ -148,20 +149,44 @@ function normalizeMarkets(raw) {
 }
 
 export function pickAdapter() {
-  const area = globalThis.chrome?.storage?.local;
-  if (area) {
-    return {
-      get: async key => (await area.get(key))[key],
-      set: (key, value) => area.set({ [key]: value }),
-    };
-  }
-  return {
-    async get(key) {
+  const local = {
+    get(key) {
       const raw = localStorage.getItem('newtab:' + key);
       return raw == null ? undefined : JSON.parse(raw);
     },
-    async set(key, value) {
+    set(key, value) {
       localStorage.setItem('newtab:' + key, JSON.stringify(value));
+    },
+  };
+  const area = globalThis.chrome?.storage?.local;
+  if (!area) {
+    return {
+      get: async key => local.get(key),
+      set: async (key, value) => local.set(key, value),
+    };
+  }
+  return {
+    get: async key => (await area.get(key))[key],
+    set: (key, value) => area.set({ [key]: value }),
+    // A copy of the state in localStorage, which reads synchronously, so a new tab can render
+    // without waiting for chrome.storage. A failed write removes it rather than leave it stale.
+    cached() {
+      try {
+        return local.get('state');
+      } catch {
+        return undefined;
+      }
+    },
+    cache(value) {
+      try {
+        local.set('state', value);
+      } catch {
+        try {
+          localStorage.removeItem('newtab:state');
+        } catch {
+          // storage unavailable; chrome.storage still has everything
+        }
+      }
     },
   };
 }
@@ -171,9 +196,11 @@ export function createStore(adapter) {
   let wallpaper = '';
   let timer = null;
   let pending = null;
+  let edited = false;
   const subs = new Set();
 
   const snapshot = () => Object.fromEntries(KEYS.map(k => [k, JSON.stringify(state[k])]));
+  const readWallpaper = () => adapter.get('wallpaper').then(v => str(v), () => '');
 
   function notify(changed) {
     for (const sub of subs) {
@@ -181,27 +208,58 @@ export function createStore(adapter) {
     }
   }
 
+  function save() {
+    adapter.cache?.(state);
+    return adapter.set('state', state);
+  }
+
   function scheduleSave() {
     clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
-      pending = adapter.set('state', state);
+      pending = save();
     }, 200);
   }
 
+  // chrome.storage is the source of truth. If it disagrees with the localStorage copy the page
+  // started from (only after a failed copy, or an older version of the extension saving), its
+  // state replaces the copy, unless something was edited in the meantime.
+  async function verify() {
+    let fresh;
+    try {
+      fresh = await adapter.get('state');
+    } catch {
+      return;
+    }
+    if (fresh === undefined || edited) return;
+    const next = normalizeState(fresh);
+    if (JSON.stringify(next) === JSON.stringify(state)) return;
+    if (next.prefs.background.useUpload && !wallpaper) wallpaper = await readWallpaper();
+    if (edited) return;
+    state = next;
+    adapter.cache?.(state);
+    notify([...KEYS, 'wallpaper']);
+  }
+
   return {
+    // Resolves as soon as the state is known: straight away from the localStorage copy when
+    // there is one (chrome.storage is then checked in the background). The wallpaper, a data
+    // URL of up to a few MB, is only read when it is shown.
     async load() {
-      try {
-        state = normalizeState(await adapter.get('state'));
-      } catch (err) {
-        console.warn('Saved state unreadable, starting from defaults.', err);
-        state = defaultState();
+      const cached = adapter.cached?.();
+      if (cached !== undefined) {
+        state = normalizeState(cached);
+        verify();
+      } else {
+        try {
+          state = normalizeState(await adapter.get('state'));
+          adapter.cache?.(state);
+        } catch (err) {
+          console.warn('Saved state unreadable, starting from defaults.', err);
+          state = defaultState();
+        }
       }
-      try {
-        wallpaper = str(await adapter.get('wallpaper'));
-      } catch {
-        wallpaper = '';
-      }
+      wallpaper = state.prefs.background.useUpload ? await readWallpaper() : '';
       return state;
     },
 
@@ -218,12 +276,14 @@ export function createStore(adapter) {
       const after = snapshot();
       const changed = KEYS.filter(k => before[k] !== after[k]);
       if (!changed.length) return;
+      edited = true;
       scheduleSave();
       notify(changed);
     },
 
     replace(next) {
       state = normalizeState(next);
+      edited = true;
       scheduleSave();
       notify([...KEYS]);
     },
@@ -245,7 +305,7 @@ export function createStore(adapter) {
       if (timer) {
         clearTimeout(timer);
         timer = null;
-        await adapter.set('state', state);
+        await save();
       } else if (pending) {
         await pending;
       }
