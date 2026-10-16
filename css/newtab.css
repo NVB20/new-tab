@@ -89,6 +89,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 .icon { flex: none; display: block; }
 
+/* Scrollbars, everywhere: a thin rounded thumb on a clear track, no arrow buttons. It stays faint
+   until the pointer is over its panel, and widens under the pointer. Chrome ignores these when an
+   element sets scrollbar-width or scrollbar-color, so only Firefox gets those (below). */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 14%, transparent) padding-box;
+}
+:hover::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--text) 28%, transparent); }
+::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active {
+  border-width: 2px;
+  background-color: color-mix(in srgb, var(--text) 42%, transparent);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 28%, transparent) transparent; }
+}
+
 .bg {
   position: fixed;
   inset: calc(var(--bg-blur) * -2);
@@ -206,7 +226,7 @@ body.has-wallpaper .topbar .icon { filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.5
 /* A frame is a size container: the clock sizes its face from it (container query units). */
 .widget-frame { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; container-type: size; }
 .widget-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.widget-root > .widget { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
+.widget-root > .widget { flex: 1; min-height: 0; overflow: hidden auto; }
 body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
 /* The search bar keeps its height and sits in the middle of its frame. */
 .frame-search .widget-root { justify-content: center; }
@@ -216,7 +236,7 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
    inside .grid-wrap). --cols is the block's own column count. */
 .widget-tiles { display: flex; flex-direction: column; }
 .tiles-head { flex: none; }
-.widget-tiles .grid-wrap { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
+.widget-tiles .grid-wrap { flex: 1; min-height: 0; overflow: hidden auto; }
 .widget-tiles .grid-wrap.more-below { mask-image: linear-gradient(#000 calc(100% - 36px), transparent); -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
 .grid-wrap {
   display: grid;
