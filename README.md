@@ -51,7 +51,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist. |
+| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
@@ -142,6 +142,12 @@ copies can each follow their own list (say, coins in one and currencies in anoth
   are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
 - **Click a row** to open the coin's chart on Bybit (the index on CNBC, or the pair on Google
   Finance); the candles icon at the end opens it on TradingView.
+- **Drag a row** up or down to reorder the list; a line shows where it will land.
+- **Segments:** right-click a row and choose **New segment above** to put a heading over it (say,
+  *US* over SPY), type its name and press Enter (Esc cancels). The rows below a heading, up to the
+  next one, belong to it, and dragging a heading moves its rows with it. Right-click a heading to
+  rename or remove it (its rows stay, under the heading above), or right-click anywhere else in the
+  widget for a new segment at the bottom. Rows that belong to no segment stay at the top.
 
 Prices refresh every 30 seconds while the tab is open and visible, and all open new tabs share one
 copy, so having many tabs open doesn't multiply the requests.
