@@ -572,13 +572,14 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .prio-low { --prio: var(--prio-low); }
 .task-flag:is(.prio-high, .prio-medium, .prio-low),
 .task-add-btn:is(.prio-high, .prio-medium, .prio-low),
-.tray-chip:is(.prio-high, .prio-medium, .prio-low) .icon,
+.task-tray-chip:is(.prio-high, .prio-medium, .prio-low) .icon,
 .menu-item:is(.prio-high, .prio-medium, .prio-low) .icon { color: var(--prio); }
 /* A set flag is filled; an unset one is an outline. */
-:is(.task-flag, .task-add-btn, .tray-chip, .menu-item):is(.prio-high, .prio-medium, .prio-low) .icon path:last-child { fill: currentColor; }
+:is(.task-flag, .task-add-btn, .task-tray-chip, .menu-item):is(.prio-high, .prio-medium, .prio-low) .icon path:last-child { fill: currentColor; }
 
-.task-search-btn { width: 26px; height: 26px; margin: -4px -4px -4px auto; }
-.task-tabs { display: flex; align-items: center; gap: 2px; margin: -2px 0 6px; }
+.task-search-btn { width: 26px; height: 26px; margin: -4px 0 -4px auto; }
+/* The links on the right keep 2px clear of the edge, which would clip their last letter. */
+.task-tabs { display: flex; align-items: center; gap: 2px; margin: -2px 0 6px; padding-right: 2px; }
 .task-tab {
   display: inline-flex;
   align-items: center;
@@ -601,6 +602,8 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .task-tabs .link-btn { margin-left: auto; font-size: 11.5px; color: var(--muted); }
 .task-tabs .link-btn:hover { color: var(--text); }
 .widget-tasks.narrow .task-tab { padding: 3px 5px; font-size: 12px; }
+.widget-tasks.narrow .task-tab[data-view="high"] .task-tab-label { display: none; }
+.widget-tasks.narrow :is(.task-text, .task-edit) { flex-basis: 5em; }
 
 .task-search { display: flex; align-items: center; gap: 8px; margin: -2px 0 6px; padding: 2px 4px 2px 8px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
 .task-search:focus-within { border-color: var(--accent); }
@@ -609,7 +612,10 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .task-search .icon-btn { width: 22px; height: 22px; }
 
 .task-list { list-style: none; margin: 0; padding: 0; }
-.task-line { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+/* The meta (flag, date, counts) stays beside the text while the text keeps about 7em; in a
+   narrower widget it wraps onto its own line, on the right. */
+.task-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; padding: 5px 0; }
+.task-meta { flex: none; display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .task-check {
   flex: none;
   display: grid;
@@ -624,9 +630,9 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 }
 .task-check:hover { border-color: var(--accent); }
 .task.done .task-check { background: var(--accent); border-color: var(--accent); }
-.task-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: text; }
+.task-text { flex: 1 1 7em; min-width: 0; overflow-wrap: anywhere; cursor: text; }
 .task.done .task-text { color: var(--muted); text-decoration: line-through; }
-.task-edit { flex: 1; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid var(--accent); background: none; color: var(--text); font: inherit; outline: none; }
+.task-edit { flex: 1 1 7em; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid var(--accent); background: none; color: var(--text); font: inherit; outline: none; }
 
 .task-repeat { flex: none; display: inline-flex; color: var(--muted); }
 .task-subs, .task-due {
@@ -665,7 +671,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .task-tray {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
   gap: 8px 10px;
   margin: 2px 0 8px 26px;
   padding: 10px;
@@ -674,10 +680,10 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
   background: var(--hover);
   font-size: 12.5px;
 }
-.tray-label { color: var(--muted); font-size: 11.5px; }
-.tray-label-top { align-self: start; padding-top: 3px; }
-.tray-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.tray-chip {
+.task-tray-label { padding-top: 3px; color: var(--muted); font-size: 11.5px; }
+.task-tray-day { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.task-tray-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.task-tray-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -689,26 +695,29 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
   font: inherit;
   font-size: 12px;
 }
-.tray-chip:hover { color: var(--text); background: var(--hover); }
-.tray-chip[aria-pressed="true"] { color: var(--text); border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); background: var(--accent-soft); }
-.tray-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.tray-date, .tray-select { padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 12px; }
-.tray-date:focus, .tray-select:focus { outline: none; border-color: var(--accent); }
-.tray-clear { width: 20px; height: 20px; }
-.sub-list { list-style: none; margin: 0; padding: 0; }
-.sub { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
-.sub-check { flex: none; display: grid; place-items: center; width: 14px; height: 14px; padding: 0; border: 1.5px solid var(--muted); border-radius: 4px; background: none; color: #fff; }
-.sub-check:hover { border-color: var(--accent); }
-.sub.done .sub-check { background: var(--accent); border-color: var(--accent); }
-.sub-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: text; }
-.sub.done .sub-text { color: var(--muted); text-decoration: line-through; }
-.sub-del { width: 20px; height: 20px; opacity: 0; }
-.sub:hover .sub-del, .sub-del:focus-visible { opacity: 1; }
-.sub-add { display: flex; align-items: center; gap: 8px; padding: 2px 0; color: var(--muted); }
-.sub-add input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: var(--text); font: inherit; outline: none; }
-.sub-add input::placeholder { color: var(--muted); font-style: italic; }
-.tray-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11.5px; }
-.tray-foot .tray-delete { color: var(--danger); font-size: 12px; }
+.task-tray-chip:hover { color: var(--text); background: var(--hover); }
+.task-tray-chip[aria-pressed="true"] { color: var(--text); border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); background: var(--accent-soft); }
+.task-tray-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.task-tray-date, .task-tray-select { min-width: 0; max-width: 100%; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 12px; }
+.task-tray-date:focus, .task-tray-select:focus { outline: none; border-color: var(--accent); }
+.task-tray-clear { width: 20px; height: 20px; }
+.task-sub-list { list-style: none; margin: 0; padding: 0; }
+.task-sub { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.task-sub-check { flex: none; display: grid; place-items: center; width: 14px; height: 14px; padding: 0; border: 1.5px solid var(--muted); border-radius: 4px; background: none; color: #fff; }
+.task-sub-check:hover { border-color: var(--accent); }
+.task-sub.done .task-sub-check { background: var(--accent); border-color: var(--accent); }
+.task-sub-text { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: text; }
+.task-sub.done .task-sub-text { color: var(--muted); text-decoration: line-through; }
+.task-sub-del { width: 20px; height: 20px; opacity: 0; }
+.task-sub:hover .task-sub-del, .task-sub-del:focus-visible { opacity: 1; }
+.task-sub-add { display: flex; align-items: center; gap: 8px; padding: 2px 0; color: var(--muted); }
+.task-sub-add input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: var(--text); font: inherit; outline: none; }
+.task-sub-add input::placeholder { color: var(--muted); font-style: italic; }
+/* Narrow: each label above its controls. */
+.widget-tasks.narrow .task-tray { grid-template-columns: minmax(0, 1fr); gap: 4px; margin-left: 0; }
+.widget-tasks.narrow .task-tray-label:not(:first-child) { margin-top: 6px; }
+.task-tray-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11.5px; }
+.task-tray-foot .task-tray-delete { color: var(--danger); font-size: 12px; }
 
 .task-add { display: flex; align-items: center; gap: 8px; padding: 5px 0; color: var(--muted); cursor: text; }
 .task-add-btn {
@@ -729,7 +738,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .task-add-btn:hover { background: var(--hover); color: var(--text); }
 .task-add-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.task-fold-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+.task-fold-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding: 6px 2px 0 0; border-top: 1px solid var(--border); }
 .task-fold { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; }
 .task-fold:hover { color: var(--text); }
 .task-fold .icon { transition: transform 0.15s; }

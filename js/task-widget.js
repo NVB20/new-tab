@@ -63,8 +63,11 @@ export function mountTasks(root, store, copy) {
       type: 'button',
       class: 'task-tab',
       dataset: { view: t.view },
+      // A narrow widget shows High as its flag alone.
+      title: t.icon ? `${t.label} importance` : null,
+      'aria-label': t.icon ? t.label : null,
       onclick: () => setSetting('view', t.view),
-    }, t.icon && icon(t.icon, 12), t.label, count);
+    }, t.icon && icon(t.icon, 12), el('span', { class: 'task-tab-label', text: t.label }), count);
   });
   const sortButton = el('button', {
     type: 'button',

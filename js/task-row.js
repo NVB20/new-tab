@@ -122,32 +122,34 @@ export function taskRow(task, ctx) {
       },
     }, task.done && icon('check', 12)),
     editable(`task:${task.id}`, task.text, 'task-text', (s, value) => editTask(s, task.id, value)),
-    task.repeat && el('span', { class: 'task-repeat', title: REPEAT_TITLE[task.repeat] }, icon('repeat', 13)),
-    task.subtasks.length > 0 && el('button', {
-      type: 'button',
-      class: 'task-subs',
-      title: 'Subtasks',
-      dataset: { focus: `subs:${task.id}` },
-      onclick: toggleTray,
-    }, icon('check', 12), `${subsDone}/${task.subtasks.length}`),
-    flag,
-    due && el('button', {
-      type: 'button',
-      class: 'task-due' + (due.overdue && !task.done ? ' overdue' : ''),
-      text: due.text,
-      title: `Due ${longDate(task.due)}`,
-      dataset: { focus: `due:${task.id}` },
-      onclick: toggleTray,
-    }),
-    el('button', {
-      type: 'button',
-      class: 'task-more icon-btn',
-      title: open ? 'Close details' : 'Details',
-      'aria-label': open ? 'Close details' : 'Details',
-      'aria-expanded': String(open),
-      dataset: { focus: `more:${task.id}` },
-      onclick: toggleTray,
-    }, icon('caret', 16)));
+    // Everything after the text, kept together: in a narrow widget it wraps under the text.
+    el('span', { class: 'task-meta' },
+      task.repeat && el('span', { class: 'task-repeat', title: REPEAT_TITLE[task.repeat] }, icon('repeat', 13)),
+      task.subtasks.length > 0 && el('button', {
+        type: 'button',
+        class: 'task-subs',
+        title: 'Subtasks',
+        dataset: { focus: `subs:${task.id}` },
+        onclick: toggleTray,
+      }, icon('check', 12), `${subsDone}/${task.subtasks.length}`),
+      flag,
+      due && el('button', {
+        type: 'button',
+        class: 'task-due' + (due.overdue && !task.done ? ' overdue' : ''),
+        text: due.text,
+        title: `Due ${longDate(task.due)}`,
+        dataset: { focus: `due:${task.id}` },
+        onclick: toggleTray,
+      }),
+      el('button', {
+        type: 'button',
+        class: 'task-more icon-btn',
+        title: open ? 'Close details' : 'Details',
+        'aria-label': open ? 'Close details' : 'Details',
+        'aria-expanded': String(open),
+        dataset: { focus: `more:${task.id}` },
+        onclick: toggleTray,
+      }, icon('caret', 16))));
 
   return el('li', {
     class: 'task' + (task.done ? ' done' : '') + (open ? ' open' : '') + (ui.rolledId === task.id ? ' rolled' : ''),
@@ -162,10 +164,10 @@ export function taskRow(task, ctx) {
 function tray(task, ctx, editable, toggleTray) {
   const { store, ui, today } = ctx;
   const update = fn => store.update(fn);
-  const row = (label, ...controls) => [el('span', { class: 'tray-label', text: label }), el('div', { class: 'tray-chips' }, ...controls)];
+  const row = (label, ...controls) => [el('span', { class: 'task-tray-label', text: label }), el('div', { class: 'task-tray-chips' }, ...controls)];
   const chip = (label, pressed, focus, onclick, extra = {}) => el('button', {
     type: 'button',
-    class: 'tray-chip' + (extra.className ? ' ' + extra.className : ''),
+    class: 'task-tray-chip' + (extra.className ? ' ' + extra.className : ''),
     'aria-pressed': String(pressed),
     dataset: { focus },
     onclick,
@@ -174,14 +176,14 @@ function tray(task, ctx, editable, toggleTray) {
   const tomorrow = addDays(today, 1);
   const date = el('input', {
     type: 'date',
-    class: 'tray-date',
+    class: 'task-tray-date',
     value: task.due ?? '',
     'aria-label': 'Due date',
     dataset: { focus: `date:${task.id}` },
     onchange: () => { if (date.value) update(s => setDue(s, task.id, date.value)); },
   });
   const repeat = el('select', {
-    class: 'tray-select',
+    class: 'task-tray-select',
     'aria-label': 'Repeat',
     dataset: { focus: `repeat:${task.id}` },
     onchange: () => update(s => setRepeat(s, task.id, repeat.value || null, Date.now())),
@@ -202,21 +204,21 @@ function tray(task, ctx, editable, toggleTray) {
     },
   });
 
-  const subs = el('ul', { class: 'sub-list' },
-    task.subtasks.map(st => el('li', { class: 'sub' + (st.done ? ' done' : '') },
+  const subs = el('ul', { class: 'task-sub-list' },
+    task.subtasks.map(st => el('li', { class: 'task-sub' + (st.done ? ' done' : '') },
       el('button', {
         type: 'button',
-        class: 'sub-check',
+        class: 'task-sub-check',
         role: 'checkbox',
         'aria-checked': String(st.done),
         'aria-label': st.done ? 'Mark subtask as not done' : 'Mark subtask as done',
         dataset: { focus: `sub-check:${task.id}:${st.id}` },
         onclick: () => update(s => toggleSubtask(s, task.id, st.id)),
       }, st.done && icon('check', 10)),
-      editable(`sub:${task.id}:${st.id}`, st.text, 'sub-text', (s, value) => editSubtask(s, task.id, st.id, value)),
+      editable(`sub:${task.id}:${st.id}`, st.text, 'task-sub-text', (s, value) => editSubtask(s, task.id, st.id, value)),
       el('button', {
         type: 'button',
-        class: 'sub-del icon-btn',
+        class: 'task-sub-del icon-btn',
         title: 'Delete subtask',
         'aria-label': 'Delete subtask',
         dataset: { focus: `sub-del:${task.id}:${st.id}` },
@@ -225,7 +227,7 @@ function tray(task, ctx, editable, toggleTray) {
           update(s => deleteSubtask(s, task.id, st.id));
         },
       }, icon('x', 12)))),
-    el('li', { class: 'sub-add' }, icon('plus', 12), subAdd));
+    el('li', { class: 'task-sub-add' }, icon('plus', 12), subAdd));
 
   return el('div', {
     class: 'task-tray',
@@ -245,23 +247,22 @@ function tray(task, ctx, editable, toggleTray) {
     row('Due',
       chip('Today', task.due === today, `due-today:${task.id}`, () => update(s => setDue(s, task.id, today))),
       chip('Tomorrow', task.due === tomorrow, `due-tomorrow:${task.id}`, () => update(s => setDue(s, task.id, tomorrow))),
-      date,
-      task.due && el('button', {
+      el('span', { class: 'task-tray-day' }, date, task.due && el('button', {
         type: 'button',
-        class: 'icon-btn tray-clear',
+        class: 'icon-btn task-tray-clear',
         title: task.repeat ? 'Clear the date (ends the repeat)' : 'Clear the date',
         'aria-label': 'Clear the date',
         dataset: { focus: `due-clear:${task.id}` },
         onclick: () => update(s => setDue(s, task.id, null)),
-      }, icon('x', 12))),
+      }, icon('x', 12)))),
     row('Repeat', repeat),
-    el('span', { class: 'tray-label tray-label-top', text: 'Subtasks' }),
+    el('span', { class: 'task-tray-label', text: 'Subtasks' }),
     subs,
-    el('div', { class: 'tray-foot' },
+    el('div', { class: 'task-tray-foot' },
       el('span', { text: task.createdAt ? `Added ${shortDate(task.createdAt)}` : '' }),
       el('button', {
         type: 'button',
-        class: 'link-btn tray-delete',
+        class: 'link-btn task-tray-delete',
         text: 'Delete',
         dataset: { focus: `delete:${task.id}` },
         onclick: () => {
