@@ -52,6 +52,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
+| **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
@@ -210,6 +211,30 @@ written into backup files.
 | "Token sees N private repos but can't read commits in …" | Give it *Contents: Read-only*. |
 | Private issues or pull requests don't show | Give it *Issues* or *Pull requests: Read-only*. A fine-grained token only sees repos of its own owner. |
 
+## Sports
+
+Add the **Sports** widget in [Layout mode](#layout-mode). It lists what's coming up for the teams
+you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's time zone.
+
+- **Choose what's shown:** hover the widget and click **✎**. Press the NBA and NFL teams you
+  follow (hover a button for the team's full name), tick Messi's teams (Inter Miami, Argentina)
+  and F1, and pick the F1 sessions you want (Practice, Sprint, Qualifying, Race). Changes apply as
+  you go; **✓** closes the editor. A new widget follows Inter Miami, Argentina and F1.
+- **A row:** the league or competition (NBA, NFL, MLS, Leagues Cup, World Cup, F1, …), the
+  teams with yours in bold, the start time and the TV channel. A moon marks games that start
+  between midnight and 7 in the morning. Times follow the Clock's 12/24-hour setting.
+- **Live:** a red dot, the score and the clock (Q3 5:21, 67'). Scores refresh every 30 seconds
+  while the tab is open. F1 sessions read LIVE while they're scheduled to run.
+- **Results:** a finished game stays for a day with its score and W, L or D for your team; after
+  a race, the podium.
+- **Click a row** to open the game on ESPN (F1: the season on formula1.com).
+- The list covers the next 14 days; a team with nothing in that time still shows its next game.
+  Up to five copies can each follow their own list (say, F1 alone in a corner).
+
+Schedules come from ESPN's public site API and from Jolpica F1 (the successor of the Ergast API),
+both free and without a key. Team schedules are checked every 6 hours and the F1 calendar once a
+day; every copy and every open tab shares one fetch.
+
 ## Search bar and AI chats
 
 The bar searches Google or sends your message to **Claude**, **ChatGPT** or **Gemini**. Choose
@@ -252,7 +277,7 @@ rearrange them.
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
-  and the search bar are single; Markets, GitHub, tiles blocks and Claude allow five each. A
+  and the search bar are single; Markets, GitHub, Sports, tiles blocks and Claude allow five each. A
   chip is greyed out at the limit or when nothing fits. **Reset layout** puts one copy of each
   widget back in its default place, keeping its settings.
 - **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its
@@ -310,6 +335,8 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
+| Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores); team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
+| Sports (F1) | `api.jolpi.ca` | calendar once a day; hourly after a race until the result is in |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 
@@ -326,6 +353,9 @@ Remove a widget in Layout mode and it stops fetching.
   again. If a site changes its page and the send button can't be found, your message is left in
   the box and you press Enter yourself.
 - No sync between computers; use a backup file to move your setup.
+- Sports: ESPN's site API is public but unofficial and can change without notice. The widget then
+  keeps the last schedule it had and says ESPN is unreachable. F1 "live" follows the timetable,
+  not live timing (there is no free live timing).
 
 ## Development
 
@@ -335,8 +365,8 @@ Plain HTML, CSS and JavaScript modules: no framework, no bundler, no dependencie
 npm test
 ```
 
-Runs the unit tests (store, importer, tile/group/folder actions, feeds, network cache, tasks,
-helpers) with Node's built-in runner.
+Runs the unit tests (store, importer, tile/group/folder actions, feeds, sports schedules and timeline,
+network cache, tasks, helpers) with Node's built-in runner.
 
 To preview outside the extension, serve the folder (`python -m http.server 5517`) and open
 `http://127.0.0.1:5517/newtab.html`. Data is then kept in `localStorage`, and the Chrome-only parts
