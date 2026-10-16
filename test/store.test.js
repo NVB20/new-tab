@@ -70,6 +70,22 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.equal(s.prefs.tiles.color, '#ffffff');
 });
 
+test('normalizeState keeps task timestamps, history and daily counts, dropping junk', () => {
+  const s = normalizeState({
+    tasks: [{ id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9 }, { id: 'u', text: 'old task' }],
+    taskHistory: [{ id: 'h', text: 'x', createdAt: 1, doneAt: 2, clearedAt: 3 }, { text: 'no times' }, 'junk'],
+    taskStats: { '2026-10-16': 4, '2026-10-15': -1, nonsense: 2, '2026-10-14': 'x' },
+  });
+  assert.deepEqual(s.tasks, [
+    { id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9 },
+    { id: 'u', text: 'old task', done: false, createdAt: null, doneAt: null },
+  ]);
+  assert.deepEqual(s.taskHistory, [{ id: 'h', text: 'x', createdAt: 1, doneAt: 2, clearedAt: 3 }]);
+  assert.deepEqual(s.taskStats, { '2026-10-16': 4 });
+  assert.deepEqual(normalizeState(null).taskStats, {});
+  assert.deepEqual(normalizeState(null).taskHistory, []);
+});
+
 test('store notifies only subscribers whose keys changed', async () => {
   const store = createStore(memoryAdapter());
   await store.load();

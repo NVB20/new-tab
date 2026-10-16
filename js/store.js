@@ -32,10 +32,11 @@ export const DEFAULT_PREFS = {
   sidebar: { enabled: true },
 };
 
-const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'notes', 'prefs'];
+const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'prefs'];
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
+const time = v => (Number.isFinite(v) ? v : null);
 
 export function defaultState() {
   const home = { id: uid(), title: 'Home' };
@@ -45,6 +46,8 @@ export function defaultState() {
     tiles: [],
     activeGroupId: home.id,
     tasks: [],
+    taskHistory: [],   // finished tasks, kept for a week
+    taskStats: {},     // { 'YYYY-MM-DD': tasks completed that day }, kept forever
     notes: '',
     prefs: structuredClone(DEFAULT_PREFS),
   };
@@ -88,7 +91,12 @@ export function normalizeState(raw) {
   s.activeGroupId = ids.has(raw.activeGroupId) ? raw.activeGroupId : s.groups[0].id;
   s.tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])
     .filter(t => isObj(t) && typeof t.text === 'string')
-    .map(t => ({ id: str(t.id) || uid(), text: t.text, done: !!t.done }));
+    .map(t => ({ id: str(t.id) || uid(), text: t.text, done: !!t.done, createdAt: time(t.createdAt), doneAt: t.done ? time(t.doneAt) : null }));
+  s.taskHistory = (Array.isArray(raw.taskHistory) ? raw.taskHistory : [])
+    .filter(t => isObj(t) && typeof t.text === 'string' && Number.isFinite(t.clearedAt))
+    .map(t => ({ id: str(t.id) || uid(), text: t.text, createdAt: time(t.createdAt), doneAt: time(t.doneAt), clearedAt: t.clearedAt }));
+  s.taskStats = Object.fromEntries(Object.entries(isObj(raw.taskStats) ? raw.taskStats : {})
+    .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isInteger(n) && n > 0));
   s.notes = str(raw.notes);
   s.prefs = deepMerge(DEFAULT_PREFS, raw.prefs);
   return s;
