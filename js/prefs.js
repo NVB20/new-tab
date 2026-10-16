@@ -465,6 +465,7 @@ export function setupPrefs(store) {
       // Sub-options hang from the nearest row above them, and are found by its name too.
       const parentOf = i => nodes[nodes.findLastIndex((m, j) => j < i && !m.matches('.pref-sub'))];
       const hit = nodes.map((n, i) => {
+        if (n.matches('.pref-section-title')) return false;   // a title inside a group: the result titles say it
         if (n.matches('.pref-row') || !n.querySelector('.pref-row')) return matches(n, group);
         const parent = n.matches('.pref-sub') && parentOf(i);
         return keep([...n.children], parent ? `${group} ${label(parent)}` : group).length > 0;
