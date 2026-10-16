@@ -105,9 +105,10 @@ or a wallpaper (uploaded file or image URL) with blur (0–20px) and dim (0–80
 - **widgets.js** — left or right column: clock (date line, HH:MM, 12/24h, "Good morning/afternoon/
   evening/night, <name>"), tasks (add, toggle, delete), notes (textarea, saved as you type; not
   re-rendered while focused).
-- **prefs.js** — modal with sections: General, Theme & background, Tiles, Widgets, Sidebar, Backup.
-  Backup: export state as JSON download, import own JSON, import Speed Dial 2 export. Imports replace
-  current data after a confirm prompt.
+- **prefs.js** — modal with sections: General (includes the sidebar toggle), Appearance (theme,
+  accent, background), Tiles, Widgets, Backup. Backup: export state as JSON download, one Import
+  button that detects an own backup or a Speed Dial 2 export, reset all. Imports replace groups, tiles
+  and prefs after a confirm prompt (tasks and notes are kept for Speed Dial 2 imports).
 - **jump.js** — Ctrl+K (or header search icon) palette. Sources: tiles (always), Chrome bookmarks,
   history, open tabs, recently closed. Fuzzy-ranked, arrow keys + Enter. Open tab → focus it; closed →
   restore it. Last row: "Search the web for …" via `chrome.search.query` (Google URL outside extension).
