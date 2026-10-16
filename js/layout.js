@@ -4,6 +4,7 @@
 
 import { uid, clamp } from './util.js';
 import { cleanMarketItems } from './feeds.js';
+import { cleanSports } from './sports.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -46,6 +47,11 @@ export const TYPES = {
     label: 'GitHub', icon: 'branch', size: [3, 6], min: [3, 3], max: 5,
     defaults: () => ({ parts: [...GITHUB_PARTS] }),
     clean: s => ({ parts: Array.isArray(s.parts) ? GITHUB_PARTS.filter(p => s.parts.includes(p)) : [...GITHUB_PARTS] }),
+  },
+  sports: {
+    label: 'Sports', icon: 'trophy', size: [3, 5], min: [2, 3], max: 5,
+    defaults: () => cleanSports({}),
+    clean: s => cleanSports(s),
   },
   // group: a group id, or null to follow the tabs.
   tiles: {
@@ -90,7 +96,7 @@ export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.
 // ---- default layout ----
 
 const NEAR = { clock: 4, tasks: 4, notes: 4, claude: 2 };   // the clock column, top to bottom
-const FAR = { markets: 5, github: 7 };                      // the other column
+const FAR = { markets: 5, github: 7, sports: 5 };           // the other column
 
 // Heights of a column sum to at most ROWS: the tallest shrinks first, never below its minimum.
 // With fill, one widget alone takes the whole column.
@@ -111,7 +117,7 @@ function column(items, fill) {
   return items;
 }
 
-// Where copies of the given types go: the clock column on `side`, Markets and GitHub opposite,
+// Where copies of the given types go: the clock column on `side`, Markets, GitHub and Sports opposite,
 // and between them the search bar (one row, at the top or the bottom) over the tiles block, which
 // is wider when a column is empty.
 export function defaultPositions(types, side = 'left', barAt = 'top') {
@@ -142,7 +148,8 @@ export const partsFromShow = show => (show === 'commits' ? ['heatmap', 'pulls', 
 export function defaultLayout(old) {
   const w = old.widgets;
   const on = name => w.enabled !== false && w[name]?.enabled !== false;
-  const types = [...Object.keys(NEAR), ...Object.keys(FAR)].filter(on);
+  // Sports came after Layout mode: an old page never had it.
+  const types = [...Object.keys(NEAR), 'markets', 'github'].filter(on);
   const settings = {
     clock: () => ({ hour24: w.clock.hour24, name: w.clock.name, greeting: w.clock.greeting, face: w.clock.face, colon: w.clock.colon }),
     markets: () => ({ items: [...w.markets.items] }),

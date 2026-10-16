@@ -243,3 +243,21 @@ test('prefsSection says where Preferences keeps a type’s settings', () => {
   for (const type of ['tasks', 'notes', 'claude']) assert.equal(prefsSection(type), null, type);
   assert.equal(prefsSection('weather'), 'layout');   // an unknown type falls back to its own group
 });
+
+test('Sports: its own settings, never added to an old page, kept by Reset layout under Markets and GitHub', () => {
+  assert.deepEqual(TYPES.sports.defaults(), { follow: ['soccer:20232', 'soccer:202', 'f1'], f1Sessions: ['sprint', 'qualifying', 'race'], edited: false });
+  assert.deepEqual(TYPES.sports.clean({ follow: ['nba:13', 'junk'] }).follow, ['nba:13']);
+  assert.equal(TYPES.sports.max, 5);
+  assert.equal(prefsSection('sports'), 'layout');
+  const l = defaultLayout(legacy());
+  assert.equal(byType(l).sports, undefined);
+  removeCopy(l, byType(l).notes.id);
+  const sports = addCopy(l, 'sports');
+  assert.deepEqual(rect(sports), [0, 8, 2, 3]);   // only its minimum fits where Notes was
+  resetLayout(l);
+  const t = byType(l);
+  assert.deepEqual(rect(t.markets), [9, 0, 3, 4]);
+  assert.deepEqual(rect(t.github), [9, 4, 3, 4]);
+  assert.deepEqual(rect(t.sports), [9, 8, 3, 4]);
+  assert.equal(t.sports.id, sports.id);
+});
