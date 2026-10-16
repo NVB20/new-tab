@@ -422,13 +422,16 @@ export function setupPrefs(store) {
       redraw();
     },
   });
-  // The sidebar's empty space is the handle for dragging the panel aside.
-  const side = el('div', { class: 'prefs-side', title: 'Drag to move · double-click to centre' },
+  // The empty strip along the top and the sidebar's empty space are handles for dragging the panel aside.
+  const dragHint = 'Drag to move · double-click to centre';
+  const side = el('div', { class: 'prefs-side', title: dragHint },
     el('label', { class: 'prefs-search' }, icon('search', 16), search),
     el('h2', { class: 'prefs-side-title', text: 'Preferences' }),
     nav);
-  const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' }, side, content,
-    el('button', { class: 'icon-btn prefs-close', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
+  const top = el('div', { class: 'prefs-top', title: dragHint },
+    el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
+  const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' },
+    side, el('div', { class: 'prefs-main' }, top, content));
   // Close on a click outside, but not when a drag that began inside (a slider, the sidebar) ends there.
   let pressedOutside = false;
   dialog.addEventListener('pointerdown', e => { pressedOutside = e.target === dialog; });
@@ -558,25 +561,27 @@ export function setupPrefs(store) {
     }
   }
 
-  side.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || e.target.closest('button, .prefs-search')) return;
-    e.preventDefault();
-    const start = { x: e.clientX - offset.x, y: e.clientY - offset.y };
-    const move = ev => place(ev.clientX - start.x, ev.clientY - start.y);
-    side.setPointerCapture(e.pointerId);
-    side.classList.add('dragging');
-    side.addEventListener('pointermove', move);
-    side.addEventListener('lostpointercapture', () => {
-      side.removeEventListener('pointermove', move);
-      side.classList.remove('dragging');
+  for (const handle of [side, top]) {
+    handle.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || e.target.closest('button, .prefs-search')) return;
+      e.preventDefault();
+      const start = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+      const move = ev => place(ev.clientX - start.x, ev.clientY - start.y);
+      handle.setPointerCapture(e.pointerId);
+      handle.classList.add('dragging');
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('lostpointercapture', () => {
+        handle.removeEventListener('pointermove', move);
+        handle.classList.remove('dragging');
+        saveOffset();
+      }, { once: true });
+    });
+    handle.addEventListener('dblclick', e => {
+      if (e.target.closest('button, .prefs-search')) return;
+      place(0, 0);
       saveOffset();
-    }, { once: true });
-  });
-  side.addEventListener('dblclick', e => {
-    if (e.target.closest('button, .prefs-search')) return;
-    place(0, 0);
-    saveOffset();
-  });
+    });
+  }
   addEventListener('resize', () => { if (dialog.open) place(offset.x, offset.y); });
 
   return {

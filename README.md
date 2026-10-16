@@ -253,8 +253,8 @@ change your data on claude.ai.
   License), so they work offline.
 - **Background:** Preferences → Page: ASCII, Plain or Image (upload a picture or paste a link).
   Switching back to ASCII or Plain keeps your picture, so Image brings it back.
-- **Preferences:** drag the panel by the empty part of its sidebar to see the page behind it change
-  as you adjust; double-click there to put it back in the middle. Type in the search box (it has the cursor
+- **Preferences:** drag the panel by its top edge or the empty part of its sidebar to see the page
+  behind it change as you adjust; double-click there to put it back in the middle. Type in the search box (it has the cursor
   when the panel opens, or press Ctrl+F) to list matching settings from every section; options
   whose switch is off show dimmed. Esc clears the search, then closes the panel.
 - **Tile logos:** each tile's logo is saved in this Chrome profile the first time it loads, so tiles

@@ -770,7 +770,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 /* Nothing dims or blurs the page: it shows exactly how the settings look. */
 .prefs-dlg::backdrop { background: none; backdrop-filter: none; }
 
-/* The sidebar's empty space is the handle for dragging the panel aside. */
+/* The strip along the top and the sidebar's empty space are handles for dragging the panel aside. */
 .prefs-side {
   display: flex;
   flex-direction: column;
@@ -778,13 +778,12 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
   padding: 14px 12px;
   border-right: 1px solid var(--border);
   background: var(--surface-2);
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
 }
-.prefs-side.dragging { cursor: grabbing; }
+.prefs-side, .prefs-top { cursor: grab; user-select: none; touch-action: none; }
+.prefs-side.dragging, .prefs-top.dragging { cursor: grabbing; }
 .prefs-side-title { margin: 22px 10px 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
-.prefs-close { position: absolute; top: 12px; right: 12px; }
+.prefs-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.prefs-top { flex: none; display: flex; justify-content: flex-end; padding: 12px 12px 0; }
 /* Pressing in the search box types into it rather than dragging the panel. */
 .prefs-search { position: relative; flex: none; cursor: text; }
 .prefs-search .icon { position: absolute; top: 50%; left: 11px; translate: 0 -50%; color: var(--muted); pointer-events: none; }
@@ -806,7 +805,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .prefs-nav button:hover { background: var(--hover); }
 .prefs-nav button[aria-current="true"] { background: var(--border); font-weight: 600; }
 
-.prefs-content { overflow-y: auto; padding: 56px 32px 32px; }
+.prefs-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 32px 32px; }
 
 .pref-section-title {
   margin: 22px 0 4px;
@@ -1020,6 +1019,7 @@ kbd {
   body.center-v .grid-wrap { align-self: start; }
   .prefs-dlg[open] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .prefs-side { padding-right: 56px; border-right: 0; border-bottom: 1px solid var(--border); }   /* clear of the close button */
+  .prefs-top { position: absolute; top: 0; right: 0; }
   .prefs-side-title { display: none; }
   .prefs-nav { flex-direction: row; margin-top: 10px; overflow-x: auto; }
   .prefs-content { padding: 16px 20px 24px; }
