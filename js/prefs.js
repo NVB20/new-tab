@@ -272,10 +272,10 @@ export function setupPrefs(store) {
       alertDialog(`${err.message} Use a backup from this page or a Speed Dial 2 export.`, 'Import failed');
       return;
     }
-    const message = `Import ${imported.tiles.length} tiles in ${imported.groups.length} group${imported.groups.length === 1 ? '' : 's'} from Speed Dial 2? This replaces your current tiles, groups and settings. Tasks and notes are kept.`;
+    const message = `Import ${imported.tiles.length} tiles in ${imported.groups.length} group${imported.groups.length === 1 ? '' : 's'} from Speed Dial 2? This replaces your current tiles, groups and settings. Tasks, task history and notes are kept.`;
     if (!await confirmDialog(message, { title: 'Import from Speed Dial 2', confirmLabel: 'Import' })) return;
-    const { tasks, notes } = store.get();
-    store.replace({ ...imported, tasks, notes });
+    const { tasks, taskHistory, taskStats, notes } = store.get();
+    store.replace({ ...imported, tasks, taskHistory, taskStats, notes });
     show('backup');
   }
 

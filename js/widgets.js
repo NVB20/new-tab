@@ -1,7 +1,7 @@
 // Widget column: clock with greeting, tasks and notes.
 
 import { el, icon } from './ui.js';
-import { uid } from './util.js';
+import { addTask, toggleTask, deleteTask, clearDone, pruneHistory } from './tasks.js';
 
 function partOfDay(hour) {
   if (hour >= 5 && hour < 12) return 'morning';
@@ -29,12 +29,20 @@ export function mountWidgets(root, store) {
       const text = taskInput.value.trim();
       if (e.key !== 'Enter' || !text) return;
       taskInput.value = '';
-      store.update(s => { s.tasks.push({ id: uid(), text, done: false }); });
+      store.update(s => { addTask(s, text, Date.now()); });
     },
   });
   const taskList = el('ul', { class: 'task-list' });
+  // Finished tasks move to a one-week history; the per-day completion counts stay.
+  const clearButton = el('button', {
+    type: 'button',
+    class: 'widget-head-status link-btn',
+    onclick: () => store.update(s => { clearDone(s, Date.now()); }),
+  });
+  const tasksHead = heading('check-circle', 'Tasks');
+  tasksHead.append(clearButton);
   const tasks = el('section', { class: 'widget widget-tasks' },
-    heading('check-circle', 'Tasks'),
+    tasksHead,
     taskList,
     el('label', { class: 'task-add' }, icon('plus', 16), taskInput));
 
@@ -80,10 +88,7 @@ export function mountWidgets(root, store) {
         role: 'checkbox',
         'aria-checked': String(t.done),
         'aria-label': t.done ? 'Mark as not done' : 'Mark as done',
-        onclick: () => store.update(s => {
-          const task = s.tasks.find(x => x.id === t.id);
-          if (task) task.done = !task.done;
-        }),
+        onclick: () => store.update(s => toggleTask(s, t.id, Date.now())),
       }, t.done && icon('check', 12)),
       el('span', { class: 'task-text', dir: 'auto', text: t.text }),
       el('button', {
@@ -91,7 +96,7 @@ export function mountWidgets(root, store) {
         type: 'button',
         title: 'Delete task',
         'aria-label': 'Delete task',
-        onclick: () => store.update(s => { s.tasks = s.tasks.filter(x => x.id !== t.id); }),
+        onclick: () => store.update(s => deleteTask(s, t.id, Date.now())),
       }, icon('x', 14)))));
   }
 
@@ -102,11 +107,16 @@ export function mountWidgets(root, store) {
     tasks.hidden = !w.tasks.enabled;
     notes.hidden = !w.notes.enabled;
     renderTasks(state.tasks);
+    const done = state.tasks.filter(t => t.done).length;
+    clearButton.hidden = !done;
+    clearButton.textContent = `Clear done (${done})`;
+    clearButton.title = 'Remove finished tasks (kept in history for a week)';
     // Don't overwrite the textarea while typing in it (it would move the cursor).
     if (document.activeElement !== notesArea) notesArea.value = state.notes;
     renderClock(true);
   }
 
+  store.update(s => pruneHistory(s, Date.now()));
   store.subscribe(render, ['tasks', 'notes', 'prefs']);
   render(store.get());
   setInterval(renderClock, 1000);

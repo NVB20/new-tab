@@ -27,6 +27,9 @@ export (`.json`). Groups, tiles and layout settings come over; tasks and notes h
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar** — the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
+- **Tasks** — Enter adds a task; tick to finish. **Clear done** (next to the heading) removes
+  finished tasks. Finished tasks are kept in a history for 7 days, and the number completed per
+  day is kept forever (counted on the day you tick it; unticking takes it back) for future charts.
 - **Markets** — BTC, SOL, XRP and ETH (Bybit spot, USDT) with a 24h sparkline, plus the USD/ILS
   daily ECB rate. Change the coins in Preferences → Widgets; click a row to open its chart.
 - **GitHub** — type your username into the widget. It shows the latest commit in each repo you've
