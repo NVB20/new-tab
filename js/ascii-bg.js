@@ -28,7 +28,8 @@ const RIPPLE = { speed: 240, maxRadius: 480, thickness: 48 }; // px/s, px, px
 const NO_RIPPLE = 'a, button, input, textarea, select, label, summary, dialog, .menu, .sidebar, .widgets';
 
 // Resting letters are the theme's text colour at very low opacity, so they melt into the
-// background; hover light makes them brighter and slightly cooler; the click ripple is blue.
+// background; hover light makes them brighter and slightly cooler; the click ripple is blue
+// (green in the GitHub theme).
 const PALETTES = {
   dark: {
     ink: [250, 249, 245], field: [0.03, 0.12], glowTo: [196, 224, 244], glow: [0.06, 0.5],
@@ -37,6 +38,14 @@ const PALETTES = {
   light: {
     ink: [20, 20, 19], field: [0.04, 0.15], glowTo: [24, 92, 140], glow: [0.07, 0.55],
     blueFrom: [24, 120, 176], blueTo: [10, 82, 140], blue: [0.16, 0.8],
+  },
+  blue: {
+    ink: [214, 228, 255], field: [0.03, 0.12], glowTo: [170, 205, 255], glow: [0.06, 0.5],
+    blueFrom: [37, 99, 235], blueTo: [147, 197, 253], blue: [0.14, 0.8],
+  },
+  github: {
+    ink: [230, 237, 243], field: [0.03, 0.12], glowTo: [175, 235, 185], glow: [0.06, 0.5],
+    blueFrom: [35, 134, 54], blueTo: [86, 211, 100], blue: [0.14, 0.8],
   },
 };
 
@@ -257,7 +266,8 @@ export function mountAsciiBackground(canvas, store) {
   function sync() {
     const p = store.get().prefs;
     const want = p.background.pattern === 'ascii' && !backgroundImage(p.background, store.wallpaper);
-    const nextMode = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    const theme = document.documentElement.dataset.theme;
+    const nextMode = theme in PALETTES ? theme : 'dark';
 
     canvas.hidden = !want;
     document.body.classList.toggle('has-pattern', want);

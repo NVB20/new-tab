@@ -4,6 +4,8 @@
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
 import { CLOCK_FACES } from './widgets.js';
+import { setTheme } from './store.js';
+import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const TILE_PRESETS = [
@@ -117,11 +119,14 @@ export function setupPrefs(store) {
 
     return [
       title('Colours'),
-      segmented('Theme', 'theme', [
+      // A theme brings its own accent, unless a different accent was picked by hand.
+      row('Theme', choice('Theme', p.theme, [
         { value: 'auto', label: 'Auto', icon: 'auto' },
         { value: 'light', label: 'Light', icon: 'sun' },
         { value: 'dark', label: 'Dark', icon: 'moon' },
-      ]),
+        { value: 'blue', label: 'Blue', icon: 'drop' },
+        { value: 'github', label: 'GitHub', icon: 'branch' },
+      ], value => store.update(s => setTheme(s.prefs, value)))),
       row('Accent', el('div', { class: 'swatches' }, swatches, custom)),
       title('Background'),
       row('Style', choice('Background', shown, [
@@ -311,7 +316,7 @@ export function setupPrefs(store) {
   function exportBackup() {
     const state = structuredClone(store.get());
     state.prefs.widgets.github.token = '';   // a backup file shouldn't carry a credential
-    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper };
+    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper, icons: iconsFor(state.tiles) };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `new-tab-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a);
@@ -335,6 +340,7 @@ export function setupPrefs(store) {
       if (!await confirmDialog(`Replace everything here with this backup (${n} tiles)?`, { title: 'Restore backup', confirmLabel: 'Restore' })) return;
       store.replace(json.state);
       await store.setWallpaper(typeof json.wallpaper === 'string' ? json.wallpaper : '');
+      await addSavedIcons(json.icons);
       redraw();
       return;
     }
@@ -359,6 +365,7 @@ export function setupPrefs(store) {
     if (!await confirmDialog('This deletes all tiles, groups, settings, tasks, notes and the wallpaper. Download a backup first if you might want them back.', { title: 'Reset everything?', confirmLabel: 'Reset', danger: true })) return;
     store.replace(null);
     await store.setWallpaper('');
+    await clearSavedIcons();
     show('page');
   }
 

@@ -49,7 +49,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
 | **GitHub** | Your contribution heatmap, latest commits and open pull requests, including private repos with a token. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
-| **Tasks and notes** | A to-do list with a week of finished-task history, and a notes pad. |
+| **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -155,9 +155,14 @@ should, the widget says why (for example, missing *Contents* access or org appro
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar:** the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
-- **Tasks:** Enter adds a task; tick to finish. **Clear done** (next to the heading) removes
-  finished tasks. Finished tasks are kept in a history for 7 days, and the number completed per day
-  is kept for good (counted on the day you tick it; unticking takes it back).
+- **Tasks:** Enter adds a task; tick to finish. Right-click a task to give it a due date (today,
+  tomorrow or any date), a priority (high, medium or low, shown as a red, amber or blue ring), to
+  edit its text or delete it. The due date shows on the right as *Today*, *Tomorrow*, a weekday or a
+  date, in red once it has passed. Drag tasks to reorder them; **Sort** (next to the heading) puts
+  them in order once (unfinished first, then by due date, then priority) and you can keep dragging
+  after. **Clear done** removes finished tasks. Finished tasks are kept in a history for 7 days, and
+  the number completed per day is kept for good (counted on the day you tick it; unticking takes it
+  back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
@@ -169,8 +174,12 @@ should, the widget says why (for example, missing *Contents* access or org appro
   Switching back to ASCII or Plain keeps your picture, so Image brings it back.
 - **Preferences:** drag the panel by its header to see the page behind it change as you adjust;
   double-click the header to put it back in the middle.
-- **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper)
-  to one file you can import again on another computer.
+- **Tile logos:** each tile's logo is saved in this Chrome profile the first time it loads, so tiles
+  keep their logos even if the server they came from (such as Speed Dial 2's) goes away. Speed Dial 2
+  logos are always saved; logos from other sites are saved when the site allows it, otherwise they
+  keep loading from their link.
+- **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper
+  and the saved tile logos) to one file you can import again on another computer.
 
 ## Your data
 
@@ -182,16 +191,17 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
+| Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 
-Turn a widget off in Preferences → Widgets and it stops fetching. Tile images load from wherever
-their icon link points.
+Turn a widget off in Preferences → Widgets and it stops fetching.
 
 ## Known limits
 
 - On a fresh new tab Chrome keeps the cursor in the address bar, so Ctrl+K and / work once you've
   clicked the page. The search icon always works.
-- Imported tile logos are still loaded from Speed Dial 2's image server. If one stops showing,
-  right-click → Edit and clear the icon field (uses the site's own icon) or paste another image link.
+- A tile logo from a site that doesn't allow saving it (no CORS headers) still loads from its link.
+  If one stops showing, right-click → Edit and clear the icon field (uses the site's own icon) or
+  paste another image link.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development
