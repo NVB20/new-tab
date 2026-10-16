@@ -89,17 +89,14 @@ import it afterwards.
 
 ### Safari (Mac only)
 
-Safari runs the extension on a Mac with one code change and a few features missing. There's no
-Safari for Windows, and an iPhone needs an Xcode build.
+Safari runs the extension on a Mac as it is, with a few features missing. There's no Safari for
+Windows, and an iPhone needs an Xcode build.
 
-1. In `js/main.js`, use `setTimeout` where `requestIdleCallback` isn't available. Safari doesn't
-   have `requestIdleCallback`, and without the fallback Jump, Preferences and the sidebar don't
-   load.
-2. In Safari, open **Settings → Advanced** and tick **Show features for web developers**.
-3. Open **Settings → Developer**, click **Add Temporary Extension…** and pick the folder that
+1. In Safari, open **Settings → Advanced** and tick **Show features for web developers**.
+2. Open **Settings → Developer**, click **Add Temporary Extension…** and pick the folder that
    contains `manifest.json`.
-4. In **Settings → General**, choose the extension under **New tabs open with**.
-5. Allow the extension on the sites Safari asks about: github.com for the heatmap, and claude.ai,
+3. In **Settings → General**, choose the extension under **New tabs open with**.
+4. Allow the extension on the sites Safari asks about: github.com for the heatmap, and claude.ai,
    chatgpt.com and gemini.google.com for sending messages from the search bar.
 
 Safari removes a temporary extension when you quit it or after 24 hours, so download a backup now
@@ -395,7 +392,8 @@ rearrange them.
 - **Tile logos:** each tile's logo is saved in this Chrome profile the first time it loads, so tiles
   keep their logos even if the server they came from (such as Speed Dial 2's) goes away. Speed Dial 2
   logos are always saved; logos from other sites are saved when the site allows it, otherwise they
-  keep loading from their link.
+  keep loading from their link. A logo over 150 KB is saved at most 768 pixels across, so one huge
+  image doesn't slow down every new tab.
 - **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper
   and the saved tile logos) to one file you can import again on another computer.
 

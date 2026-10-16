@@ -8,6 +8,13 @@ export function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
+// Runs fn once the page has a quiet moment (within timeoutMs at the latest). Safari has no
+// requestIdleCallback, and Node neither, so there it runs on the next turn.
+export function idle(fn, timeoutMs = 2000) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => fn(), { timeout: timeoutMs });
+  else setTimeout(fn, 1);
+}
+
 // The image shown behind the page, or '' when the ASCII or plain background shows instead.
 // wallpaper is null while the uploaded one is still being read, and so is the result then.
 export function backgroundImage(background, wallpaper) {

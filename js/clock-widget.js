@@ -111,6 +111,15 @@ export function mountClock(root, store, copy) {
     face.classList.toggle('beside', best.beside);
     time.style.fontSize = `${Math.max(24, Math.floor(best.size))}px`;
   }
+  // fit() measures the page several times over: after a redraw it waits for the next frame, so a
+  // new tab measures once, with every widget on the page, rather than while they're still mounting.
+  let fitFrame = 0;
+  const fitSoon = () => {
+    fitFrame ||= requestAnimationFrame(() => {
+      fitFrame = 0;
+      fit();
+    });
+  };
 
   function setEditing(on) {
     faces.hidden = !on;
@@ -120,7 +129,7 @@ export function mountClock(root, store, copy) {
     editButton.setAttribute('aria-label', editButton.title);
     editButton.setAttribute('aria-pressed', String(on));
     if (on) renderClock(true);
-    else fit();
+    else fitSoon();
   }
   setEditing(false);
 
@@ -157,7 +166,7 @@ export function mountClock(root, store, copy) {
     // The time as shown, so it fills the frame: in Stencil and Serif, whose 1s are narrow, it
     // grows or shrinks a little when the digits change.
     probe.replaceChildren(...clockDigits(current, now, c));
-    fit();
+    fitSoon();
   }
 
   // Only this copy's own settings change what it shows (its size and fonts refit it below), so

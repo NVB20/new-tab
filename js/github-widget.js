@@ -3,7 +3,7 @@
 // the request cache and one token (prefs.github.token).
 
 import { el, icon, svgEl, widgetSub, widgetEmpty } from './ui.js';
-import { feed, fetchJson, fetchText } from './net.js';
+import { feed, peek, fetchJson, fetchText } from './net.js';
 import { parseCommits, latestCommits, parseIssues, timeAgo, parseContributions, heatmapLayout, MONTHS } from './feeds.js';
 import { copyById, TYPES } from './layout.js';
 
@@ -17,9 +17,12 @@ const GITHUB = 'https://api.github.com';
 // Heatmap geometry in SVG units: cell pitch, cell size, and the month label row on top.
 const HM = { pitch: 10, cell: 8, top: 20 };
 
+// One formatter for the map's 371 day labels (toLocaleString builds a new one per call).
+const COUNT = new Intl.NumberFormat('en-US');
+
 function dayLabel({ date, count }) {
   const [, month, day] = date.split('-').map(Number);
-  return `${count ? count.toLocaleString('en-US') : 'No'} contribution${count === 1 ? '' : 's'} on ${MONTHS[month - 1]} ${day}`;
+  return `${count ? COUNT.format(count) : 'No'} contribution${count === 1 ? '' : 's'} on ${MONTHS[month - 1]} ${day}`;
 }
 
 // The contribution calendar: weeks as columns, Sunday on top, darker = more activity.
@@ -80,6 +83,15 @@ export function mountGithub(root, store, copy, ctx) {
   }
   const sizes = new ResizeObserver(fitCommits);
   sizes.observe(section);
+  // After a redraw: in the next frame, once every widget is on the page, rather than forcing a
+  // layout of the half-built page.
+  let fitFrame = 0;
+  const fitSoon = () => {
+    fitFrame ||= requestAnimationFrame(() => {
+      fitFrame = 0;
+      fitCommits();
+    });
+  };
 
   function githubRow({ href, iconName, name, meta, title }) {
     return el('a', { class: 'gh-row', title, ...linkProps(href) },
@@ -167,17 +179,21 @@ export function mountGithub(root, store, copy, ctx) {
       }
     }
     body.replaceChildren(...out.filter(Boolean));
-    fitCommits();
-    // GitHub is checked at most once an hour; Refresh skips the wait (e.g. after changing the token).
-    const when = lists ? at : calendar.at;
+    fitSoon();
+    renderStatus(lists ? at : calendar.at);
+  }
+
+  // GitHub is checked at most once an hour; Refresh skips the wait (e.g. after changing the token).
+  function renderStatus(when) {
     status.replaceChildren(
       when ? `${timeAgo(when) === 'now' ? 'just now' : `${timeAgo(when)} ago`} · ` : '',
       el('button', { type: 'button', class: 'link-btn', text: 'Refresh', title: 'Fetch from GitHub now', onclick: () => load(true) }));
   }
 
   let seq = 0;
-  let shown = null;   // what was last drawn
-  async function load(force = false) {
+  let shown = null;   // what was last drawn: the settings, each feed's time and error, the minute
+  // cachedOnly draws the saved copies, however old, without fetching: a new tab shows them at once.
+  async function load(force = false, cachedOnly = false) {
     const { parts } = settings();
     const user = prefs().github.user.trim();
     const tok = token();
@@ -197,20 +213,28 @@ export function mountGithub(root, store, copy, ctx) {
     };
     const my = ++seq;
     const ttl = force ? 0 : GITHUB_TTL;
+    const get = (key, loader) => (cachedOnly ? Promise.resolve(peek(key) ?? { data: null, at: 0 }) : feed(key, ttl, loader));
     // The contribution calendar is the HTML one on the profile (no API gives it without a token);
     // the extension's github.com host permission lets it be read across origins.
     const calendar = parts.includes('heatmap')
-      ? feed(`github-cal:${user}`, ttl, async () => parseContributions(await fetchText(`https://github.com/users/${encodeURIComponent(user)}/contributions`)))
+      ? get(`github-cal:${user}`, async () => parseContributions(await fetchText(`https://github.com/users/${encodeURIComponent(user)}/contributions`)))
       : Promise.resolve({ data: null, at: 0 });
     // Pull requests, issues and commits come from one fetch whichever of them are shown, so
     // switching parts never waits.
     const activity = parts.some(p => p !== 'heatmap')
-      ? feed(`github-v7:${user}:${tok ? 'token' : 'public'}`, ttl, () => fetchActivity(user, tok, headers))
+      ? get(`github-v7:${user}:${tok ? 'token' : 'public'}`, () => fetchActivity(user, tok, headers))
       : Promise.resolve({ data: null, at: 0 });
     const [result, cal] = await Promise.all([activity, calendar]);
     if (my !== seq) return;
-    shown = [result, user, cal];
-    renderGithub(...shown);
+    // The 30 s refresh mostly gets back what's drawn already: then only the "x ago" moves on (the
+    // rows' own times once a minute).
+    const drawn = JSON.stringify([conf, result.at, result.error?.message, cal.at, cal.error?.message, Math.floor(Date.now() / 60e3)]);
+    if (drawn === shown) {
+      renderStatus(parts.some(p => p !== 'heatmap') ? result.at : cal.at);
+      return;
+    }
+    shown = drawn;
+    renderGithub(result, user, cal);
   }
 
   async function fetchActivity(user, tok, headers) {
@@ -270,7 +294,9 @@ export function mountGithub(root, store, copy, ctx) {
     const first = conf === null;
     conf = next;
     clearTimeout(timer);
-    // The cache answers at once for parts that were already fetched, so this is cheap.
+    // The saved copy now, so the widget isn't empty while GitHub is asked (once an hour); then
+    // the cache or GitHub.
+    load(false, true);
     timer = setTimeout(load, first ? 0 : RECONFIGURE_MS);
   }
 
@@ -288,6 +314,7 @@ export function mountGithub(root, store, copy, ctx) {
       seq++;
       clearInterval(interval);
       clearTimeout(timer);
+      cancelAnimationFrame(fitFrame);
       sizes.disconnect();
       document.removeEventListener('visibilitychange', refresh);
       unsubscribe();

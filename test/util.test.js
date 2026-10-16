@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeUrl, hostOf, fuzzyScore, clamp, uid, backgroundImage } from '../js/util.js';
+import { normalizeUrl, hostOf, fuzzyScore, clamp, uid, backgroundImage, idle } from '../js/util.js';
+
+test('idle runs the function later, also without requestIdleCallback', async () => {
+  let ran = false;
+  idle(() => { ran = true; });
+  assert.equal(ran, false);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(ran, true);
+});
 
 test('normalizeUrl adds https when there is no scheme', () => {
   assert.equal(normalizeUrl('example.com'), 'https://example.com/');

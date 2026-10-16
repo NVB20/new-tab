@@ -11,6 +11,11 @@ const COPY = 'newtab:icon-copy';
 const MAX_BYTES = 2 * 1024 * 1024;   // per logo
 const MAX_COPY = 3 * 1024 * 1024;    // characters; past this only chrome.storage keeps them
 const PARALLEL = 4;
+// A logo bigger than this is redrawn at most SHRINK_TO px on its long side (twice what a big tile
+// shows), so one huge image doesn't slow every new tab. Speed Dial 2's banners (640 × 265, ~10 KB)
+// stay as they are.
+const SHRINK_OVER = 150 * 1024;      // bytes
+const SHRINK_TO = 768;
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isWebLink = v => typeof v === 'string' && /^https?:\/\//i.test(v);
@@ -21,6 +26,12 @@ const clean = map => Object.fromEntries(Object.entries(isObj(map) ? map : {})
 export function iconsToFetch(tiles, saved, failed = new Set()) {
   return [...new Set(tiles.filter(t => t.kind !== 'folder').map(t => t.icon))]
     .filter(url => isWebLink(url) && !saved[url] && !failed.has(url));
+}
+
+// Whether a saved logo (a data URL) is big enough to redraw smaller. SVG stays sharp at any size
+// and a GIF may be animated, so those are kept.
+export function needsShrink(dataUrl) {
+  return dataUrl.length * 0.75 > SHRINK_OVER && !/^data:image\/(svg|gif)/i.test(dataUrl);
 }
 
 // The saved logos the given tiles use.
@@ -99,17 +110,63 @@ function showSaved() {
   }
 }
 
+const dataUrlOf = blob => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(blob);
+});
+
+// A big logo redrawn smaller as WebP, or the logo itself when that isn't smaller (or can't be done).
+async function shrink(blob) {
+  if (blob.size <= SHRINK_OVER || /svg|gif/i.test(blob.type) || typeof OffscreenCanvas !== 'function') return blob;
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, SHRINK_TO / Math.max(bitmap.width, bitmap.height));
+    const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
+    const g = canvas.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const out = await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 });
+    return out.size < blob.size ? out : blob;
+  } catch {
+    return blob;
+  }
+}
+
 async function download(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(15000), credentials: 'omit', referrerPolicy: 'no-referrer' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const blob = await res.blob();
   if (!blob.type.startsWith('image/') || blob.size > MAX_BYTES) throw new Error('not a usable image');
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+  return dataUrlOf(await shrink(blob));
+}
+
+// Big logos saved before they were redrawn smaller, or that came in a backup: redrawn once.
+async function shrinkSaved() {
+  const big = Object.entries(all()).filter(([, data]) => needsShrink(data));
+  if (!big.length) return;
+  const smaller = {};
+  for (const [url, data] of big) {
+    try {
+      const next = await dataUrlOf(await shrink(await (await fetch(data)).blob()));
+      if (next.length < data.length) smaller[url] = next;
+    } catch {
+      // kept as it is
+    }
+  }
+  if (!Object.keys(smaller).length) return;
+  // Another tab may have saved logos in the meantime; keep those too.
+  let stored = {};
+  try {
+    stored = clean(await adapter.get(KEY));
+  } catch {
+    // keep what this tab has
+  }
+  saved = { ...stored, ...all(), ...smaller };
+  await persist();
+  showSaved();
 }
 
 async function fetchMissing(store) {
@@ -158,7 +215,8 @@ function sync(store) {
   return running;
 }
 
-// Reads the saved logos, then fetches missing ones now and whenever the tiles change.
+// Reads the saved logos, then fetches missing ones now and whenever the tiles change. The tiles'
+// first paint uses the localStorage copy, so main.js starts this once the page is idle.
 export async function startIconCache(store) {
   adapter ??= pickAdapter();
   let stored = {};
@@ -180,4 +238,5 @@ export async function startIconCache(store) {
     timer = setTimeout(() => sync(store), 500);
   }, ['tiles']);
   await sync(store);
+  await shrinkSaved();
 }
