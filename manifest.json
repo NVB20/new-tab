@@ -17,6 +17,7 @@
     "search"
   ],
   "host_permissions": [
-    "https://github.com/*"
+    "https://github.com/*",
+    "https://*.speeddial2.com/*"
   ]
 }

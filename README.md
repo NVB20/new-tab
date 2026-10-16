@@ -169,8 +169,12 @@ should, the widget says why (for example, missing *Contents* access or org appro
   (SIL Open Font License), so they work offline.
 - **Background:** Preferences → Appearance: ASCII or Plain, animation on or off, or upload a
   wallpaper (a wallpaper replaces the ASCII field while it's set).
-- **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper)
-  to one file you can import again on another computer.
+- **Tile logos:** each tile's logo is saved in this Chrome profile the first time it loads, so tiles
+  keep their logos even if the server they came from (such as Speed Dial 2's) goes away. Speed Dial 2
+  logos are always saved; logos from other sites are saved when the site allows it, otherwise they
+  keep loading from their link.
+- **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper
+  and the saved tile logos) to one file you can import again on another computer.
 
 ## Your data
 
@@ -182,16 +186,17 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
+| Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 
-Turn a widget off in Preferences → Widgets and it stops fetching. Tile images load from wherever
-their icon link points.
+Turn a widget off in Preferences → Widgets and it stops fetching.
 
 ## Known limits
 
 - On a fresh new tab Chrome keeps the cursor in the address bar, so Ctrl+K and / work once you've
   clicked the page. The search icon always works.
-- Imported tile logos are still loaded from Speed Dial 2's image server. If one stops showing,
-  right-click → Edit and clear the icon field (uses the site's own icon) or paste another image link.
+- A tile logo from a site that doesn't allow saving it (no CORS headers) still loads from its link.
+  If one stops showing, right-click → Edit and clear the icon field (uses the site's own icon) or
+  paste another image link.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development

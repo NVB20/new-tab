@@ -1,6 +1,7 @@
 // Shared DOM helpers: element builder, icons, context menu, dialogs, tile icons.
 
 import { faviconUrl } from './chrome-api.js';
+import { localIcon } from './icon-cache.js';
 import { hostOf } from './util.js';
 
 export const TILE_MIME = 'application/x-newtab-tile';
@@ -88,9 +89,17 @@ export function tileIcon(url, iconUrl, title, { mini = false, preferSite = mini 
 
   const img = el('img', { class: mini ? 'mini-img' : 'tile-img', alt: '', draggable: false, decoding: 'async', referrerpolicy: 'no-referrer' });
   let i = 0;
+  // A custom icon link uses its saved copy when there is one; data-icon lets a copy saved
+  // later replace the image on screen.
+  const show = () => {
+    const src = candidates[i];
+    if (src === iconUrl) img.dataset.icon = src;
+    else delete img.dataset.icon;
+    img.src = localIcon(src) || src;
+  };
   img.addEventListener('error', () => {
     i += 1;
-    if (i < candidates.length) img.src = candidates[i];
+    if (i < candidates.length) show();
     else img.replaceWith(letter());
   });
   // Wide images get a wide box in the flat layout instead of shrinking into a square one.
@@ -98,9 +107,9 @@ export function tileIcon(url, iconUrl, title, { mini = false, preferSite = mini 
   // also cropped to their centre.
   img.addEventListener('load', () => {
     img.classList.toggle('wide', img.naturalWidth / img.naturalHeight > 1.3);
-    img.classList.toggle('banner', SD2_BANNER.test(img.currentSrc));
+    img.classList.toggle('banner', SD2_BANNER.test(candidates[i]));
   });
-  img.src = candidates[0];
+  show();
   return img;
 }
 

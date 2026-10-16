@@ -3,6 +3,7 @@
 import { el, icon, field, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl } from './util.js';
 import { fromSpeedDial2 } from './importer.js';
+import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const TILE_PRESETS = [
@@ -237,7 +238,7 @@ export function setupPrefs(store) {
   function exportBackup() {
     const state = structuredClone(store.get());
     state.prefs.widgets.github.token = '';   // a backup file shouldn't carry a credential
-    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper };
+    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper, icons: iconsFor(state.tiles) };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `new-tab-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a);
@@ -261,6 +262,7 @@ export function setupPrefs(store) {
       if (!await confirmDialog(`Replace everything here with this backup (${n} tiles)?`, { title: 'Restore backup', confirmLabel: 'Restore' })) return;
       store.replace(json.state);
       await store.setWallpaper(typeof json.wallpaper === 'string' ? json.wallpaper : '');
+      await addSavedIcons(json.icons);
       show('backup');
       return;
     }
@@ -283,6 +285,7 @@ export function setupPrefs(store) {
     if (!await confirmDialog('This deletes all tiles, groups, settings, tasks, notes and the wallpaper. Download a backup first if you might want them back.', { title: 'Reset everything?', confirmLabel: 'Reset', danger: true })) return;
     store.replace(null);
     await store.setWallpaper('');
+    await clearSavedIcons();
     show('general');
   }
 
