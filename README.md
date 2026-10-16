@@ -345,9 +345,9 @@ To preview outside the extension, serve the folder (`python -m http.server 5517`
 After editing files, reload the new tab. Changes to `manifest.json` need the extension's reload
 button on `chrome://extensions`.
 
-The tab icon is drawn by `icons/make-icons.mjs`: a dot-matrix "N" in the accent colour, lit like the
-ASCII field under the cursor. It writes `icons/icon.svg`, and the PNGs Chrome needs for the favicon
-and the extension card when given a Chrome or chrome-headless-shell binary to rasterize with:
+The tab icon is drawn by `icons/make-icons.mjs`: one stroke tracing an "N", mint to sky, ending in
+a cursor point. It writes `icons/icon.svg`, and the PNGs Chrome needs for the favicon and the
+extension card when given a Chrome or chrome-headless-shell binary to rasterize with:
 
 ```
 node icons/make-icons.mjs path/to/chrome-headless-shell.exe
