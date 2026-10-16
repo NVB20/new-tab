@@ -3,9 +3,12 @@
 
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
-import { CLOCK_FACES } from './widgets.js';
+import { CLOCK_FACES } from './clock-widget.js';
 import { setTheme } from './store.js';
+import { GITHUB_PARTS, copyById, copyTitle, resetLayout } from './layout.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
+
+const PART_NAMES = { heatmap: 'Activity map', pulls: 'Pull requests', issues: 'Issues', commits: 'Commits' };
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const TILE_PRESETS = [
@@ -17,8 +20,14 @@ const BACKUP_FORMAT = 'new-tab-backup';
 const OFFSET_KEY = 'newtab:prefs-offset';
 const KEEP_VISIBLE = 120;   // px of the panel that stay inside the window while dragging
 
-export function setupPrefs(store) {
+// enterLayoutMode() opens Layout mode (the panel closes first).
+export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
   const prefs = () => store.get().prefs;
+  // One setting of a widget copy on the canvas (see layout.js).
+  const setCopy = (id, key, value) => store.update(s => {
+    const own = copyById(s, id);
+    if (own) own.settings[key] = value;
+  });
   const getPref = path => path.split('.').reduce((o, k) => o?.[k], prefs());
   const setPref = (path, value) => store.update(s => {
     const keys = path.split('.');
@@ -103,6 +112,28 @@ export function setupPrefs(store) {
 
   const textInput = (label, path, placeholder, { hint, ...opts } = {}) => row(label, textField(label, path, placeholder, opts), hint);
 
+  // The same controls for a value that isn't at a prefs path (a widget copy's settings).
+  function textFor(label, key, value, placeholder, set, { maxLength = 60 } = {}) {
+    const input = el('input', {
+      type: 'text', class: 'pref-input', value, placeholder, dir: 'auto', maxLength, 'aria-label': label,
+      autocomplete: 'off', spellcheck: false, dataset: { key },
+      oninput: () => set(input.value),
+    });
+    return input;
+  }
+
+  function sliderFor(label, key, value, min, max, set, { step = 1, unit = '' } = {}) {
+    const out = el('output', { class: 'range-value', text: value + unit });
+    const input = el('input', {
+      type: 'range', min, max, step, value, 'aria-label': label, dataset: { key },
+      oninput: () => {
+        out.textContent = input.value + unit;
+        set(Number(input.value));
+      },
+    });
+    return el('div', { class: 'pref-row pref-slider' }, el('div', { class: 'pref-label' }, el('span', { text: label }), out), input);
+  }
+
   // ---- sections ----
 
   function page() {
@@ -140,12 +171,11 @@ export function setupPrefs(store) {
       sub(shown === 'ascii', toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations')),
       sub(shown === 'image', imageRows(image)),
       title('Search bar'),
-      toggle('Search bar', 'search.enabled', 'Ctrl+Space jumps to it. Tab or the icon picks an engine; drag ⠿ to move it between rows of tiles'),
-      sub(p.search.enabled,
-        toggle('Google', 'search.google'),
-        toggle('Claude', 'search.claude', 'Sends what you type to claude.ai and runs it'),
-        toggle('ChatGPT', 'search.chatgpt', 'Sends what you type to chatgpt.com and runs it'),
-        toggle('Gemini', 'search.gemini', 'Sends what you type to gemini.google.com and runs it')),
+      el('p', { class: 'pref-hint pref-intro', text: 'The engines every search bar offers. Ctrl+Space jumps to the bar; Tab or its icon picks an engine. A bar sits among a tiles block’s rows (drag its ⠿ to move it) or anywhere on its own: see Layout.' }),
+      toggle('Google', 'search.google'),
+      toggle('Claude', 'search.claude', 'Sends what you type to claude.ai and runs it'),
+      toggle('ChatGPT', 'search.chatgpt', 'Sends what you type to chatgpt.com and runs it'),
+      toggle('Gemini', 'search.gemini', 'Sends what you type to gemini.google.com and runs it'),
       title('Top bar'),
       toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
     ];
@@ -200,8 +230,7 @@ export function setupPrefs(store) {
     const t = prefs().tiles;
     return [
       title('Layout'),
-      slider('Columns', 'columns', 2, 10),
-      slider('Width', 'width', 480, 1600, { step: 10, unit: 'px' }),
+      el('p', { class: 'pref-hint pref-intro', text: 'Each tiles block’s columns, group and search bar are under Layout; its size is set in Layout mode.' }),
       slider('Spacing', 'spacing', 0, 40, { unit: 'px' }),
       toggle('Center vertically', 'centerVertically'),
       toggle('Compact layout', 'compact', 'Shorter tiles'),
@@ -228,51 +257,95 @@ export function setupPrefs(store) {
     ];
   }
 
-  function widgets() {
-    const w = prefs().widgets;
-    const [near, far] = w.position === 'right' ? ['Right', 'Left'] : ['Left', 'Right'];
+  // Layout mode, and one group per widget copy on the canvas with that copy's own settings. A
+  // widget's ✎ opens its group (the anchor is the copy's id).
+  function layout() {
+    const s = store.get();
     return [
-      segmented('Clock side', 'widgets.position', [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }],
-        'Markets and GitHub take the other side'),
-      title(`${near} column`),
-      toggle('Clock', 'widgets.clock.enabled', 'Or use ✎ on the clock to pick a style'),
-      sub(w.clock.enabled,
-        clockStyle(w.clock.face),
-        toggle('24-hour clock', 'widgets.clock.hour24'),
-        row('Greeting', el('div', { class: 'btn-row' },
-          w.clock.greeting && textField('Your name', 'widgets.clock.name', 'Your name'),
-          switchInput('Greeting', 'widgets.clock.greeting')), 'Good morning, and your name')),
-      toggle('Tasks', 'widgets.tasks.enabled'),
-      toggle('Notes', 'widgets.notes.enabled'),
-      toggle('Claude', 'widgets.claude.enabled', 'A box that sends a message to a new chat on claude.ai'),
-      title(`${far} column`),
-      toggle('Markets', 'widgets.markets.enabled', 'Use ✎ on the widget to choose coins and currency pairs'),
-      row('GitHub', el('button', { type: 'button', class: 'btn', onclick: () => show('github') }, 'Settings'),
-        `${w.github.enabled ? 'On' : 'Off'} · set up in its own section`),
+      row('Layout', el('button', { type: 'button', class: 'btn', onclick: () => { dialog.close(); enterLayoutMode(); } }, icon('layout', 16), 'Edit layout'),
+        'Drag, resize, add, duplicate and remove the widgets on the page'),
+      row('Reset layout', el('button', { type: 'button', class: 'btn', text: 'Reset', onclick: resetAllLayout }),
+        'Back to the default places, keeping each widget’s settings'),
+      ...s.prefs.layout.widgets.map(copy => group(copy.id, title(copyTitle(copy, s.groups)), ...copyRows(copy, s.groups))),
     ];
   }
 
+  function copyRows(copy, groups) {
+    const s = copy.settings;
+    const set = (key, value) => setCopy(copy.id, key, value);
+    switch (copy.type) {
+      case 'clock':
+        return [
+          ...clockStyle(copy),
+          row('24-hour clock', switchFor('24-hour clock', `${copy.id}.hour24`, s.hour24, on => set('hour24', on))),
+          row('Greeting', el('div', { class: 'btn-row' },
+            s.greeting && textFor('Your name', `${copy.id}.name`, s.name, 'Your name', v => set('name', v)),
+            switchFor('Greeting', `${copy.id}.greeting`, s.greeting, on => set('greeting', on))), 'Good morning, and your name'),
+        ];
+      case 'tiles': {
+        const groupSelect = el('select', {
+          class: 'pref-input', 'aria-label': 'Group', dataset: { key: `${copy.id}.group` },
+          onchange: () => {
+            set('group', groupSelect.value || null);
+            redraw();
+          },
+        },
+        el('option', { value: '', text: 'Follow the tabs', selected: s.group === null }),
+        groups.map(g => el('option', { value: g.id, text: g.title, selected: g.id === s.group })));
+        const current = s.bar == null ? 'off' : String(s.bar);
+        const barOptions = [['off', 'Off'], ['0', 'Above the tiles'], ...(s.bar > 0 ? [[String(s.bar), `After row ${s.bar}`]] : []), ['-1', 'Below the tiles']];
+        const barSelect = el('select', {
+          class: 'pref-input', 'aria-label': 'Search bar', dataset: { key: `${copy.id}.bar` },
+          onchange: () => {
+            set('bar', barSelect.value === 'off' ? null : Number(barSelect.value));
+            redraw();
+          },
+        }, barOptions.map(([value, text]) => el('option', { value, text, selected: value === current })));
+        return [
+          row('Group', groupSelect, 'The group this block shows'),
+          sliderFor('Columns', `${copy.id}.columns`, s.columns, 2, 10, v => set('columns', v)),
+          row('Search bar', barSelect, 'Among this block’s rows; drag its ⠿ to put it between two rows'),
+        ];
+      }
+      case 'github':
+        return [
+          row('Username', textFor('Username', `${copy.id}.user`, s.user, 'NVB20', v => set('user', v))),
+          ...GITHUB_PARTS.map(part => row(PART_NAMES[part], switchFor(PART_NAMES[part], `${copy.id}.${part}`, s.parts.includes(part),
+            on => set('parts', GITHUB_PARTS.filter(p => (p === part ? on : s.parts.includes(p))))))),
+          row('Private repos', el('button', { type: 'button', class: 'btn', text: 'GitHub section', onclick: () => show('github') }),
+            'The access token is shared by every GitHub widget'),
+        ];
+      case 'markets':
+        return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'search':
+        return [row('Engines', el('button', { type: 'button', class: 'btn', text: 'Page section', onclick: () => show('page') }), 'Shared by every search bar')];
+      default:
+        return [row('No settings', el('span'))];
+    }
+  }
+
+  async function resetAllLayout() {
+    const s = store.get();
+    const names = resetLayout(structuredClone(s.prefs.layout)).map(c => copyTitle(c, s.groups)).join(', ');
+    const ok = await confirmDialog(
+      names ? `Put every widget back in its default place? ${names} will be removed.` : 'Put every widget back in its default place?',
+      { title: 'Reset layout', confirmLabel: 'Reset' },
+    );
+    if (!ok) return;
+    store.update(st => { resetLayout(st.prefs.layout); });
+    redraw();
+  }
+
   function github() {
-    const on = prefs().widgets.github.enabled;
     return [
-      // The widget's ✎ and Set up button open this group; an empty Username box gets the cursor.
-      group('github',
-        title('GitHub'),
-        toggle('GitHub widget', 'widgets.github.enabled', 'A year of activity, open pull requests, and your issues and commits'),
-        sub(on,
-          textInput('Username', 'widgets.github.user', 'NVB20'),
-          segmented('Show', 'widgets.github.show', [
-            { value: 'commits', label: 'Commits' },
-            { value: 'issues', label: 'Issues' },
-            { value: 'both', label: 'Both' },
-          ], 'Listed under your open pull requests'))),
-      on && title('Private repos'),
-      on && textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
+      title('Private repos'),
+      textInput('Access token (optional)', 'github.token', 'github_pat_…', {
         type: 'password',
         maxLength: 300,
-        hint: 'Only needed for private repos. Kept only in this browser and left out of backups.',
+        hint: 'One token for every GitHub widget. Only needed for private repos. Kept only in this browser and left out of backups.',
       }),
-      on && tokenHelp(),
+      tokenHelp(),
+      el('p', { class: 'pref-hint pref-intro', text: 'Each GitHub widget’s username and what it shows are under Layout.' }),
     ];
   }
 
@@ -291,16 +364,17 @@ export function setupPrefs(store) {
 
   // Style picks the font. Stencil, Rounded and Serif come stacked or on one line (their `-line`
   // face), so a switch picks which, and changing font keeps that choice.
-  function clockStyle(faceId) {
-    const face = CLOCK_FACES.find(f => f.id === faceId) ?? CLOCK_FACES[0];
+  function clockStyle(copy) {
+    const face = CLOCK_FACES.find(f => f.id === copy.settings.face) ?? CLOCK_FACES[0];
     const font = face.font ?? face.id;
     const lineOf = f => CLOCK_FACES.find(x => x.font === f)?.id;
     const fonts = CLOCK_FACES.filter(f => !f.font).map(f => ({ value: f.id, label: f.label }));
+    const setFace = id => setCopy(copy.id, 'face', id);
     return [
-      row('Style', choice('Clock style', font, fonts, f => setPref('widgets.clock.face', face.font && lineOf(f) ? lineOf(f) : f))),
+      row('Style', choice('Clock style', font, fonts, f => setFace(face.font && lineOf(f) ? lineOf(f) : f))),
       lineOf(font) && row('Hours over minutes', switchFor('Hours over minutes', 'clock-stacked', !face.font,
-        on => setPref('widgets.clock.face', on ? font : lineOf(font)))),
-      !face.stacked && toggle('Colon', 'widgets.clock.colon', '15:41, or 1541 without it'),
+        on => setFace(on ? font : lineOf(font)))),
+      !face.stacked && row('Colon', switchFor('Colon', `${copy.id}.colon`, copy.settings.colon, on => setCopy(copy.id, 'colon', on)), '15:41, or 1541 without it'),
     ];
   }
 
@@ -342,7 +416,7 @@ export function setupPrefs(store) {
 
   function exportBackup() {
     const state = structuredClone(store.get());
-    state.prefs.widgets.github.token = '';   // a backup file shouldn't carry a credential
+    state.prefs.github.token = '';   // a backup file shouldn't carry a credential
     const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper, icons: iconsFor(state.tiles) };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `new-tab-backup-${new Date().toISOString().slice(0, 10)}.json` });
@@ -383,8 +457,12 @@ export function setupPrefs(store) {
     }
     const message = `Import ${imported.tiles.length} tiles in ${imported.groups.length} group${imported.groups.length === 1 ? '' : 's'} from Speed Dial 2? This replaces your current tiles, groups and settings. Tasks, task history and notes are kept.`;
     if (!await confirmDialog(message, { title: 'Import from Speed Dial 2', confirmLabel: 'Import' })) return;
-    const { tasks, taskHistory, taskStats, notes } = store.get();
-    store.replace({ ...imported, tasks, taskHistory, taskStats, notes });
+    // The layout and the token stay; only the export's column count goes to the block that
+    // follows the tabs. Blocks pinned to the old groups go back to following the tabs on load.
+    const { tasks, taskHistory, taskStats, notes, prefs: { layout, github } } = structuredClone(store.get());
+    const block = layout.widgets.find(c => c.type === 'tiles' && c.settings.group === null);
+    if (block) block.settings.columns = imported.prefs.columns;
+    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, prefs: { ...imported.prefs, layout, github } });
     redraw();
   }
 
@@ -401,7 +479,7 @@ export function setupPrefs(store) {
   const sections = [
     { id: 'page', label: 'Page', icon: 'palette', build: page },
     { id: 'tiles', label: 'Tiles', icon: 'grid', build: tiles },
-    { id: 'widgets', label: 'Widgets', icon: 'layout', build: widgets },
+    { id: 'layout', label: 'Layout', icon: 'layout', build: layout },
     { id: 'github', label: 'GitHub', icon: 'branch', build: github },
     { id: 'backup', label: 'Backup', icon: 'database', build: backup },
   ];

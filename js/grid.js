@@ -1,7 +1,8 @@
-// Tile grid for the active group: open, drag to reorder, drop a tile on another to make a folder,
-// context menu, add/edit dialog.
+// A tiles block: the tiles of one group (the active one, or a pinned group) with the search bar
+// docked among them when the block has one. Open, drag to reorder, drop a tile on another to
+// make a folder, drag a tile to another block to move it there, context menu, add/edit dialog.
 
-import { el, icon, tileIcon, showMenu, openDialog, confirmDialog, field, TILE_MIME } from './ui.js';
+import { el, icon, tileIcon, showMenu, openDialog, confirmDialog, field, TILE_MIME, tileDrag } from './ui.js';
 import {
   addTile, updateTile, deleteTile, moveTileToGroup, reorderTile,
   isFolder, topLevel, createFolder, addToFolder, removeFromFolder, dissolveFolder,
@@ -9,17 +10,31 @@ import {
 import { openFolder, settleFolder } from './folders.js';
 import { openUrl } from './chrome-api.js';
 import { normalizeUrl, hostOf } from './util.js';
+import { copyById, TYPES } from './layout.js';
+import { mountSearchBar } from './searchbar.js';
 
 const isWeb = url => /^https?:/i.test(url);
 const MARKS = ['drop-before', 'drop-after', 'drop-into'];
 // The only prefs the tiles themselves use; the rest are CSS variables set by theme.js.
 const tilePrefs = p => `${p.showAddButton}|${p.openInNewTab}|${p.tiles.icons}`;
 
-export function mountGrid(root, store) {
-  let dragId = null;
+export function mountTiles(root, store, copy, ctx) {
+  const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.tiles.defaults();
+  // The group shown: the pinned one, or whichever tab is active.
+  const groupId = () => settings().group ?? store.get().activeGroupId;
+
+  const headTitle = el('span');
+  const heading = el('h2', { class: 'widget-head tiles-head', hidden: true }, icon('grid', 18), headTitle);
+  const bar = el('div', { class: 'searchbar', role: 'search', hidden: true });
+  const grid = el('div', { class: 'grid' });
+  const wrap = el('div', { class: 'grid-wrap' }, bar, grid);
+  const section = el('section', { class: 'widget widget-tiles' }, heading, wrap);
+  root.append(section);
+  const search = mountSearchBar(bar, store, { grid, copy, ctx });
+
   let canNest = false;
   let marked = null;   // the tile showing a drop mark
-  let shownPrefs = '';
+  let shown = '';
 
   function tileMenu(e, tile) {
     const others = store.get().groups.filter(g => g.id !== tile.groupId);
@@ -117,24 +132,41 @@ export function mountGrid(root, store) {
       el('div', { class: 'tile-title', dir: 'auto', text: tile.title }));
   }
 
+  // What the block looks like apart from its tiles: redrawn only when this changes.
+  function key(state) {
+    const s = settings();
+    const group = state.groups.find(g => g.id === s.group);
+    return [tilePrefs(state.prefs), s.group, s.columns, s.bar == null, group?.title ?? '', s.group ? '' : state.activeGroupId].join('|');
+  }
+
   function render() {
-    const { tiles, activeGroupId, prefs } = store.get();
-    shownPrefs = tilePrefs(prefs);
+    const state = store.get();
+    const { tiles, prefs } = state;
+    const s = settings();
+    const gid = groupId();
+    const group = state.groups.find(g => g.id === s.group);
+    shown = key(state);
+    heading.hidden = !group;
+    headTitle.textContent = group?.title ?? '';
+    wrap.style.setProperty('--cols', String(s.columns));
+    bar.hidden = s.bar == null;
+
     const kids = Map.groupBy(tiles.filter(t => t.folderId), t => t.folderId);
-    const nodes = topLevel({ tiles }, activeGroupId).map(t => tileNode(t, prefs, kids.get(t.id)));
+    const nodes = topLevel({ tiles }, gid).map(t => tileNode(t, prefs, kids.get(t.id)));
     if (prefs.showAddButton) {
       nodes.push(el('button', {
         class: 'tile tile-add',
         type: 'button',
         title: 'Add a tile',
         'aria-label': 'Add a tile',
-        onclick: () => openTileDialog(store),
+        onclick: () => openTileDialog(store, null, gid),
       }, icon('plus', 28)));
     }
     if (!nodes.length) {
       nodes.push(el('p', { class: 'grid-empty', text: 'No tiles in this group. Turn on the + button in Preferences to add some.' }));
     }
-    root.replaceChildren(...nodes);
+    grid.replaceChildren(...nodes);
+    search.place();
   }
 
   const clearMarks = () => {
@@ -142,13 +174,13 @@ export function mountGrid(root, store) {
     marked = null;
   };
 
-  root.addEventListener('dragstart', e => {
+  grid.addEventListener('dragstart', e => {
     const tile = e.target.closest?.('.tile[data-id]');
     if (!tile) return;
-    dragId = tile.dataset.id;
+    tileDrag.id = tile.dataset.id;
     // Folders can't go inside folders.
-    canNest = !tile.classList.contains('tile-folder');
-    e.dataTransfer.setData(TILE_MIME, dragId);
+    tileDrag.folder = tile.classList.contains('tile-folder');
+    e.dataTransfer.setData(TILE_MIME, tileDrag.id);
     if (tile.href) {
       e.dataTransfer.setData('text/uri-list', tile.href);
       e.dataTransfer.setData('text/plain', tile.href);
@@ -157,19 +189,20 @@ export function mountGrid(root, store) {
     tile.classList.add('dragging');
   });
 
-  root.addEventListener('dragend', () => {
-    dragId = null;
+  grid.addEventListener('dragend', () => {
+    tileDrag.id = null;
     clearMarks();
-    root.querySelector('.dragging')?.classList.remove('dragging');
+    grid.querySelector('.dragging')?.classList.remove('dragging');
   });
 
-  root.addEventListener('dragover', e => {
-    if (!dragId) return;
+  grid.addEventListener('dragover', e => {
+    if (!tileDrag.id) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     clearMarks();
     const tile = e.target.closest?.('.tile[data-id]');
-    if (!tile || tile.dataset.id === dragId) return;
+    if (!tile || tile.dataset.id === tileDrag.id) return;
+    canNest = !tileDrag.folder;
     // Edges reorder; the middle drops the tile into the target (making a folder if needed).
     const r = tile.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
@@ -178,16 +211,27 @@ export function mountGrid(root, store) {
     marked = tile;
   });
 
-  root.addEventListener('drop', e => {
-    if (!dragId) return;
+  // Also leaving the block clears its marks (the drop may land in another block).
+  grid.addEventListener('dragleave', e => {
+    if (!grid.contains(e.relatedTarget)) clearMarks();
+  });
+
+  grid.addEventListener('drop', e => {
+    const id = tileDrag.id;
+    if (!id) return;
     e.preventDefault();
     const mark = marked;
-    const id = dragId;
-    if (!mark) return;
+    const gid = groupId();
+    clearMarks();
+    const fromOtherGroup = store.get().tiles.find(t => t.id === id)?.groupId !== gid;
+    if (!mark) {
+      // Dropped on the block's empty space: a tile from another group moves here, last.
+      if (fromOtherGroup) store.update(s => moveTileToGroup(s, id, gid));
+      return;
+    }
     const targetId = mark.dataset.id;
     const into = mark.classList.contains('drop-into');
     const after = mark.classList.contains('drop-after');
-    clearMarks();
     if (into) {
       if (mark.classList.contains('tile-folder')) {
         store.update(s => addToFolder(s, id, targetId));
@@ -199,17 +243,28 @@ export function mountGrid(root, store) {
       return;
     }
     const beforeId = after ? (mark.nextElementSibling?.dataset?.id ?? null) : targetId;
-    store.update(s => reorderTile(s, id, beforeId));
+    store.update(s => {
+      if (fromOtherGroup) moveTileToGroup(s, id, gid);
+      reorderTile(s, id, beforeId);
+    });
   });
 
-  store.subscribe((s, changed) => {
-    if (changed.every(k => k === 'prefs') && tilePrefs(s.prefs) === shownPrefs) return;
+  const unsubscribe = store.subscribe((s, changed) => {
+    if (changed.every(k => k === 'prefs' || k === 'activeGroupId' || k === 'groups') && key(s) === shown) return;
     render();
   }, ['tiles', 'groups', 'activeGroupId', 'prefs']);
   render();
+
+  return {
+    destroy() {
+      unsubscribe();
+      search.destroy();
+    },
+  };
 }
 
-export async function openTileDialog(store, tile = null) {
+// groupId: the group a new tile goes to by default (the block's group).
+export async function openTileDialog(store, tile = null, groupId = null) {
   const s = store.get();
   const title = el('input', { type: 'text', value: tile?.title ?? '', placeholder: 'Netflix', dir: 'auto', maxLength: 200 });
   const url = el('input', { type: 'text', value: tile?.url ?? '', placeholder: 'netflix.com', inputMode: 'url', autocomplete: 'off', spellcheck: false });
@@ -217,7 +272,7 @@ export async function openTileDialog(store, tile = null) {
   const group = el('select', {}, s.groups.map(g => el('option', {
     value: g.id,
     text: g.title,
-    selected: g.id === (tile?.groupId ?? s.activeGroupId),
+    selected: g.id === (tile?.groupId ?? groupId ?? s.activeGroupId),
   })));
   const urlHint = el('span', { class: 'field-hint' });
   const iconHint = el('span', { class: 'field-hint' });

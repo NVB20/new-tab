@@ -7,6 +7,10 @@ import { hostOf } from './util.js';
 export const TILE_MIME = 'application/x-newtab-tile';
 export const GROUP_MIME = 'application/x-newtab-group';
 
+// The tile being dragged, shared by every tiles block on the page: dataTransfer can't be read
+// until the drop, and a tile may be dragged from one block to another.
+export const tileDrag = { id: null, folder: false };
+
 // el('a', { class, text, dataset, onclick, ...props/attributes }, ...children)
 export function el(tag, props = {}, ...children) {
   const node = document.createElement(tag);
@@ -74,6 +78,9 @@ const ICONS = {
   chatgpt: '<path d="M12 3.5 19.4 7.75v8.5L12 20.5l-7.4-4.25v-8.5z"/><circle cx="12" cy="12" r="3"/>',
   gemini: '<path d="M12 3c.7 4.6 4.4 8.3 9 9-4.6.7-8.3 4.4-9 9-.7-4.6-4.4-8.3-9-9 4.6-.7 8.3-4.4 9-9z"/>',
   'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
   caret: '<path d="m8 10 4 4 4-4"/>',
   grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
 };
@@ -91,6 +98,20 @@ export function icon(name, size = 18) {
     iconCache.set(key, svg);
   }
   return svg.cloneNode(true);
+}
+
+// ---- Widget pieces shared by the widget modules ----
+
+export const widgetHead = (iconName, text) => el('h2', { class: 'widget-head' }, icon(iconName, 18), el('span', { text }));
+export const widgetSub = text => el('div', { class: 'widget-sub', text });
+export const widgetEmpty = (...children) => el('p', { class: 'widget-empty' }, ...children);
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+export function svgEl(tag, attrs = {}, text) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  if (text != null) node.textContent = text;
+  return node;
 }
 
 // Image for a tile or link: custom icon → Chrome favicon → letter avatar.

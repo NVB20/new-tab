@@ -19,7 +19,7 @@ function dayFromNow(days) {
 
 const longDate = day => new Date(day + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
-export function mountTasks(store) {
+export function mountTasks(root, store) {
   let editingId = null;
   let dragId = null;
   let marked = null;   // the row showing a drop line
@@ -222,10 +222,16 @@ export function mountTasks(store) {
     store.update(s => moveTask(s, id, beforeId));
   });
 
+  root.append(section);
   store.update(s => pruneHistory(s, Date.now()));
-  store.subscribe(render, ['tasks']);
+  const unsubscribe = store.subscribe(render, ['tasks']);
   // Due labels are relative to today, so redraw once the date changes.
-  setInterval(() => { if (dayKey(Date.now()) !== shownDay) render(); }, 60_000);
+  const timer = setInterval(() => { if (dayKey(Date.now()) !== shownDay) render(); }, 60_000);
   render();
-  return section;
+  return {
+    destroy() {
+      clearInterval(timer);
+      unsubscribe();
+    },
+  };
 }

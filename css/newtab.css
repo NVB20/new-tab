@@ -6,7 +6,6 @@
   --danger: #e5534b;
   --cols: 5;
   --gap: 8px;
-  --width: 720px;
   --tile-radius: 10px;
   --tile-bg: #ffffff;
   --tile-text: #202124;
@@ -113,8 +112,8 @@ button { cursor: pointer; }
   pointer-events: none;
 }
 
-body:not(.ready) .layout { opacity: 0; }
-.layout { transition: opacity 0.12s ease; }
+body:not(.ready) .canvas { opacity: 0; }
+.canvas { transition: opacity 0.12s ease; }
 
 /* ---------- Header ---------- */
 
@@ -189,30 +188,41 @@ body.no-sidebar #btn-sidebar { display: none; }
 body.has-wallpaper .topbar :is(.group-tab, .icon-btn) { text-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
 body.has-wallpaper .topbar .icon { filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.5)); }
 
-/* ---------- Layout ---------- */
+/* ---------- Canvas ---------- */
 
-.layout {
+/* The page under the top bar: a 12 × 12 grid of cells. Every widget copy is a frame placed with
+   grid-area (set by canvas.js). The cells are proportional, so a layout fits any window; a very
+   short window scrolls instead of squashing the rows. */
+.canvas {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(250px, 1fr) minmax(0, var(--width)) minmax(250px, 1fr);
-  column-gap: 32px;
-  row-gap: 24px;
-  align-items: start;
-  min-height: calc(100vh - 56px);
-  padding: 16px 24px 24px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  padding: 8px 24px 24px;
+  height: calc(100vh - 56px);
+  min-height: 560px;
 }
-body.widgets-off .layout { grid-template-columns: minmax(0, 1fr) minmax(0, var(--width)) minmax(0, 1fr); }
+/* A frame is a size container: the clock sizes its face from it (container query units). */
+.widget-frame { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; container-type: size; }
+.widget-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.widget-root > .widget { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
+body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
+.frame-search .widget-root { justify-content: center; }
 
-/* The tiles (#grid is display: contents) and the search bar share this grid, so the bar can take a
-   row of its own between the tiles. */
+/* A tiles block: an optional heading (the pinned group), then the tiles and the docked search bar
+   sharing one grid (#grid is display: contents), so the bar can take a row of its own between
+   the tiles. --cols is the block's own column count. */
+.widget-tiles { display: flex; flex-direction: column; }
+.tiles-head { flex: none; }
+.widget-tiles .grid-wrap { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
 .grid-wrap {
-  grid-column: 2;
-  grid-row: 1;
   display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
   align-content: start;
   gap: var(--gap);
 }
-body.center-v .grid-wrap { align-self: center; }
+body.center-v .grid-wrap { align-content: center; }
 
 /* ---------- Search bar ---------- */
 
@@ -299,24 +309,14 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 
 /* ---------- Widgets ---------- */
 
-.widgets {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: start;
-  width: 100%;
-  max-width: 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-  padding: 8px 0 0;
-}
-body.widgets-right .widgets { grid-column: 3; justify-self: end; }
-body.widgets-off .widgets { display: none; }
-body.has-wallpaper .widgets { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
-
-/* Markets and GitHub sit in the column opposite the clock. */
-.side-widgets { grid-column: 3; justify-self: end; }
-body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
+.widget { padding-top: 8px; }
+.widget-tiles, .widget-search { padding-top: 0; }
+/* A search bar with every engine off says so. */
+.sb-note { flex: 1; min-width: 0; padding-left: 10px; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.searchbar.off { padding-left: 4px; }
+/* Under 3 cells wide a Markets copy has no room for the sparklines. */
+.widget-markets.narrow .mk-row { grid-template-columns: 50px minmax(0, 1fr) 62px 15px; }
+.widget-markets.narrow .mk-spark { display: none; }
 
 .widget-sub {
   margin: 10px 0 2px;
@@ -407,13 +407,19 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 .widget-clock { position: relative; }
 .clock-face { display: flex; flex-direction: column; }
 .clock-date { font-size: 15px; font-weight: 600; }
+/* The time fills its frame: --fit-w and --fit-h are percentages of the frame's width and height
+   (container query units), set per face below so "15:41" or the stacked digits fit either way. */
 .clock-time {
   margin: 2px 0 4px;
-  font-size: var(--clock-size, 64px);
+  font-size: min(var(--fit-w, 30) * 1cqw, var(--fit-h, 45) * 1cqh);
   font-weight: 200;
   line-height: 1.05;
-  letter-spacing: -1px;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+}
+/* A short frame keeps the time and drops the date and greeting. */
+@container (max-height: 160px) {
+  .clock-date, .clock-greeting { display: none; }
 }
 .clock-ampm { margin-left: 6px; font-family: var(--font); font-size: 20px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
 .clock-greeting { order: 3; font-size: 15px; color: var(--muted); }
@@ -421,22 +427,22 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 /* One UI style faces. Stacked faces: hours over minutes, date underneath. */
 .stacked .clock-time { display: flex; flex-direction: column; margin: 0 0 10px; letter-spacing: 0; }
 .clock-face.stacked .clock-date { order: 2; }
-.face-stencil { --clock-size: 136px; }
+.face-stencil { --fit-w: 55; --fit-h: 34; }
 .face-stencil .clock-time { font-family: "Big Shoulders Stencil", var(--font); font-weight: 800; line-height: 0.9; letter-spacing: 0.03em; color: color-mix(in srgb, var(--text) 88%, transparent); }
-.face-rounded { --clock-size: 108px; }
+.face-rounded { --fit-w: 50; --fit-h: 34; }
 .face-rounded .clock-time { font-family: "Nunito", var(--font); font-weight: 900; line-height: 0.9; letter-spacing: -0.04em; }
-.face-serif { --clock-size: 112px; }
+.face-serif { --fit-w: 52; --fit-h: 36; }
 .face-serif .clock-time { font-family: "DM Serif Display", Georgia, serif; font-weight: 400; line-height: 0.86; }
-.face-dot { --clock-size: 58px; }
+.face-dot { --fit-w: 26; --fit-h: 45; }
 .face-dot .clock-time { font-family: "Doto", ui-monospace, monospace; font-weight: 900; line-height: 1.1; letter-spacing: 0; }
 :is(.face-stencil, .face-rounded) .clock-date { font-family: "Nunito", var(--font); font-size: 17px; font-weight: 800; }
 .face-serif .clock-date { font-family: "DM Serif Display", Georgia, serif; font-size: 18px; font-weight: 400; font-style: italic; }
 .face-dot .clock-date { font-family: "Doto", ui-monospace, monospace; font-size: 16px; font-weight: 800; }
 .stacked .clock-ampm { font-size: 18px; }
 /* The same fonts on one line, sized so "15:32" fits the column. */
-.face-stencil:not(.stacked) { --clock-size: 100px; }
-.face-rounded:not(.stacked) { --clock-size: 80px; }
-.face-serif:not(.stacked) { --clock-size: 96px; }
+.face-stencil:not(.stacked) { --fit-w: 32; --fit-h: 45; }
+.face-rounded:not(.stacked) { --fit-w: 28; --fit-h: 45; }
+.face-serif:not(.stacked) { --fit-w: 30; --fit-h: 45; }
 
 /* ✎ in a widget: shown on hover, and while its editor is open. */
 .widget-edit { width: 26px; height: 26px; border-radius: 7px; opacity: 0; transition: opacity 0.15s, background 0.12s, color 0.12s; }
@@ -463,7 +469,7 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 .clock-face-btn:hover { background: var(--hover); }
 .clock-face-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .clock-face-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
-.clock-face-btn .clock-time { flex: 1; justify-content: center; align-self: stretch; display: flex; align-items: center; margin: 0; font-size: calc(var(--clock-size, 64px) * 0.24); letter-spacing: 0; }
+.clock-face-btn .clock-time { flex: 1; justify-content: center; align-self: stretch; display: flex; align-items: center; margin: 0; font-size: 16px; letter-spacing: 0; }
 .clock-face-btn.stacked .clock-time { flex-direction: column; }
 .clock-face-btn .clock-ampm { display: none; }
 .clock-face-label { font-size: 11px; color: var(--muted); }
@@ -525,11 +531,13 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
   display: block;
   width: 100%;
   min-height: 72px;
-  max-height: 40vh;
   resize: none;
   line-height: 1.5;
   field-sizing: content;
 }
+/* The pad fills its frame and scrolls inside it. */
+.widget-notes { display: flex; flex-direction: column; }
+.widget-notes .notes-input { flex: 1; min-height: 0; }
 
 .claude-box { display: flex; align-items: flex-end; gap: 8px; }
 .claude-input { min-height: 0; padding: 5px 0; }
@@ -1058,14 +1066,13 @@ kbd {
 /* ---------- Small screens ---------- */
 
 @media (max-width: 900px) {
-  .layout,
-  body.widgets-off .layout { grid-template-columns: minmax(0, 1fr); }
-  .widgets,
-  body.widgets-right .widgets { grid-column: 1; grid-row: 1; justify-self: stretch; max-width: none; }
-  .side-widgets,
-  body.widgets-right .side-widgets { grid-row: 2; }
-  .grid-wrap { grid-column: 1; grid-row: 3; justify-self: center; width: min(100%, var(--width)); }
-  body.center-v .grid-wrap { align-self: start; }
+  /* The frames stack in reading order (canvas.js keeps them in that order), each as tall as its content. */
+  .canvas { display: flex; flex-direction: column; gap: 28px; height: auto; min-height: 0; }
+  .widget-frame { grid-area: auto !important; container-type: normal; }
+  .widget-root > .widget, .widget-tiles .grid-wrap { overflow: visible; }
+  .clock-time { font-size: 56px; }
+  .face-stencil.stacked, .face-rounded.stacked, .face-serif.stacked { --fit-w: 0; }
+  .face-stencil.stacked .clock-time, .face-rounded.stacked .clock-time, .face-serif.stacked .clock-time { font-size: 110px; }
   .prefs-dlg[open] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .prefs-side { padding-right: 56px; border-right: 0; border-bottom: 1px solid var(--border); }   /* clear of the close button */
   .prefs-top { position: absolute; top: 0; right: 0; }

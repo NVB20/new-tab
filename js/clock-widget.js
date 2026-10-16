@@ -1,9 +1,9 @@
-// Widget column: clock with greeting, tasks, notes and a box that sends to Claude.
+// Clock widget: date, time and greeting in one of the One UI style faces. The face is sized to
+// the widget's frame (container query units, see the CSS), so a bigger clock is a bigger clock.
 
 import { el, icon } from './ui.js';
-import { askChat } from './chrome-api.js';
+import { copyById, TYPES } from './layout.js';
 import { playClockIntro } from './clock-intro.js';
-import { mountTasks } from './task-widget.js';
 
 function partOfDay(hour) {
   if (hour >= 5 && hour < 12) return 'morning';
@@ -28,8 +28,6 @@ export const CLOCK_FACES = [
 const faceOf = id => CLOCK_FACES.find(f => f.id === id) ?? CLOCK_FACES[0];
 const faceClass = f => `face-${f.font ?? f.id}${f.stacked ? ' stacked' : ''}`;
 
-const heading = (iconName, text) => el('h2', { class: 'widget-head' }, icon(iconName, 18), el('span', { text }));
-
 // The time's children for a face: "9:05" (or "905" without the colon) in one line, or "09" over
 // "05" (stacked faces always show two-digit hours).
 function clockDigits(face, now, { hour24, colon }) {
@@ -43,7 +41,9 @@ function clockDigits(face, now, { hour24, colon }) {
     : [`${hh}${colon ? ':' : ''}${mm}`, ampm].filter(Boolean);
 }
 
-export function mountWidgets(root, store) {
+export function mountClock(root, store, copy) {
+  const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.clock.defaults();
+
   const date = el('div', { class: 'clock-date' });
   const time = el('div', { class: 'clock-time' });
   const greeting = el('div', { class: 'clock-greeting', dir: 'auto' });
@@ -55,11 +55,12 @@ export function mountWidgets(root, store) {
     class: 'icon-btn widget-edit clock-edit',
     onclick: () => setEditing(faces.hidden),
   });
-  const clock = el('section', { class: 'widget widget-clock' }, face, editButton, faces);
+  const section = el('section', { class: 'widget widget-clock' }, face, editButton, faces);
+  root.append(section);
 
   function setEditing(on) {
     faces.hidden = !on;
-    clock.classList.toggle('editing', on);
+    section.classList.toggle('editing', on);
     editButton.replaceChildren(icon(on ? 'check' : 'edit', 15));
     editButton.title = on ? 'Done' : 'Clock style';
     editButton.setAttribute('aria-label', editButton.title);
@@ -68,52 +69,10 @@ export function mountWidgets(root, store) {
   }
   setEditing(false);
 
-  const tasks = mountTasks(store);
-
-  const notesArea = el('textarea', {
-    class: 'notes-input',
-    placeholder: 'Write something…',
-    dir: 'auto',
-    'aria-label': 'Notes',
-    oninput: () => {
-      const value = notesArea.value;
-      store.update(s => { s.notes = value; });
-    },
+  const pickFace = id => store.update(s => {
+    const own = copyById(s, copy.id);
+    if (own) own.settings.face = id;
   });
-  const notes = el('section', { class: 'widget widget-notes' }, heading('note', 'Notes'), notesArea);
-
-  // Claude: Enter sends to a new chat on claude.ai, Shift+Enter starts a new line.
-  const claudeInput = el('textarea', {
-    class: 'notes-input claude-input',
-    placeholder: 'Ask Claude…',
-    dir: 'auto',
-    rows: 1,
-    'aria-label': 'Message for Claude',
-    onkeydown: e => {
-      if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
-      e.preventDefault();
-      sendToClaude(e.ctrlKey || e.metaKey);
-    },
-  });
-  const claudeSend = el('button', {
-    type: 'button',
-    class: 'icon-btn claude-send',
-    title: 'Send to Claude (Enter)',
-    'aria-label': 'Send to Claude',
-    onclick: e => sendToClaude(e.ctrlKey || e.metaKey),
-  }, icon('arrow-up', 16));
-  const claude = el('section', { class: 'widget widget-claude' },
-    heading('claude', 'Claude'),
-    el('div', { class: 'claude-box' }, claudeInput, claudeSend));
-
-  function sendToClaude(ctrl) {
-    const text = claudeInput.value.trim();
-    if (!text) return;
-    claudeInput.value = '';
-    askChat('claude', text, { newTab: ctrl || store.get().prefs.openInNewTab });
-  }
-
-  root.append(clock, tasks, notes, claude);
 
   let shownMinute = '';
   function renderClock(force = false) {
@@ -122,7 +81,7 @@ export function mountWidgets(root, store) {
     if (!force && minute === shownMinute) return;
     shownMinute = minute;
 
-    const c = store.get().prefs.widgets.clock;
+    const c = settings();
     const current = faceOf(c.face);
     face.className = `clock-face ${faceClass(current)}`;
     // Classic keeps "Friday, Oct 16"; the One UI faces use the short "Fri 16 Oct".
@@ -137,26 +96,20 @@ export function mountWidgets(root, store) {
         type: 'button',
         class: `clock-face-btn ${faceClass(f)}`,
         'aria-pressed': String(f.id === current.id),
-        onclick: () => store.update(s => { s.prefs.widgets.clock.face = f.id; }),
+        onclick: () => pickFace(f.id),
       }, el('span', { class: 'clock-time', 'aria-hidden': 'true' }, clockDigits(f, now, c)), el('span', { class: 'clock-face-label', text: f.label }))));
     }
   }
 
-  function render(state) {
-    const w = state.prefs.widgets;
-    root.hidden = !w.enabled || !(w.clock.enabled || w.tasks.enabled || w.notes.enabled || w.claude.enabled);
-    clock.hidden = !w.clock.enabled;
-    tasks.hidden = !w.tasks.enabled;
-    notes.hidden = !w.notes.enabled;
-    claude.hidden = !w.claude.enabled;
-    // Don't overwrite the textarea while typing in it (it would move the cursor).
-    if (document.activeElement !== notesArea) notesArea.value = state.notes;
-    renderClock(true);
-  }
-
-  store.subscribe(render, ['notes', 'prefs']);
-  render(store.get());
+  const unsubscribe = store.subscribe(() => renderClock(true), ['prefs']);
+  renderClock(true);
   // A new tab builds its time out of a single point, then redraws it as plain text.
   playClockIntro(time, [date, greeting]).then(() => renderClock(true));
-  setInterval(renderClock, 1000);
+  const timer = setInterval(renderClock, 1000);
+  return {
+    destroy() {
+      clearInterval(timer);
+      unsubscribe();
+    },
+  };
 }

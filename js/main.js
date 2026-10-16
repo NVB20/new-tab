@@ -1,37 +1,35 @@
 import { createStore, pickAdapter } from './store.js';
-import { icon } from './ui.js';
+import { icon, showMenu } from './ui.js';
 import { mountTheme } from './theme.js';
 import { mountGroups } from './groups.js';
-import { mountGrid } from './grid.js';
-import { mountSearchBar } from './searchbar.js';
-import { mountWidgets } from './widgets.js';
-import { mountSideWidgets } from './side-widgets.js';
+import { mountCanvas } from './canvas.js';
 import { startIconCache } from './icon-cache.js';
 
 const store = createStore(pickAdapter());
 await store.load();
 
-mountTheme(store);
-mountGroups(document.getElementById('groups'), store);
-mountSearchBar(document.getElementById('search'), document.getElementById('grid'), store);
-mountGrid(document.getElementById('grid'), store);
-startIconCache(store);
-mountWidgets(document.getElementById('widgets'), store);
-mountSideWidgets(document.getElementById('side-widgets'), store, (id, anchor) => prefs().then(p => p.open(id, anchor)));
-
-// Jump, Preferences and the sidebar aren't needed to show the page: each loads on first use,
-// or once the page is idle, whichever comes first.
+// Jump, Preferences, the sidebar and Layout mode aren't needed to show the page: each loads on
+// first use (the first three also once the page is idle).
 const lazy = load => {
   let promise = null;
   return () => (promise ??= load());
 };
 const jump = lazy(() => import('./jump.js').then(m => m.setupJump(store)));
-const prefs = lazy(() => import('./prefs.js').then(m => m.setupPrefs(store)));
+const prefs = lazy(() => import('./prefs.js').then(m => m.setupPrefs(store, { enterLayoutMode: () => layout().then(l => l.enter()) })));
 const sidebar = lazy(() => import('./sidebar.js').then(m => m.setupSidebar()));
+const layout = lazy(() => import('./edit-mode.js').then(m => m.setupEditMode(store, canvas, ctx)));
+const ctx = { openPrefs: (id, anchor) => prefs().then(p => p.open(id, anchor)) };
 const openJump = () => jump().then(j => j.open());
+
+mountTheme(store);
+mountGroups(document.getElementById('groups'), store);
+const canvasRoot = document.getElementById('canvas');
+const canvas = mountCanvas(canvasRoot, store, ctx);
+startIconCache(store);
 
 const buttons = [
   ['btn-jump', 'search', openJump],
+  ['btn-layout', 'layout', () => layout().then(l => l.toggle())],
   ['btn-sidebar', 'sidebar', () => sidebar().then(s => s.toggle())],
   ['btn-prefs', 'menu', () => prefs().then(p => p.open())],
 ];
@@ -40,6 +38,13 @@ for (const [id, iconName, action] of buttons) {
   button.append(icon(iconName, 20));
   button.addEventListener('click', action);
 }
+
+// Right-click on the empty canvas: the way into Layout mode without the top bar.
+canvasRoot.addEventListener('contextmenu', e => {
+  if (e.target !== canvasRoot) return;
+  e.preventDefault();
+  showMenu(e.clientX, e.clientY, [{ label: 'Edit layout', icon: 'layout', action: () => layout().then(l => l.enter()) }]);
+});
 
 document.addEventListener('keydown', e => {
   const typing = e.target.closest?.('input, textarea, select, [contenteditable]');

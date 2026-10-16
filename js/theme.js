@@ -27,9 +27,7 @@ export function mountTheme(store) {
     const image = backgroundImage(p.background, store.wallpaper);
     const vars = {
       '--accent': p.accent,
-      '--cols': p.columns,
       '--gap': p.spacing + 'px',
-      '--width': p.width + 'px',
       '--tile-radius': p.tiles.radius + 'px',
       '--tile-bg': p.tiles.color,
       '--tile-text': p.tiles.textColor,
@@ -52,8 +50,6 @@ export function mountTheme(store) {
     cl.toggle('no-titles', !p.tiles.showTitle);
     cl.toggle('tiles-card', p.tiles.style === 'card');
     cl.toggle('site-icons', p.tiles.icons === 'site');
-    cl.toggle('widgets-right', p.widgets.position === 'right');
-    cl.toggle('widgets-off', !Object.values(p.widgets).some(w => w?.enabled === true));
     cl.toggle('no-sidebar', !p.sidebar.enabled);
   }
 
