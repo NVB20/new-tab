@@ -115,6 +115,7 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.equal(s.prefs.background.pattern, 'ascii');
   assert.equal(s.prefs.background.motion, true);
   assert.equal(s.prefs.background.blur, 4);
+  assert.deepEqual(s.prefs.background.color, { dark: '', light: '' });
   assert.equal(s.prefs.tiles.style, 'flat');
   assert.equal(s.prefs.tiles.icons, 'logo');
   const c = copies(s);

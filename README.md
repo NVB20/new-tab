@@ -60,7 +60,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
-| **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
+| **Background** | An animated ASCII field that reacts to the mouse, a plain colour (Chrome's greys or any other), or your own wallpaper. |
 | **Backup and import** | One-file backups, and an importer for Speed Dial 2 exports. |
 
 ## Install by hand
@@ -385,7 +385,9 @@ rearrange them.
   Windows is set to reduce animations). The faces' fonts are bundled in `fonts/` (SIL Open Font
   License), so they work offline.
 - **Background:** Preferences → Page: ASCII, Plain or Image (upload a picture or paste a link).
-  Switching back to ASCII or Plain keeps your picture, so Image brings it back.
+  Plain is the theme's background, one of Chrome's greys or any colour you pick; Light and the
+  dark themes each keep their own pick, so text stays readable. Switching back to ASCII or Plain
+  keeps your picture, so Image brings it back.
 - **Preferences:** drag the panel by its top edge or the empty part of its sidebar to see the page
   behind it change as you adjust; double-click there to put it back in the middle. Type in the search box (it has the cursor
   when the panel opens, or press Ctrl+F) to list matching settings from every section; options

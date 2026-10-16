@@ -11,6 +11,22 @@ import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 const PART_NAMES = { heatmap: 'Activity map', pulls: 'Pull requests', issues: 'Issues', commits: 'Commits' };
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
+// Chrome's own greys for the plain background. Text keeps the theme's colour, so the light
+// theme gets light greys and the others dark ones, and each keeps its own pick.
+const PLAIN_COLOURS = {
+  dark: [
+    { color: '#3c3c3c', label: 'Chrome toolbar' },
+    { color: '#2b2b2b', label: 'Chrome tab strip' },
+    { color: '#282828', label: 'Chrome address bar' },
+    { color: '#202124', label: 'Chrome dark page' },
+  ],
+  light: [
+    { color: '#ffffff', label: 'Chrome toolbar' },
+    { color: '#dee1e6', label: 'Chrome tab strip' },
+    { color: '#f1f3f4', label: 'Chrome address bar' },
+    { color: '#e8eaed', label: 'Chrome grey' },
+  ],
+};
 const TILE_PRESETS = [
   { label: 'White', color: '#ffffff', textColor: '#202124' },
   { label: 'Dark', color: '#30302e', textColor: '#faf9f5' },
@@ -169,6 +185,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         { value: 'image', label: 'Image' },
       ], pickBackground)),
       sub(shown === 'ascii', toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations')),
+      sub(shown === 'none', plainColour()),
       sub(shown === 'image', imageRows(image)),
       title('Top bar'),
       toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
@@ -184,6 +201,30 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
       toggle('ChatGPT', 'search.chatgpt', 'Sends what you type to chatgpt.com and runs it'),
       toggle('Gemini', 'search.gemini', 'Sends what you type to gemini.google.com and runs it'),
     ];
+  }
+
+  // '' is the theme's own background (the first swatch).
+  function plainColour() {
+    const family = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    const path = `background.color.${family}`;
+    const current = getPref(path);
+    const pick = color => {
+      setPref(path, color);
+      redraw();
+    };
+    const options = [{ color: '', label: 'Theme colour' }, ...PLAIN_COLOURS[family]];
+    const swatches = options.map(o => el('button', {
+      type: 'button', class: 'swatch', title: o.color ? `${o.label} ${o.color}` : o.label, 'aria-label': o.label,
+      'aria-pressed': String(current === o.color),
+      style: `background:${o.color || 'var(--bg)'}`,
+      onclick: () => pick(o.color),
+    }));
+    const custom = el('input', {
+      type: 'color', value: current || options[1].color, title: 'Any colour', 'aria-label': 'Custom background colour',
+      oninput: () => setPref(path, custom.value),
+    });
+    return row('Colour', el('div', { class: 'swatches' }, swatches, custom),
+      'The theme’s, Chrome’s greys or any colour. Light and the dark themes keep their own');
   }
 
   function imageRows(image) {
