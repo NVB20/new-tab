@@ -19,7 +19,9 @@ const bool = (v, fallback) => (typeof v === 'boolean' ? v : fallback);
 const str = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
 
 // size and min are [w, h] in cells; max is how many copies the page may hold. clean(settings,
-// state) returns a full, valid settings object for the type.
+// state) returns a full, valid settings object for the type. A type's settings are the copy's own
+// group under Preferences → Layout, unless prefs names another section (shared by every copy) or
+// is null (nothing to set).
 export const TYPES = {
   clock: {
     label: 'Clock', icon: 'clock', size: [3, 4], min: [2, 2], max: 1,
@@ -32,9 +34,9 @@ export const TYPES = {
       colon: bool(s.colon, true),
     }),
   },
-  tasks: { label: 'Tasks', icon: 'check-circle', size: [3, 4], min: [2, 3], max: 1, defaults: () => ({}), clean: () => ({}) },
-  notes: { label: 'Notes', icon: 'note', size: [3, 3], min: [2, 2], max: 1, defaults: () => ({}), clean: () => ({}) },
-  claude: { label: 'Claude', icon: 'claude', size: [3, 2], min: [2, 2], max: 5, defaults: () => ({}), clean: () => ({}) },
+  tasks: { label: 'Tasks', icon: 'check-circle', size: [3, 4], min: [2, 3], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
+  notes: { label: 'Notes', icon: 'note', size: [3, 3], min: [2, 2], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
+  claude: { label: 'Claude', icon: 'claude', size: [3, 2], min: [2, 2], max: 5, prefs: null, defaults: () => ({}), clean: () => ({}) },
   markets: {
     label: 'Markets', icon: 'trend', size: [3, 5], min: [2, 3], max: 5,
     defaults: () => ({ items: [...MARKET_ITEMS] }),
@@ -55,8 +57,12 @@ export const TYPES = {
     }),
   },
   // The one search bar on the page, a widget of its own.
-  search: { label: 'Search bar', icon: 'search', size: [6, 1], min: [3, 1], max: 1, defaults: () => ({}), clean: () => ({}) },
+  search: { label: 'Search bar', icon: 'search', size: [6, 1], min: [3, 1], max: 1, prefs: 'search', defaults: () => ({}), clean: () => ({}) },
 };
+
+// The Preferences section that holds a type's settings: 'layout' (the copy's own group), another
+// section's id, or null.
+export const prefsSection = type => (TYPES[type] && 'prefs' in TYPES[type] ? TYPES[type].prefs : 'layout');
 
 // ---- geometry ----
 

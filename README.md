@@ -248,7 +248,8 @@ rearrange them.
 - **Drag** a widget anywhere on it; an outline shows the cells it will snap to. Nothing else moves.
   A spot that is taken, or off the canvas, shows red, and letting go there puts the widget back.
 - **Resize** from any corner or edge. Lists scroll inside their widget; the clock grows with it.
-- **Each widget's toolbar:** settings (its group in Preferences), duplicate, remove. Removing Tasks
+- **Each widget's toolbar:** settings (its group in Preferences, or for the search bar its own
+  section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
   and the search bar are single; Markets, GitHub, tiles blocks and Claude allow five each. A

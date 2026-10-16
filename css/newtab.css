@@ -221,11 +221,11 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
 .grid-wrap {
   display: grid;
   grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
-  align-content: start;
+  /* Rows sit in the middle of a block taller than they need. "safe": a block too short for its
+     tiles scrolls from the top instead of hiding the first rows. */
+  align-content: safe center;
   gap: var(--gap);
 }
-/* "safe": a block too short for its tiles scrolls from the top instead of hiding the first rows. */
-body.center-v .grid-wrap { align-content: safe center; }
 
 /* ---------- Search bar ---------- */
 
@@ -515,7 +515,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 
 /* ---------- Tiles ---------- */
 
-/* Laid out by .grid-wrap, which it shares with the search bar. */
+/* Laid out by .grid-wrap. */
 .grid { display: contents; }
 
 /* Flat by default: icon and title straight on the background. */

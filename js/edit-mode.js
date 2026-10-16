@@ -4,7 +4,7 @@
 
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import {
-  TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout,
+  TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, prefsSection,
 } from './layout.js';
 import { gridArea } from './canvas.js';
 
@@ -36,11 +36,14 @@ export function setupEditMode(store, canvas, ctx) {
   function decorate(frame) {
     if (frame.querySelector(':scope > .frame-tools')) return;
     const id = frame.dataset.id;
+    // Settings: the copy's group under Layout, or the section every copy shares; none for a type
+    // with nothing to set.
+    const section = prefsSection(copyById(store.get(), id)?.type);
     frame.tabIndex = 0;
     frame.append(
       el('div', { class: 'frame-label' }),
       el('div', { class: 'frame-tools' },
-        el('button', { type: 'button', class: 'icon-btn', title: 'Settings', 'aria-label': 'Settings', onclick: () => ctx.openPrefs('layout', id) }, icon('settings', 15)),
+        section && el('button', { type: 'button', class: 'icon-btn', title: 'Settings', 'aria-label': 'Settings', onclick: () => ctx.openPrefs(section, section === 'layout' ? id : undefined) }, icon('settings', 15)),
         el('button', { type: 'button', class: 'icon-btn frame-dup', 'aria-label': 'Duplicate', onclick: () => duplicate(id) }, icon('copy', 15)),
         el('button', { type: 'button', class: 'icon-btn frame-remove', title: 'Remove (Delete)', 'aria-label': 'Remove', onclick: () => remove(id) }, icon('x', 15))),
       ...DIRS.map(dir => el('div', { class: `frame-handle ${dir}`, dataset: { dir }, 'aria-hidden': 'true' })));

@@ -9,7 +9,6 @@ import { defaultLayout, normalizeLayout } from './layout.js';
 export const DEFAULT_PREFS = {
   theme: 'dark',
   spacing: 8,
-  centerVertically: true,
   showAddButton: true,
   compact: false,
   openInNewTab: false,
@@ -20,8 +19,7 @@ export const DEFAULT_PREFS = {
   // pattern 'ascii' is the animated letter field. An image (the upload when useUpload, else url)
   // covers it while showImage is on; picking a pattern turns showImage off and keeps the image.
   background: { pattern: 'ascii', motion: true, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
-  // The engines every search bar offers (docked in a tiles block or on its own); mode is the one
-  // Enter goes to.
+  // The engines the search bar offers; mode is the one Enter goes to.
   search: { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' },
   // One username and one token for every GitHub widget. The token is optional (read-only), only
   // adds private repos' commits, issues and PRs, and is never exported in backups.
@@ -159,7 +157,7 @@ export function normalizeState(raw) {
   const copies = Array.isArray(rp.layout?.widgets) ? rp.layout.widgets : [];
   const user = [...copies.map(c => c?.settings?.user), rp.widgets?.github?.user].find(u => typeof u === 'string' && u.trim());
   if (user && !s.prefs.github.user.trim()) s.prefs.github.user = user.trim();
-  for (const k of ['columns', 'width', 'widgets']) delete s.prefs[k];
+  for (const k of ['columns', 'width', 'widgets', 'centerVertically']) delete s.prefs[k];
   delete s.prefs.search.enabled;
   delete s.prefs.search.row;
   return s;

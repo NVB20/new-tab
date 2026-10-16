@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   COLS, ROWS, TYPES, GITHUB_PARTS, fits, firstFree, countOf, stackOrder, defaultLayout, normalizeLayout,
-  addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle,
+  addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle, prefsSection,
 } from '../js/layout.js';
 
 const legacy = over => ({
@@ -235,4 +235,11 @@ test('copyTitle names a copy for labels and Preferences', () => {
   assert.equal(copyTitle({ type: 'clock', settings: {} }, groups), 'Clock');
   assert.equal(TYPES.clock.max, 1);
   assert.equal(TYPES.tiles.max, 5);
+});
+
+test('prefsSection says where Preferences keeps a type’s settings', () => {
+  for (const type of ['clock', 'markets', 'github', 'tiles']) assert.equal(prefsSection(type), 'layout', type);
+  assert.equal(prefsSection('search'), 'search');
+  for (const type of ['tasks', 'notes', 'claude']) assert.equal(prefsSection(type), null, type);
+  assert.equal(prefsSection('weather'), 'layout');   // an unknown type falls back to its own group
 });

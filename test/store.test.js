@@ -44,6 +44,7 @@ test('a saved state from before Layout mode converts to the same page, and loses
   const s = normalizeState({ prefs: {
     columns: 7,
     width: 900,
+    centerVertically: false,
     search: { enabled: true, row: 1, google: true, claude: false, chatgpt: true, gemini: false, mode: 'chatgpt' },
     widgets: {
       enabled: true,
@@ -65,7 +66,7 @@ test('a saved state from before Layout mode converts to the same page, and loses
   assert.deepEqual([c.tiles.y, c.tiles.h], [1, 11]);
   assert.equal(s.prefs.github.token, 'ghp_x');
   assert.deepEqual(s.prefs.search, { google: true, claude: false, chatgpt: true, gemini: false, mode: 'chatgpt' });
-  for (const k of ['columns', 'width', 'widgets']) assert.equal(k in s.prefs, false, k);
+  for (const k of ['columns', 'width', 'widgets', 'centerVertically']) assert.equal(k in s.prefs, false, k);
 });
 
 test('a saved layout is kept and validated; notes and tasks are untouched', () => {

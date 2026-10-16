@@ -46,7 +46,6 @@ export function mountTheme(store) {
     const cl = document.body.classList;
     cl.toggle('has-wallpaper', !!image);
     cl.toggle('compact', p.compact);
-    cl.toggle('center-v', p.centerVertically);
     cl.toggle('no-titles', !p.tiles.showTitle);
     cl.toggle('tiles-card', p.tiles.style === 'card');
     cl.toggle('site-icons', p.tiles.icons === 'site');

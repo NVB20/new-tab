@@ -5,7 +5,7 @@ import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
 import { CLOCK_FACES } from './clock-widget.js';
 import { setTheme } from './store.js';
-import { GITHUB_PARTS, copyById, copyTitle, resetLayout } from './layout.js';
+import { GITHUB_PARTS, copyById, copyTitle, resetLayout, prefsSection } from './layout.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 const PART_NAMES = { heatmap: 'Activity map', pulls: 'Pull requests', issues: 'Issues', commits: 'Commits' };
@@ -234,10 +234,9 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
   function tiles() {
     const t = prefs().tiles;
     return [
-      title('Layout'),
+      title('Grid'),
       el('p', { class: 'pref-hint pref-intro', text: 'Each tiles block’s columns and group are under Layout; its size and place are set in Layout mode.' }),
       slider('Spacing', 'spacing', 0, 40, { unit: 'px' }),
-      toggle('Center vertically', 'centerVertically'),
       toggle('Compact layout', 'compact', 'Shorter tiles'),
       title('Look'),
       segmented('Style', 'tiles.style', [{ value: 'flat', label: 'Flat' }, { value: 'card', label: 'Cards' }]),
@@ -262,16 +261,17 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
     ];
   }
 
-  // Layout mode, and one group per widget copy on the canvas with that copy's own settings. A
+  // Layout mode, and one group per widget copy on the canvas that has settings of its own. A
   // widget's ✎ opens its group (the anchor is the copy's id).
   function layout() {
     const s = store.get();
+    const own = s.prefs.layout.widgets.filter(copy => prefsSection(copy.type) === 'layout');
     return [
       row('Layout', el('button', { type: 'button', class: 'btn', onclick: () => { dialog.close(); enterLayoutMode(); } }, icon('layout', 16), 'Edit layout'),
         'Drag, resize, add, duplicate and remove the widgets on the page'),
       row('Reset layout', el('button', { type: 'button', class: 'btn', text: 'Reset', onclick: resetAllLayout }),
         'Back to the default places, keeping each widget’s settings'),
-      ...s.prefs.layout.widgets.map(copy => group(copy.id, title(copyTitle(copy, s.groups)), ...copyRows(copy, s.groups))),
+      ...own.map(copy => group(copy.id, title(copyTitle(copy, s.groups)), ...copyRows(copy, s.groups))),
     ];
   }
 
@@ -311,8 +311,6 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         ];
       case 'markets':
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
-      case 'search':
-        return [row('Engines', el('button', { type: 'button', class: 'btn', text: 'Search bar section', onclick: () => show('search') }), 'Google, Claude, ChatGPT, Gemini')];
       default:
         return [row('No settings', el('span'))];
     }

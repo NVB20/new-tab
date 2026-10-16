@@ -60,7 +60,6 @@ function mapPrefs(raw) {
     columns: num(p.columns, 2, 10),
     spacing: num(p.spacing, 0, 40),
     width: num(p.maxWidth, 480, 1600),
-    centerVertically: bool(p.centeredLayout),
     showAddButton: bool(p.showAddButton),
     openInNewTab: bool(p.openInNewTab),
     theme: oneOf(isObj(p.theme) ? p.theme.theme : undefined, ['dark', 'light', 'auto']),

@@ -85,7 +85,6 @@ test('preferences are mapped onto our prefs', () => {
   assert.equal(prefs.columns, 5);
   assert.equal(prefs.spacing, 8);
   assert.equal(prefs.width, 720);
-  assert.equal(prefs.centerVertically, true);
   assert.equal(prefs.showAddButton, true);
   assert.equal(prefs.openInNewTab, false);
   assert.equal(prefs.theme, 'dark');
