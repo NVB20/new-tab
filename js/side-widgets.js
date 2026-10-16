@@ -175,21 +175,21 @@ export function mountSideWidgets(root, store) {
         : [empty('No commits found.')]));
       const t = data.tokenInfo;
       if (t) {
-        parts.push(el('p', {
-          class: 'widget-note',
-          text: !t.privateRepos
-            ? `Token works but sees no private repos in ${t.owners.join(', ')}. A fine-grained token only reaches the one account or organisation picked as its resource owner.`
+        parts.push(el('p', { class: 'widget-note' },
+          !t.privateRepos
+            ? `Token works but sees no private repos in ${t.owners.join(', ')}. It needs Contents: read-only, and an organisation may still have to approve it. `
             : t.unreadable
-              ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only.`
-              : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}.`,
-        }));
+              ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only. `
+              : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}. `,
+          // Results are cached for 10 minutes; after changing the token's access, skip the wait.
+          el('button', { type: 'button', class: 'link-btn', text: 'Check again', onclick: () => loadGithub(true) })));
       }
     }
     githubBody.replaceChildren(...parts);
   }
 
   let githubSeq = 0;
-  async function loadGithub() {
+  async function loadGithub(force = false) {
     const g = prefs().widgets.github;
     const user = g.user.trim();
     const token = g.token.trim();
@@ -207,7 +207,7 @@ export function mountSideWidgets(root, store) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     const my = ++githubSeq;
-    const result = await feed(`github-v4:${user}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
+    const result = await feed(`github-v4:${user}:${token ? 'token' : 'public'}`, force ? 0 : GITHUB_TTL, async () => {
       // Commit search finds the user's commits in every repo and organisation (default branches);
       // GitHub's events feed returns nothing for this account. 100 results reach enough repos to
       // pick the latest commit of each.
