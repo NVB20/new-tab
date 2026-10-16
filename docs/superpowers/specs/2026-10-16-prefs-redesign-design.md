@@ -20,10 +20,14 @@ Removed: the "Show widgets" master switch (each widget has its own) and the shor
 
 ## Data
 
-- No pref is renamed. The Background choice is read from the existing fields: Image when an
-  uploaded image (`useUpload` and a stored wallpaper) or a `url` is set, otherwise `pattern`.
-  Choosing ASCII or Plain sets `pattern` and clears `url` and `useUpload`; the uploaded file stays
-  stored, so choosing Image again brings it back. Remove deletes the file and the link.
+- No pref is renamed. One is added: `background.showImage` (default `true`). The page shows
+  `backgroundImage(background, wallpaper)` (in `util.js`, used by theme, ASCII field and panel):
+  nothing while `showImage` is off, else the upload when `useUpload`, else `url`. Saved states
+  without the field keep showing their image.
+- The Background choice reads Image when an image is shown, otherwise `pattern`. Choosing ASCII or
+  Plain sets `pattern` and turns `showImage` off, keeping the upload and the link, so choosing Image
+  again brings them back (also after a reload: `useUpload` stays on, so the file is still loaded).
+  Upload and Apply link turn `showImage` on. Remove deletes the file and the link.
 - Blur and Dim only apply while an image is shown, so a hidden slider never darkens the plain or
   ASCII background.
 - `widgets.enabled` stays in the data, always `true`. `normalizeState` turns an old `false` into
@@ -40,14 +44,23 @@ Removed: the "Show widgets" master switch (each widget has its own) and the shor
 - Double-click the header to put it back in the middle. The position is remembered in
   `localStorage` (`newtab:prefs-offset`) and re-fitted to the window on open and on resize.
 
-## Widgets refresh (being built in parallel)
+## Features being built in parallel
 
-When `widgets.markets.items` and `widgets.clock.face` land on main, the Widgets section follows that
-spec: Markets loses Coins and USD/ILS (the widget's own picker replaces them) and Clock gets a Style
-control. This is done while merging the two.
+The panel draws these from the data, so it is right before and after each one lands on main:
+
+- Widgets refresh: when `widgets.markets.items` exists, Markets has no Coins box or USD/ILS switch
+  (the widget's own ✎ picker replaces them); when `widgets.clock.face` exists, Clock gets a Style
+  choice (Classic · Stencil · Rounded · Serif · Dot).
+- Search bar: when `prefs.search` exists, Page gets a *Search bar* group: the bar's switch, and under
+  it Google and Claude ("Sends what you type to claude.ai and runs it"). When
+  `widgets.claude` exists, a Claude switch sits after Notes.
+- Perf pass: `setupPrefs(store)` keeps returning `{ open(id?) }` (main.js loads it lazily), and the
+  Speed Dial 2 importer is loaded with `import()` only when a file is imported.
+
+Once all three are merged, the branches for older data (Coins, USD/ILS) and the "exists" checks go.
 
 ## Testing
 
-Unit tests for the `widgets.enabled` migration. Visual check in headless Chrome against the static
+Unit tests for the `widgets.enabled` migration, the `showImage` default and `backgroundImage`. Visual check in headless Chrome against the static
 preview: each section, conditional rows appearing and disappearing, dragging, double-click reset,
 light and dark.
