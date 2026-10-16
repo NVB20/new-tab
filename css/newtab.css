@@ -132,8 +132,8 @@ button { cursor: pointer; }
   pointer-events: none;
 }
 
+/* No fade in: the page is drawn in the same task that marks it ready, so it shows at once. */
 body:not(.ready) .canvas { opacity: 0; }
-.canvas { transition: opacity 0.12s ease; }
 
 /* ---------- Header ---------- */
 
@@ -1021,7 +1021,9 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
   color: var(--text);
   box-shadow: var(--shadow);
 }
-.dlg::backdrop { background: rgb(0 0 0 / 0.45); backdrop-filter: blur(2px); }
+/* Dimmed, not blurred: a blur would be redone over the whole window on every frame of the
+   animated background behind it. */
+.dlg::backdrop { background: rgb(0 0 0 / 0.45); }
 
 .dlg-form { display: flex; flex-direction: column; gap: 18px; padding: 22px; }
 .dlg-title { margin: 0; font-size: 18px; font-weight: 600; }
@@ -1073,7 +1075,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 /* Laid out like Claude's settings: search and sections in a sidebar, the close button top right. */
 .prefs-dlg[open] { display: grid; grid-template-columns: 224px minmax(0, 1fr); }
 /* Nothing dims or blurs the page: it shows exactly how the settings look. */
-.prefs-dlg::backdrop { background: none; backdrop-filter: none; }
+.prefs-dlg::backdrop { background: none; }
 
 /* The strip along the top and the sidebar's empty space are handles for dragging the panel aside. */
 .prefs-side {

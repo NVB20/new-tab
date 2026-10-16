@@ -193,19 +193,29 @@ export function mountSports(root, store, copy) {
   // Every followed source failed with nothing saved: the notes say so, "no games" would be a guess.
   const nothingLoaded = follow => follow.every(id => sources.get(id)?.error && !sources.get(id).data);
 
+  // What the list was last drawn from: a refresh (every 30 s, and on every return to the tab)
+  // that changes nothing shown leaves the rows, and their logo images, alone.
+  let drawn = '';
+
   function render() {
     const s = settings();
     if (!s.follow.length) {
+      drawn = '';
       list.replaceChildren(widgetEmpty('Nothing chosen. ', pickLink('Choose teams')));
       notes.replaceChildren();
       return;
     }
     const days = timeline(applyLive(events(), live), { follow: s.follow, f1Sessions: s.f1Sessions, now: Date.now() });
+    const empty = loaded && nothingLoaded(s.follow);
+    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl):/.test(id));
+    const lines = problems(s.follow);
+    const next = JSON.stringify([days, loaded, empty, hint, lines.map(p => p.textContent), podium, hour24(), prefs().openInNewTab]);
+    if (next === drawn) return;
+    drawn = next;
     list.replaceChildren(...(days.length
       ? days.flatMap(d => [el('div', { class: 'sp-day', text: d.label }), ...d.events.map(row)])
-      : loaded && nothingLoaded(s.follow) ? [] : [widgetEmpty(loaded ? 'No games scheduled yet' : 'Loading…')]));
-    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl):/.test(id));
-    notes.replaceChildren(...problems(s.follow),
+      : empty ? [] : [widgetEmpty(loaded ? 'No games scheduled yet' : 'Loading…')]));
+    notes.replaceChildren(...lines,
       ...(hint ? [el('p', { class: 'widget-note' }, pickLink('Pick your NBA and NFL teams'))] : []));
   }
 

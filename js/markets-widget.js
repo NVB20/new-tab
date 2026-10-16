@@ -113,12 +113,18 @@ export function mountMarkets(root, store, copy) {
   let naming = null;    // { at, rename }: the name box sits at index at, over the heading if rename
   let dragFrom = null;  // index of the entry being dragged
 
+  // What the list was last drawn from: a refresh (every 30 s, and on every return to the tab)
+  // that brings the same numbers leaves the rows alone.
+  let drawn = '';
+  const signature = rows => JSON.stringify([rows, prefs().openInNewTab]);
+
   function renderMarkets(rows) {
     shownRows = rows;
-    if (!naming && dragFrom == null) draw();
+    if (!naming && dragFrom == null && signature(rows) !== drawn) draw();
   }
 
   function draw() {
+    drawn = naming ? '' : signature(shownRows);
     if (!shownRows.length && !naming) {
       marketList.replaceChildren(widgetEmpty('Nothing chosen. ',
         el('button', { type: 'button', class: 'link-btn', text: 'Choose products', onclick: () => setEditing(true) })));

@@ -16,7 +16,8 @@ export function siteUrl(input) {
 // A site is its host without "www.". Access and the header rule cover it and every subdomain,
 // since sites move between www, bare and regional hosts.
 export const siteDomain = url => hostOf(url);
-export const sitePattern = url => `*://*.${siteDomain(url)}/*`;
+const domainPattern = domain => `*://*.${domain}/*`;
+export const sitePattern = url => domainPattern(siteDomain(url));
 
 // The sites the layout's Website copies show, once each.
 export const siteDomains = widgets => [...new Set(widgets
@@ -42,3 +43,15 @@ export function frameRules(domains, extensionId) {
     condition: { requestDomains: [domain], initiatorDomains: [extensionId, domain], resourceTypes: ['sub_frame'] },
   }));
 }
+
+// Whether the dynamic rules Chrome holds are already `rules` (as frameRules makes them), so a
+// new tab needn't write them again. Compared by id and sites: Chrome may fill in other fields.
+export function sameRules(stored, rules) {
+  const key = list => JSON.stringify(list
+    .map(r => [r.id, r.condition?.requestDomains, r.condition?.initiatorDomains])
+    .sort((a, b) => a[0] - b[0]));
+  return key(stored) === key(rules);
+}
+
+// Where content/site-frame.js runs: the Website copies' sites (with their subdomains) only.
+export const framePatterns = domains => domains.map(domainPattern);

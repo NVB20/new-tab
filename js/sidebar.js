@@ -1,7 +1,7 @@
 // Slide-out panel with Chrome bookmarks, recent history and recently closed tabs.
 
 import { el, icon, tileIcon } from './ui.js';
-import { hasChrome, bookmarksTree, historySearch, recentlyClosed, restoreSession, openUrl } from './chrome-api.js';
+import { hasChrome, bookmarksTree, historySearch, recentlyClosed, restoreSession, openUrl, onBookmarksChange, onClosedChange } from './chrome-api.js';
 
 const VIEWS = [
   { id: 'bookmarks', label: 'Bookmarks' },
@@ -9,6 +9,7 @@ const VIEWS = [
   { id: 'closed', label: 'Closed' },
 ];
 const BOOKMARKS_BAR_ID = '1';
+const HISTORY_FRESH_MS = 30e3;   // history shown again within this is reused, not asked again
 
 const timeLabel = ms => {
   const d = new Date(ms);
@@ -63,7 +64,16 @@ export function setupSidebar() {
     el('div', { class: 'sidebar-head' }, tabs, el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close sidebar', onclick: close }, icon('x'))),
     body);
 
+  // Each view's rows are kept while they're still current, so opening the sidebar again is
+  // instant and keeps the folders that were open: bookmarks until one changes, recently closed
+  // until a tab closes, history for HISTORY_FRESH_MS.
+  const built = new Map();   // view → { nodes, at }
+  onBookmarksChange(() => built.delete('bookmarks'));
+  onClosedChange(() => built.delete('closed'));
+  let seq = 0;
+
   async function render() {
+    const my = ++seq;
     tabs.replaceChildren(...VIEWS.map(v => el('button', {
       type: 'button', role: 'tab', 'aria-selected': String(v.id === view), 'aria-pressed': String(v.id === view),
       text: v.label,
@@ -75,18 +85,28 @@ export function setupSidebar() {
       return;
     }
 
+    const kept = built.get(view);
+    if (kept && (view !== 'history' || Date.now() - kept.at < HISTORY_FRESH_MS)) {
+      body.replaceChildren(...kept.nodes);
+      return;
+    }
+    const shown = view;
     let nodes = [];
-    if (view === 'bookmarks') {
+    if (shown === 'bookmarks') {
       const [root] = await bookmarksTree();
       nodes = (root?.children ?? []).map(n => folderNode(n, n.id === BOOKMARKS_BAR_ID));
-    } else if (view === 'history') {
+    } else if (shown === 'history') {
       const items = await historySearch('', 50, Date.now() - 7 * 24 * 3600 * 1000);
       nodes = items.map(h => linkRow(h.url, h.title, timeLabel(h.lastVisitTime)));
     } else {
       const items = await recentlyClosed(25);
       nodes = items.map(c => linkRow(c.url, c.title, c.time ? timeLabel(c.time * 1000) : '', () => restoreSession(c.sessionId)));
     }
-    body.replaceChildren(...(nodes.length ? nodes : [el('p', { class: 'side-empty', text: 'Nothing here yet.' })]));
+    // A view picked meanwhile is the one to show.
+    if (my !== seq) return;
+    if (!nodes.length) nodes = [el('p', { class: 'side-empty', text: 'Nothing here yet.' })];
+    built.set(shown, { nodes, at: Date.now() });
+    body.replaceChildren(...nodes);
   }
 
   function open() {
