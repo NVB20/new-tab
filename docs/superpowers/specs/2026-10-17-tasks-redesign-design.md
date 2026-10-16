@@ -168,7 +168,8 @@ split on spaces and matched in any case.
     dated the coming such day (a week on when it's that day today).
   - A phrase that would set a date or repeat that's already set (`today tomorrow`) ends the
     reading; it stays in the text.
-- A repeat with no date is dated as in *Repeating tasks*.
+- A repeat with no date gets one when the task is added: the add bar's date if it has one,
+  otherwise as in *Repeating tasks* (`parseTask` itself leaves `due` empty).
 - **Nothing left:** if removing the shorthand would leave no text (`tomorrow`), nothing is read and
   the whole input is the task's text.
 
@@ -191,8 +192,7 @@ split on spaces and matched in any case.
 
 ## Code
 
-- **`js/tasks.js`** (pure, existing): `addTask(s, fields, now)` takes `{ text, priority, due,
-  repeat }`; `toggleTask` rolls a repeating task on; `setDue` clears the repeat with the date;
+- **`js/tasks.js`** (pure, existing): `addTask(s, text, now, { priority, due, repeat })`; `toggleTask` rolls a repeating task on; `setDue` clears the repeat with the date;
   new `setRepeat(s, id, repeat, now)`, `nextDue(day, repeat, today)`, `firstDue(repeat, today)`,
   `addSubtask`, `toggleSubtask`, `editSubtask` (empty deletes), `deleteSubtask`, and
   `viewTasks(tasks, view, query, today)` → `{ open, finished }` plus `todayCount(tasks, today)` →
