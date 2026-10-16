@@ -36,6 +36,16 @@ export const DEFAULT_PREFS = {
   sidebar: { enabled: true },
 };
 
+// theme is 'auto' | 'light' | 'dark' | 'blue' | 'github'; these two bring their own accent.
+export const THEME_ACCENTS = { blue: '#2563eb', github: '#238636' };
+const themeAccent = theme => THEME_ACCENTS[theme] ?? DEFAULT_PREFS.accent;
+
+// The accent follows the theme until the user picks a different one.
+export function setTheme(prefs, theme) {
+  if (prefs.accent === themeAccent(prefs.theme)) prefs.accent = themeAccent(theme);
+  prefs.theme = theme;
+}
+
 const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'prefs'];
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);

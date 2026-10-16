@@ -40,6 +40,31 @@
   color-scheme: light;
 }
 
+:root[data-theme="blue"] {
+  --bg: #0f1a2e;
+  --surface: #17243d;
+  --surface-2: #121e34;
+  --text: #e8effc;
+  --muted: #a3b3cf;
+  --border: rgba(148, 180, 235, 0.16);
+  --hover: rgba(150, 185, 255, 0.08);
+  --shadow: 0 12px 32px rgba(3, 10, 25, 0.55);
+  color-scheme: dark;
+}
+
+/* GitHub's dark palette (Primer). */
+:root[data-theme="github"] {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #0d1117;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --border: rgba(240, 246, 252, 0.15);
+  --hover: rgba(177, 186, 196, 0.08);
+  --shadow: 0 12px 32px rgba(1, 4, 9, 0.6);
+  color-scheme: dark;
+}
+
 /* Clock face fonts (bundled, SIL Open Font License; see fonts/). */
 @font-face { font-family: "Big Shoulders Stencil"; src: url("../fonts/big-shoulders-stencil.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
 @font-face { font-family: "Nunito"; src: url("../fonts/nunito.woff2") format("woff2"); font-weight: 200 1000; font-display: block; }
@@ -462,7 +487,7 @@ body.site-icons:not(.tiles-card) .tile-img {
   transform: translate(-50%, -60%);
 }
 /* Dark logos (ChatGPT, GitHub) would vanish on the dark background without a faint outline. */
-:root[data-theme="dark"] body:not(.tiles-card) .tile-img { filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.45)); }
+:root:not([data-theme="light"]) body:not(.tiles-card) .tile-img { filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.45)); }
 
 body.tiles-card .tile {
   overflow: hidden;

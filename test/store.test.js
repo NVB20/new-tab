@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_PREFS, deepMerge, normalizeState, createStore } from '../js/store.js';
+import { DEFAULT_PREFS, THEME_ACCENTS, deepMerge, normalizeState, createStore, setTheme } from '../js/store.js';
 
 function memoryAdapter(initial = {}) {
   const data = { ...initial };
@@ -117,6 +117,20 @@ test('normalizeState keeps folders and their tiles, and repairs broken folder li
     ],
   });
   assert.deepEqual(s.tiles.map(t => [t.id, t.kind ?? '', t.folderId ?? '']), [['f', 'folder', ''], ['a', '', 'f'], ['b', '', '']]);
+});
+
+test('switching theme brings its accent unless the user picked another one', () => {
+  const p = structuredClone(DEFAULT_PREFS);
+  setTheme(p, 'github');
+  assert.equal(p.theme, 'github');
+  assert.equal(p.accent, THEME_ACCENTS.github);
+  setTheme(p, 'blue');
+  assert.equal(p.accent, THEME_ACCENTS.blue);
+  setTheme(p, 'light');
+  assert.equal(p.accent, DEFAULT_PREFS.accent);
+  p.accent = '#8b5cf6';
+  setTheme(p, 'github');
+  assert.equal(p.accent, '#8b5cf6');
 });
 
 test('store notifies only subscribers whose keys changed', async () => {

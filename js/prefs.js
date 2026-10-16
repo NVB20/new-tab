@@ -3,6 +3,7 @@
 import { el, icon, field, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl } from './util.js';
 import { fromSpeedDial2 } from './importer.js';
+import { setTheme } from './store.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
@@ -49,12 +50,12 @@ export function setupPrefs(store) {
     return el('div', { class: 'pref-row pref-slider' }, el('div', { class: 'pref-label' }, el('span', { text: label }), out), input);
   }
 
-  function segmented(label, path, options, hint) {
+  function segmented(label, path, options, hint, set = value => setPref(path, value)) {
     const buttons = options.map(o => el('button', {
       type: 'button',
       'aria-pressed': String(getPref(path) === o.value),
       onclick: () => {
-        setPref(path, o.value);
+        set(o.value);
         buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value)));
       },
     }, o.icon && icon(o.icon, 16), el('span', { text: o.label })));
@@ -84,7 +85,9 @@ export function setupPrefs(store) {
         { value: 'auto', label: 'Auto', icon: 'auto' },
         { value: 'light', label: 'Light', icon: 'sun' },
         { value: 'dark', label: 'Dark', icon: 'moon' },
-      ]),
+        { value: 'blue', label: 'Blue', icon: 'drop' },
+        { value: 'github', label: 'GitHub', icon: 'branch' },
+      ], undefined, value => store.update(s => setTheme(s.prefs, value))),
       slider('Number of columns', 'columns', 2, 10),
       slider('Spacing', 'spacing', 0, 40, { unit: 'px' }),
       slider('Width', 'width', 480, 1600, { step: 10, unit: 'px' }),
