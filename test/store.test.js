@@ -57,11 +57,14 @@ test('normalizeState merges saved prefs over defaults', () => {
   assert.equal(s.prefs.accent, DEFAULT_PREFS.accent);
 });
 
-test('older saved prefs get the ASCII background by default', () => {
-  const s = normalizeState({ prefs: { background: { blur: 4 } } });
+test('older saved prefs get the ASCII background and flat tiles by default', () => {
+  const s = normalizeState({ prefs: { background: { blur: 4 }, tiles: { color: '#ffffff' } } });
   assert.equal(s.prefs.background.pattern, 'ascii');
   assert.equal(s.prefs.background.motion, true);
   assert.equal(s.prefs.background.blur, 4);
+  assert.equal(s.prefs.tiles.style, 'flat');
+  assert.equal(s.prefs.tiles.icons, 'logo');
+  assert.equal(s.prefs.tiles.color, '#ffffff');
 });
 
 test('store notifies only subscribers whose keys changed', async () => {

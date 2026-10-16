@@ -66,14 +66,15 @@ export function icon(name, size = 18) {
 }
 
 // Image for a tile or link: custom icon → Chrome favicon → letter avatar.
-// Small (mini) icons try the favicon first: custom tile logos are padded and turn into dots at 18px.
-export function tileIcon(url, iconUrl, title, { mini = false } = {}) {
+// preferSite tries the favicon first; small (mini) icons always do, since custom tile logos are
+// padded and turn into dots at 18px.
+export function tileIcon(url, iconUrl, title, { mini = false, preferSite = mini } = {}) {
   const letter = () => el('span', {
     class: 'letter-avatar' + (mini ? ' mini' : ''),
     text: ((title || '').trim()[0] || hostOf(url)[0] || '?').toUpperCase(),
   });
   const favicon = faviconUrl(url, mini ? 32 : 64);
-  const candidates = (mini ? [favicon, iconUrl] : [iconUrl, favicon]).filter(Boolean);
+  const candidates = (preferSite ? [favicon, iconUrl] : [iconUrl, favicon]).filter(Boolean);
   if (!candidates.length) return letter();
 
   const img = el('img', { class: mini ? 'mini-img' : 'tile-img', alt: '', draggable: false, decoding: 'async', referrerpolicy: 'no-referrer' });

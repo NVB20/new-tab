@@ -25,11 +25,15 @@ export function valueNoise(x, y, seed = 0) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-// Brightness of the resting glyph field: two octaves of noise with the low end cut off,
-// so the field has blank gaps between denser patches.
-export function density(x, y, seed = 0) {
-  const n = valueNoise(x, y, seed) * 0.65 + valueNoise(x * 2.3, y * 2.3, seed + 7) * 0.35;
-  return Math.min(1, Math.max(0, (n - 0.32) / 0.6));
+// Brightness (0..1) of the resting field at cell (c, r) after t seconds. Two layers of noise
+// stretched into streaks — one flat, one diagonal — blended region by region, then cut off
+// high so most of the screen stays empty and each streak fades out at its ends.
+export function streakField(c, r, t, seed = 0) {
+  const flat = valueNoise(c / 14 + t * 0.02, r / 2.2, seed);
+  const diagonal = valueNoise((c - r * 2.5) / 14 - t * 0.02, r / 6, seed + 5);
+  const blend = smooth(Math.min(1, Math.max(0, (valueNoise(c / 80, r / 25, seed + 3) - 0.3) / 0.4)));
+  const n = flat * (1 - blend) + diagonal * blend;
+  return Math.min(1, Math.max(0, (n - 0.6) / 0.3));
 }
 
 // How strongly the cursor lights a cell at `distance` px: 1 under the cursor, 0 at `radius`.
@@ -37,6 +41,13 @@ export function falloff(distance, radius) {
   if (distance >= radius) return 0;
   const t = 1 - distance / radius;
   return t * t;
+}
+
+// Where a cell at `distance` sits inside a ripple ring whose wavefront is at `radius`:
+// 0 on the wavefront, 1 at the trailing edge `thickness` px behind it, -1 outside the ring.
+export function ringOffset(distance, radius, thickness) {
+  const behind = radius - distance;
+  return behind < 0 || behind > thickness ? -1 : behind / thickness;
 }
 
 export function level(value, levels) {

@@ -48,7 +48,7 @@ export function setupPrefs(store) {
     return el('div', { class: 'pref-row pref-slider' }, el('div', { class: 'pref-label' }, el('span', { text: label }), out), input);
   }
 
-  function segmented(label, path, options) {
+  function segmented(label, path, options, hint) {
     const buttons = options.map(o => el('button', {
       type: 'button',
       'aria-pressed': String(getPref(path) === o.value),
@@ -57,7 +57,7 @@ export function setupPrefs(store) {
         buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value)));
       },
     }, o.icon && icon(o.icon, 16), el('span', { text: o.label })));
-    return row(label, el('div', { class: 'seg', role: 'group', 'aria-label': label }, buttons));
+    return row(label, el('div', { class: 'seg', role: 'group', 'aria-label': label }, buttons), hint);
   }
 
   function color(label, path) {
@@ -149,17 +149,21 @@ export function setupPrefs(store) {
   function tiles() {
     return [
       title('Tiles'),
-      slider('Corner radius', 'tiles.radius', 0, 24, { unit: 'px' }),
+      segmented('Style', 'tiles.style', [{ value: 'flat', label: 'Flat' }, { value: 'card', label: 'Cards' }]),
+      segmented('Icons', 'tiles.icons', [{ value: 'logo', label: 'Logos' }, { value: 'site', label: 'Site icons' }],
+        'Site icons are the flat icons Chrome keeps for each site (installed extension only)'),
       toggle('Show titles', 'tiles.showTitle'),
-      color('Tile colour', 'tiles.color'),
+      title('Cards'),
+      slider('Corner radius', 'tiles.radius', 0, 24, { unit: 'px' }),
+      color('Card colour', 'tiles.color'),
       color('Title colour', 'tiles.textColor'),
       row('Presets', el('div', { class: 'btn-row' }, TILE_PRESETS.map(p => el('button', {
         type: 'button', class: 'btn',
         onclick: () => {
-          store.update(s => Object.assign(s.prefs.tiles, { color: p.color, textColor: p.textColor }));
+          store.update(s => Object.assign(s.prefs.tiles, { style: 'card', color: p.color, textColor: p.textColor }));
           show('tiles');
         },
-      }, p.label)))),
+      }, p.label))), 'Only used with the Cards style'),
     ];
   }
 

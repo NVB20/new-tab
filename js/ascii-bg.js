@@ -1,23 +1,33 @@
-// Animated ASCII background: a dim field of letters that scrambles slowly and lights up blue
-// around the mouse. Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
+// Animated ASCII background in the style of the Claude Code app: faint streaks of letters that
+// drift slowly, brighten softly around the mouse, and ripple outwards from a click on the page.
+// Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
 
-import { GLYPHS, hash2, valueNoise, density, falloff, level } from './ascii-field.js';
+import { GLYPHS, hash2, streakField, falloff, ringOffset, level } from './ascii-field.js';
 
+const CHARSET = GLYPHS;
 const FONT = '"Cascadia Mono", Consolas, "SF Mono", Menlo, monospace';
-const FONT_SIZE = 12;
-const CELL_W = 8.2;
+const FONT_SIZE = 10;
+const CELL_W = 7;
 const CELL_H = 14;
-const GRAY_LEVELS = 8;
-const BLUE_LEVELS = 10;
-const RADIUS = 120;          // typical px around the cursor that lights up (the edge wobbles ±45%)
-const DECAY_MS = 500;        // how fast the glow fades behind the cursor
-const IDLE_AFTER_MS = 2500;  // a still mouse stops lighting cells
+const FIELD_LEVELS = 6;
+const GLOW_LEVELS = 8;
+const GLOW_MIN = 0.1;           // below this a lit letter falls back to the resting field
+const FIELD_MS = 160;          // how often the drifting field is recomputed
+const HOVER_RADIUS = 90;       // px around the cursor that brightens
+const HOVER_DECAY_MS = 280;    // how fast hover light fades
+const RIPPLE_DECAY_MS = 80;    // ripple light fades fast, so the wave reads as a ring
+const IDLE_AFTER_MS = 2500;    // a still mouse stops lighting cells
 const ACTIVE_FRAME_MS = 1000 / 40;
-const IDLE_FRAME_MS = 1000 / 12;
+const IDLE_FRAME_MS = 1000 / 10;
+const RIPPLE = { speed: 520, maxRadius: 440, thickness: 40 };
+// Clicks on these start no ripple.
+const NO_RIPPLE = 'a, button, input, textarea, select, label, summary, dialog, .menu, .sidebar, .widgets';
 
+// Resting letters are the theme's text colour at very low opacity, so they melt into the
+// background; lit letters (hover, ripple) get brighter and slightly cooler.
 const PALETTES = {
-  dark: { gray: [255, 255, 255], grayAlpha: [0.035, 0.2], blueLow: [25, 134, 194], blueHigh: [170, 220, 248] },
-  light: { gray: [20, 20, 19], grayAlpha: [0.05, 0.22], blueLow: [24, 120, 176], blueHigh: [8, 70, 120] },
+  dark: { ink: [250, 249, 245], field: [0.03, 0.12], glowTo: [196, 224, 244], glow: [0.06, 0.5] },
+  light: { ink: [20, 20, 19], field: [0.04, 0.15], glowTo: [24, 92, 140], glow: [0.07, 0.55] },
 };
 
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -28,9 +38,10 @@ export function mountAsciiBackground(canvas, store) {
   const ctx = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const seed = Math.floor(Math.random() * 1e6);
+  const startTime = performance.now();
 
   let cols = 0, rows = 0, cw = 0, ch = 0, cwPx = 0, chPx = 0;
-  let chars, base, glow, drawn;
+  let chars, base, glow, fadeMs, drawn;
   let atlas = null;
   let mode = null;
   let enabled = false;
@@ -38,51 +49,60 @@ export function mountAsciiBackground(canvas, store) {
   let pointer = null;
   let lastMove = 0;
   let lastFrame = 0;
+  let lastField = 0;
   let raf = 0;
   const active = new Set();
+  const ripples = [];
 
   function buildAtlas(dpr) {
     const p = PALETTES[mode];
     atlas = document.createElement('canvas');
-    atlas.width = GLYPHS.length * cwPx;
-    atlas.height = (GRAY_LEVELS + BLUE_LEVELS) * chPx;
+    atlas.width = CHARSET.length * cwPx;
+    atlas.height = (FIELD_LEVELS + GLOW_LEVELS) * chPx;
     const g = atlas.getContext('2d');
     g.font = `${FONT_SIZE * dpr}px ${FONT}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const row = (index, style) => {
       g.fillStyle = style;
-      for (let i = 0; i < GLYPHS.length; i++) g.fillText(GLYPHS[i], i * cwPx + cwPx / 2, index * chPx + chPx / 2);
+      for (let i = 0; i < CHARSET.length; i++) g.fillText(CHARSET[i], i * cwPx + cwPx / 2, index * chPx + chPx / 2);
     };
-    for (let l = 0; l < GRAY_LEVELS; l++) {
-      const [lo, hi] = p.grayAlpha;
-      row(l, rgba(p.gray, lo + (hi - lo) * (l / (GRAY_LEVELS - 1))));
-    }
-    for (let l = 0; l < BLUE_LEVELS; l++) {
-      const t = (l + 1) / BLUE_LEVELS;
-      row(GRAY_LEVELS + l, rgba(mix(p.blueLow, p.blueHigh, t * t * t), 0.3 + 0.7 * t));
+    const [f0, f1] = p.field;
+    for (let l = 0; l < FIELD_LEVELS; l++) row(l, rgba(p.ink, f0 + (f1 - f0) * (l / (FIELD_LEVELS - 1))));
+    const [g0, g1] = p.glow;
+    for (let l = 0; l < GLOW_LEVELS; l++) {
+      const t = l / (GLOW_LEVELS - 1);
+      row(FIELD_LEVELS + l, rgba(mix(p.ink, p.glowTo, t * t), g0 + (g1 - g0) * t));
     }
   }
 
-  // Atlas row for a cell: a blue level while it glows, else a grey level from the resting field.
+  // Atlas row for a cell: a glow level while lit, else a field level, or -1 for blank.
   function rowFor(i) {
-    if (glow[i] >= 0.05) return GRAY_LEVELS + level(glow[i], BLUE_LEVELS);
-    return base[i] > 0 ? level(base[i], GRAY_LEVELS) : -1;
+    if (glow[i] >= GLOW_MIN) return FIELD_LEVELS + level(glow[i], GLOW_LEVELS);
+    return base[i] > 0 ? level(base[i], FIELD_LEVELS) : -1;
   }
 
   function drawCell(i) {
     const row = rowFor(i);
-    const code = row < 0 ? -1 : row * 64 + chars[i];
+    const glyph = chars[i];
+    const code = row < 0 ? -1 : row * 64 + glyph;
     if (drawn[i] === code) return;
     drawn[i] = code;
     const x = (i % cols) * cw;
     const y = Math.floor(i / cols) * ch;
     ctx.clearRect(x, y, cw, ch);
-    if (row >= 0) ctx.drawImage(atlas, chars[i] * cwPx, row * chPx, cwPx, chPx, x, y, cw, ch);
+    if (row >= 0) ctx.drawImage(atlas, glyph * cwPx, row * chPx, cwPx, chPx, x, y, cw, ch);
   }
 
-  function drawAll() {
-    for (let i = 0; i < cols * rows; i++) drawCell(i);
+  // Recomputes the drifting streaks; letters that newly appear get a fresh glyph.
+  function updateField(now) {
+    const t = motion ? (now - startTime) / 1000 : 0;
+    for (let i = 0; i < cols * rows; i++) {
+      const v = streakField(i % cols, Math.floor(i / cols), t, seed);
+      if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
+      base[i] = v;
+      drawCell(i);
+    }
   }
 
   function layout() {
@@ -101,44 +121,62 @@ export function mountAsciiBackground(canvas, store) {
     chars = new Uint8Array(n);
     base = new Float32Array(n);
     glow = new Float32Array(n);
+    fadeMs = new Float32Array(n);
     drawn = new Int16Array(n).fill(-2);
     active.clear();
-    for (let i = 0; i < n; i++) {
-      const c = i % cols;
-      const r = Math.floor(i / cols);
-      // Slightly dimmer towards the edges of the screen.
-      const dx = c / cols - 0.5;
-      const dy = r / rows - 0.5;
-      const vignette = 1 - Math.min(1, (dx * dx + dy * dy) * 1.6);
-      chars[i] = Math.floor(hash2(c, r, seed) * GLYPHS.length);
-      base[i] = density(c / 22, r / 11, seed) * (0.45 + 0.55 * vignette);
-    }
+    ripples.length = 0;
+    for (let i = 0; i < n; i++) chars[i] = Math.floor(hash2(i % cols, Math.floor(i / cols), seed) * GLYPHS.length);
     buildAtlas(dpr);
-    drawAll();
+    updateField(performance.now());
   }
 
-  // Lights a scattered, irregular patch around the cursor: the edge wobbles with drifting noise
-  // and only some cells catch the light, so it doesn't read as a clean circle.
-  function lightAroundPointer(now) {
+  function light(i, strength, decayMs) {
+    if (strength <= glow[i]) return;
+    glow[i] = strength;
+    fadeMs[i] = decayMs;
+    active.add(i);
+  }
+
+  // A soft, sparse brightening around the cursor.
+  function lightAroundPointer() {
     const { x, y } = pointer;
-    const reach = RADIUS * 1.45;
-    const drift = now / 1500;
-    const c0 = Math.max(0, Math.floor((x - reach) / cw));
-    const c1 = Math.min(cols - 1, Math.ceil((x + reach) / cw));
-    const r0 = Math.max(0, Math.floor((y - reach) / ch));
-    const r1 = Math.min(rows - 1, Math.ceil((y + reach) / ch));
+    const c0 = Math.max(0, Math.floor((x - HOVER_RADIUS) / cw));
+    const c1 = Math.min(cols - 1, Math.ceil((x + HOVER_RADIUS) / cw));
+    const r0 = Math.max(0, Math.floor((y - HOVER_RADIUS) / ch));
+    const r1 = Math.min(rows - 1, Math.ceil((y + HOVER_RADIUS) / ch));
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        const edge = 0.55 + 0.9 * valueNoise(c / 3 + drift, r / 2 - drift, seed + 1);
-        const f = falloff(Math.hypot(c * cw + cw / 2 - x, r * ch + ch / 2 - y), RADIUS * edge);
-        if (f <= 0 || Math.random() > 0.25 + 0.6 * f) continue;
-        const strength = f * (0.35 + 0.65 * Math.random());
-        const i = r * cols + c;
-        if (strength > glow[i]) {
-          glow[i] = strength;
-          active.add(i);
+        const f = falloff(Math.hypot(c * cw + cw / 2 - x, r * ch + ch / 2 - y), HOVER_RADIUS);
+        if (f <= 0 || Math.random() > 0.15 + 0.5 * f) continue;
+        light(r * cols + c, f * (0.3 + 0.4 * Math.random()), HOVER_DECAY_MS);
+      }
+    }
+  }
+
+  // One soft wave: letters inside the moving band brighten (strongest mid-band) and a few
+  // change as it passes; it fades out as it spreads.
+  function drawRipple(cx, cy, radius) {
+    if (radius <= 0 || radius > RIPPLE.maxRadius) return;
+    const inner = Math.max(0, radius - RIPPLE.thickness);
+    const fade = 1 - radius / RIPPLE.maxRadius;
+    const r0 = Math.max(0, Math.floor((cy - radius) / ch));
+    const r1 = Math.min(rows - 1, Math.ceil((cy + radius) / ch));
+    for (let r = r0; r <= r1; r++) {
+      const dy = r * ch + ch / 2 - cy;
+      if (Math.abs(dy) > radius) continue;
+      const xOuter = Math.sqrt(radius * radius - dy * dy);
+      const xInner = inner > Math.abs(dy) ? Math.sqrt(inner * inner - dy * dy) : 0;
+      for (const [from, to] of [[cx - xOuter, cx - xInner], [cx + xInner, cx + xOuter]]) {
+        const c0 = Math.max(0, Math.floor(from / cw));
+        const c1 = Math.min(cols - 1, Math.ceil(to / cw));
+        for (let c = c0; c <= c1; c++) {
+          const off = ringOffset(Math.hypot(c * cw + cw / 2 - cx, dy), radius, RIPPLE.thickness);
+          if (off < 0) continue;
+          const i = r * cols + c;
+          const strength = Math.sin(Math.PI * off) * fade * (0.55 + 0.25 * Math.random());
+          light(i, strength, RIPPLE_DECAY_MS);
+          if (Math.random() < strength * 0.12) chars[i] = randomGlyph();
         }
-        if (Math.random() < f * 0.3) chars[i] = randomGlyph();
       }
     }
   }
@@ -146,36 +184,36 @@ export function mountAsciiBackground(canvas, store) {
   function frame(now) {
     raf = requestAnimationFrame(frame);
     if (pointer && now - lastMove > IDLE_AFTER_MS) pointer = null;
-    const busy = pointer || active.size > 40;
+    const busy = pointer || ripples.length || active.size > 40;
     if (now - lastFrame < (busy ? ACTIVE_FRAME_MS : IDLE_FRAME_MS)) return;
     const dt = Math.min(120, now - lastFrame);
     lastFrame = now;
 
-    if (pointer) lightAroundPointer(now);
+    if (now - lastField >= FIELD_MS) {
+      lastField = now;
+      updateField(now);
+      // Now and then a single visible letter changes.
+      const i = Math.floor(Math.random() * cols * rows);
+      if (base[i] > 0) {
+        chars[i] = randomGlyph();
+        drawCell(i);
+      }
+    }
 
-    const keep = Math.exp(-dt / DECAY_MS);
+    if (pointer) lightAroundPointer();
+    for (let k = ripples.length - 1; k >= 0; k--) {
+      const radius = ((now - ripples[k].start) / 1000) * RIPPLE.speed;
+      if (radius > RIPPLE.maxRadius) ripples.splice(k, 1);
+      else drawRipple(ripples[k].x, ripples[k].y, radius);
+    }
+
     for (const i of active) {
-      glow[i] *= keep;
-      if (glow[i] < 0.05) {
+      glow[i] *= Math.exp(-dt / fadeMs[i]);
+      if (glow[i] < GLOW_MIN) {
         glow[i] = 0;
         active.delete(i);
       }
       drawCell(i);
-    }
-
-    // Resting shimmer: a few letters change, and now and then one flashes blue.
-    const n = cols * rows;
-    for (let k = Math.ceil(n * 0.002); k > 0; k--) {
-      const i = Math.floor(Math.random() * n);
-      chars[i] = randomGlyph();
-      drawCell(i);
-    }
-    if (Math.random() < 0.35) {
-      const i = Math.floor(Math.random() * n);
-      if (base[i] > 0.15) {
-        glow[i] = Math.max(glow[i], 0.35 + Math.random() * 0.45);
-        active.add(i);
-      }
     }
   }
 
@@ -201,20 +239,17 @@ export function mountAsciiBackground(canvas, store) {
       enabled = false;
       return;
     }
-    if (!enabled || nextMode !== mode) {
-      enabled = true;
-      mode = nextMode;
-      layout();
-    }
-    motion = p.background.motion && !reducedMotion.matches;
+    const nextMotion = p.background.motion && !reducedMotion.matches;
+    const changed = !enabled || nextMode !== mode || nextMotion !== motion;
+    enabled = true;
+    mode = nextMode;
+    motion = nextMotion;
+    if (changed) layout();
     if (motion) {
       start();
     } else {
       stop();
       pointer = null;
-      for (const i of active) glow[i] = 0;
-      active.clear();
-      drawAll();
     }
   }
 
@@ -225,6 +260,11 @@ export function mountAsciiBackground(canvas, store) {
   }, { passive: true });
   document.addEventListener('pointerout', e => {
     if (!e.relatedTarget) pointer = null;
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!motion || e.button !== 0 || e.target.closest?.(NO_RIPPLE)) return;
+    ripples.push({ x: e.clientX, y: e.clientY, start: performance.now() });
+    if (ripples.length > 4) ripples.shift();
   });
 
   let resizeTimer = 0;

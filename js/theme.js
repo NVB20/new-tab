@@ -38,6 +38,8 @@ export function mountTheme(store) {
     cl.toggle('compact', p.compact);
     cl.toggle('center-v', p.centerVertically);
     cl.toggle('no-titles', !p.tiles.showTitle);
+    cl.toggle('tiles-card', p.tiles.style === 'card');
+    cl.toggle('site-icons', p.tiles.icons === 'site');
     cl.toggle('widgets-right', p.widgets.position === 'right');
     cl.toggle('widgets-off', !p.widgets.enabled);
     cl.toggle('no-sidebar', !p.sidebar.enabled);

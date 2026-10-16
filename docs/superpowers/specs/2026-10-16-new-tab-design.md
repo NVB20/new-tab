@@ -83,14 +83,16 @@ Default "Claude dark", matching the Claude Code desktop app (sampled from a scre
 | `--border`   | `rgba(222,220,209,.12)` | `rgba(31,30,29,.15)` |
 | `--accent`   | from prefs (`#d97757`) | same |
 
-`auto` follows `prefers-color-scheme`. Tiles default to white cards with dark text (many logos, e.g.
-ChatGPT's black mark, vanish on a dark card); tile colours are configurable.
+`auto` follows `prefers-color-scheme`. Tiles default to flat (icon and title straight on the background,
+icons in a rounded square box, a faint outline on dark logos); a Cards style with configurable colours
+is kept. Icons come from each tile's logo, or optionally from Chrome's site favicons.
 
-Background: by default an animated ASCII field in the style of the Claude Code app — dim letters and
-digits on the theme colour, a few changing at a time, lighting up blue (`#1986c2` → `#aadcf8`) around
-the mouse and fading behind it (`js/ascii-field.js` pure maths, `js/ascii-bg.js` canvas renderer that
-redraws only changed cells from a glyph atlas). Can be switched to Plain, or made static (also static
-when the OS asks for reduced motion). A wallpaper (uploaded file or image URL) with blur (0–20px) and dim (0–80%) sliders.
+Background: by default a minimal animated ASCII field in the style of the Claude Code app — faint
+streaks of letters on a 7×14px grid (theme text colour at 3–12% opacity) that drift slowly; a soft,
+sparse brightening around the mouse; and a single soft ring that spreads from a click on empty
+background, brightening letters as it passes (`js/ascii-field.js` pure maths, `js/ascii-bg.js` canvas
+renderer that redraws only changed cells from a glyph atlas). Can be switched to Plain, or made static
+(also static when the OS asks for reduced motion). A wallpaper (uploaded file or image URL) with blur (0–20px) and dim (0–80%) sliders.
 
 ## Components (one file each under `js/`)
 

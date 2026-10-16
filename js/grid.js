@@ -51,7 +51,7 @@ export function mountGrid(root, store) {
         tileMenu(e, tile);
       },
     },
-      el('div', { class: 'tile-thumb' }, tileIcon(tile.url, tile.icon, tile.title)),
+      el('div', { class: 'tile-thumb' }, tileIcon(tile.url, tile.icon, tile.title, { preferSite: prefs.tiles.icons === 'site' })),
       el('div', { class: 'tile-title', dir: 'auto', text: tile.title }));
   }
 
