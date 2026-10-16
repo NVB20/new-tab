@@ -1,7 +1,8 @@
 # New Tab
 
 A personal new-tab page for Chrome: groups of tiles, clock / tasks / notes, a Jump launcher, a
-bookmarks-and-history sidebar and custom wallpapers. No account, no subscription — everything is
+bookmarks-and-history sidebar, and a Claude Code–style animated ASCII background that lights up
+around the mouse (or your own wallpaper). No account, no subscription — everything is
 stored in this Chrome profile.
 
 ## Install
@@ -26,6 +27,8 @@ export (`.json`). Groups, tiles and layout settings come over; tasks and notes h
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar** — the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
+- **Background** — Preferences → Appearance: ASCII or Plain, animation on/off, or upload a
+  wallpaper (a wallpaper replaces the ASCII field while it's set).
 - **Backup** — Preferences → Backup → **Download backup** saves everything (including the
   wallpaper) to one file you can import again on another computer.
 

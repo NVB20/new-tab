@@ -14,7 +14,8 @@ export const DEFAULT_PREFS = {
   openInNewTab: false,
   accent: '#d97757',
   tiles: { radius: 10, showTitle: true, color: '#ffffff', textColor: '#202124' },
-  background: { url: '', useUpload: false, blur: 0, dim: 0 },
+  // pattern 'ascii' is the animated letter field; a wallpaper, when set, replaces it.
+  background: { pattern: 'ascii', motion: true, url: '', useUpload: false, blur: 0, dim: 0 },
   widgets: {
     enabled: true,
     position: 'left',

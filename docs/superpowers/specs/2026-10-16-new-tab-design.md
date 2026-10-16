@@ -71,21 +71,26 @@ back to `localStorage` and the Chrome-API features degrade (see each section).
 
 ## Theme
 
-Default "Claude dark", matching the Claude desktop app:
+Default "Claude dark", matching the Claude Code desktop app (sampled from a screenshot):
 
 | token        | dark      | light     |
 |--------------|-----------|-----------|
-| `--bg`       | `#262624` | `#faf9f5` |
-| `--surface`  | `#30302e` | `#ffffff` |
-| `--surface-2`| `#1f1e1d` | `#f0eee6` |
+| `--bg`       | `#151515` | `#faf9f5` |
+| `--surface`  | `#212121` | `#ffffff` |
+| `--surface-2`| `#1a1a1a` | `#f0eee6` |
 | `--text`     | `#faf9f5` | `#141413` |
 | `--muted`    | `#c2c0b6` | `#5e5d59` |
-| `--border`   | `rgba(222,220,209,.15)` | `rgba(31,30,29,.15)` |
+| `--border`   | `rgba(222,220,209,.12)` | `rgba(31,30,29,.15)` |
 | `--accent`   | from prefs (`#d97757`) | same |
 
 `auto` follows `prefers-color-scheme`. Tiles default to white cards with dark text (many logos, e.g.
-ChatGPT's black mark, vanish on a dark card); tile colours are configurable. Background: theme colour,
-or a wallpaper (uploaded file or image URL) with blur (0–20px) and dim (0–80%) sliders.
+ChatGPT's black mark, vanish on a dark card); tile colours are configurable.
+
+Background: by default an animated ASCII field in the style of the Claude Code app — dim letters and
+digits on the theme colour, a few changing at a time, lighting up blue (`#1986c2` → `#aadcf8`) around
+the mouse and fading behind it (`js/ascii-field.js` pure maths, `js/ascii-bg.js` canvas renderer that
+redraws only changed cells from a glyph atlas). Can be switched to Plain, or made static (also static
+when the OS asks for reduced motion). A wallpaper (uploaded file or image URL) with blur (0–20px) and dim (0–80%) sliders.
 
 ## Components (one file each under `js/`)
 

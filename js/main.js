@@ -1,6 +1,7 @@
 import { createStore, pickAdapter } from './store.js';
 import { icon } from './ui.js';
 import { mountTheme } from './theme.js';
+import { mountAsciiBackground } from './ascii-bg.js';
 import { mountGroups } from './groups.js';
 import { mountGrid } from './grid.js';
 import { mountWidgets } from './widgets.js';
@@ -12,6 +13,7 @@ const store = createStore(pickAdapter());
 await store.load();
 
 mountTheme(store);
+mountAsciiBackground(document.getElementById('ascii'), store);
 mountGroups(document.getElementById('groups'), store);
 mountGrid(document.getElementById('grid'), store);
 mountWidgets(document.getElementById('widgets'), store);

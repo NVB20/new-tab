@@ -57,6 +57,13 @@ test('normalizeState merges saved prefs over defaults', () => {
   assert.equal(s.prefs.accent, DEFAULT_PREFS.accent);
 });
 
+test('older saved prefs get the ASCII background by default', () => {
+  const s = normalizeState({ prefs: { background: { blur: 4 } } });
+  assert.equal(s.prefs.background.pattern, 'ascii');
+  assert.equal(s.prefs.background.motion, true);
+  assert.equal(s.prefs.background.blur, 4);
+});
+
 test('store notifies only subscribers whose keys changed', async () => {
   const store = createStore(memoryAdapter());
   await store.load();

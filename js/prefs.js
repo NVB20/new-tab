@@ -105,7 +105,9 @@ export function setupPrefs(store) {
     const custom = el('input', { type: 'color', value: getPref('accent'), 'aria-label': 'Custom accent colour', oninput: () => setPref('accent', custom.value) });
 
     const bg = store.get().prefs.background;
-    const source = bg.useUpload && store.wallpaper ? 'Uploaded image' : bg.url ? 'Image from a link' : 'Theme colour (no wallpaper)';
+    const source = bg.useUpload && store.wallpaper
+      ? 'Uploaded image (replaces the style above)'
+      : bg.url ? 'Image from a link (replaces the style above)' : 'None';
     const fileInput = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: () => uploadWallpaper(fileInput.files[0]) });
     const urlInput = el('input', { type: 'text', class: 'pref-input wide', value: bg.url, placeholder: 'https://… image link', spellcheck: false, autocomplete: 'off' });
     const urlHint = el('div', { class: 'field-hint' });
@@ -129,6 +131,8 @@ export function setupPrefs(store) {
       title('Accent'),
       row('Accent colour', el('div', { class: 'swatches' }, swatches, custom)),
       title('Background'),
+      segmented('Style', 'background.pattern', [{ value: 'ascii', label: 'ASCII' }, { value: 'none', label: 'Plain' }]),
+      toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations'),
       row('Wallpaper', el('div', { class: 'btn-row' },
         el('button', { type: 'button', class: 'btn', onclick: () => fileInput.click() }, icon('upload', 16), 'Upload image'),
         el('button', { type: 'button', class: 'btn', onclick: clearWallpaper }, 'Remove'),
