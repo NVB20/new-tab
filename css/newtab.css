@@ -476,45 +476,53 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .gh-heatmap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .gh-heatmap-note { margin: 0 0 4px; }
 
-.widget-clock { position: relative; }
-.clock-face { display: flex; flex-direction: column; }
+/* The clock sits in the middle of whatever room its time leaves over. */
+.widget-clock { position: relative; display: flex; flex-direction: column; justify-content: safe center; }
+/* The digits fit, but the font's line boxes reach past them and would make the frame scroll;
+   only the ✎ face strip may need to. */
+.widget-root > .widget-clock:not(.editing) { overflow: hidden; }
+.clock-face { display: flex; flex-direction: column; column-gap: 16px; }   /* the gap is for .beside */
+/* Beside: the time takes the full height, the date and greeting sit at its foot on the right. */
+.clock-face.beside { display: grid; grid-template: 1fr auto auto / auto minmax(0, 1fr); align-items: end; }
+.clock-face.beside .clock-time { grid-area: 1 / 1 / 4; margin: 0; }   /* over .stacked's margin */
+.beside .clock-date { grid-area: 2 / 2; }
+.beside .clock-greeting { grid-area: 3 / 2; }
 .clock-date { font-size: 15px; font-weight: 600; }
-/* The time fills its frame: --fit-w and --fit-h are percentages of the frame's width and height
-   (container query units), set per face below so "15:41" or the stacked digits fit either way. */
+/* clock-widget.js sizes the time to fill its frame; this is the size before it has measured.
+   The time's box is just its digits: trimmed to their top and baseline, no line gap above or below.
+   The padding keeps round digits' overshoot and a tightly spaced last digit inside it. */
 .clock-time {
-  margin: 2px 0 4px;
-  font-size: min(var(--fit-w, 30) * 1cqw, var(--fit-h, 45) * 1cqh);
+  margin: 8px 0 10px;
+  padding: 0.02em 0.02em 0.02em 0;
+  font-size: 64px;
   font-weight: 200;
   line-height: 1.05;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
-/* A short frame keeps the time and drops the date and greeting. */
+.clock-face .clock-time { text-box: trim-both cap alphabetic; }
+/* A short frame keeps the time and drops the date and greeting, unless they fit beside it. */
 @container (max-height: 160px) {
-  .clock-date, .clock-greeting { display: none; }
+  .clock-face:not(.beside) :is(.clock-date, .clock-greeting) { display: none; }
 }
 .clock-ampm { margin-left: 6px; font-family: var(--font); font-size: 20px; font-weight: 400; color: var(--muted); letter-spacing: 0; }
 .clock-greeting { order: 3; font-size: 15px; color: var(--muted); }
+/* A copy of the time, measured to size the real one. Parked above the frame's top right corner,
+   it grows up and to the left, where it can't make the frame scroll. */
+.clock-probe { position: absolute; right: 0; bottom: 100%; width: max-content; margin: 0; visibility: hidden; pointer-events: none; }
 
 /* One UI style faces. Stacked faces: hours over minutes, date underneath. */
-.stacked .clock-time { display: flex; flex-direction: column; margin: 0 0 10px; letter-spacing: 0; }
+.stacked .clock-time { margin: 0 0 14px; letter-spacing: 0; }
+.clock-face.stacked :is(.clock-h, .clock-m) { display: block; }
 .clock-face.stacked .clock-date { order: 2; }
-.face-stencil { --fit-w: 55; --fit-h: 34; }
 .face-stencil .clock-time { font-family: "Big Shoulders Stencil", var(--font); font-weight: 800; line-height: 0.9; letter-spacing: 0.03em; color: color-mix(in srgb, var(--text) 88%, transparent); }
-.face-rounded { --fit-w: 50; --fit-h: 34; }
 .face-rounded .clock-time { font-family: "Nunito", var(--font); font-weight: 900; line-height: 0.9; letter-spacing: -0.04em; }
-.face-serif { --fit-w: 52; --fit-h: 36; }
 .face-serif .clock-time { font-family: "DM Serif Display", Georgia, serif; font-weight: 400; line-height: 0.86; }
-.face-dot { --fit-w: 26; --fit-h: 45; }
 .face-dot .clock-time { font-family: "Doto", ui-monospace, monospace; font-weight: 900; line-height: 1.1; letter-spacing: 0; }
 :is(.face-stencil, .face-rounded) .clock-date { font-family: "Nunito", var(--font); font-size: 17px; font-weight: 800; }
 .face-serif .clock-date { font-family: "DM Serif Display", Georgia, serif; font-size: 18px; font-weight: 400; font-style: italic; }
 .face-dot .clock-date { font-family: "Doto", ui-monospace, monospace; font-size: 16px; font-weight: 800; }
 .stacked .clock-ampm { font-size: 18px; }
-/* The same fonts on one line, sized so "15:32" fits the column. */
-.face-stencil:not(.stacked) { --fit-w: 32; --fit-h: 45; }
-.face-rounded:not(.stacked) { --fit-w: 28; --fit-h: 45; }
-.face-serif:not(.stacked) { --fit-w: 30; --fit-h: 45; }
 
 /* ✎ in a widget: shown on hover, and while its editor is open. */
 .widget-edit { width: 26px; height: 26px; border-radius: 7px; opacity: 0; transition: opacity 0.15s, background 0.12s, color 0.12s; }
@@ -1170,7 +1178,6 @@ kbd {
   .widget-frame { grid-area: auto !important; container-type: normal; }
   .widget-root > .widget, .widget-tiles .grid-wrap { overflow: visible; }
   .clock-time { font-size: 56px; }
-  .face-stencil.stacked, .face-rounded.stacked, .face-serif.stacked { --fit-w: 0; }
   .face-stencil.stacked .clock-time, .face-rounded.stacked .clock-time, .face-serif.stacked .clock-time { font-size: 110px; }
   .prefs-dlg[open] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .prefs-side { padding-right: 56px; border-right: 0; border-bottom: 1px solid var(--border); }   /* clear of the close button */

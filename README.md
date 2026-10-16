@@ -373,7 +373,9 @@ rearrange them.
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
   line (the second row of the picker, or **Hours over minutes** off in Preferences), and one-line
-  faces can drop the colon (1541). Each new tab builds the time out of a single point (skipped if
+  faces can drop the colon (1541). The time grows to fill its frame; the date and greeting move
+  beside it when that gives it more room (hours over minutes in a wide frame) or when the frame is
+  too short for them underneath. Each new tab builds the time out of a single point (skipped if
   Windows is set to reduce animations). The faces' fonts are bundled in `fonts/` (SIL Open Font
   License), so they work offline.
 - **Background:** Preferences → Page: ASCII, Plain or Image (upload a picture or paste a link).
