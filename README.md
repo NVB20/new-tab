@@ -168,7 +168,9 @@ should, the widget says why (for example, missing *Contents* access or org appro
 - **Background:** Preferences → Page: ASCII, Plain or Image (upload a picture or paste a link).
   Switching back to ASCII or Plain keeps your picture, so Image brings it back.
 - **Preferences:** drag the panel by its header to see the page behind it change as you adjust;
-  double-click the header to put it back in the middle.
+  double-click the header to put it back in the middle. Type in the search box (it has the cursor
+  when the panel opens, or press Ctrl+F) to list matching settings from every section; options
+  whose switch is off show dimmed. Esc clears the search, then closes the panel.
 - **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper)
   to one file you can import again on another computer.
 

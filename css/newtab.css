@@ -695,6 +695,11 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .prefs-grab { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .prefs-grab .icon { color: var(--muted); }
 .prefs-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
+/* Pressing in the search box types into it rather than dragging the panel. */
+.prefs-search { position: relative; flex: 0 1 260px; min-width: 0; margin-left: auto; cursor: text; }
+.prefs-search .icon { position: absolute; top: 50%; left: 11px; translate: 0 -50%; color: var(--muted); pointer-events: none; }
+.prefs-search .pref-input { width: 100%; padding-block: 7px; padding-left: 34px; }
+.prefs-empty { margin: 48px 0; text-align: center; color: var(--muted); }
 
 .prefs-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px 1fr; }
 
@@ -756,6 +761,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .pref-row:has(+ .pref-sub) { border-bottom: 0; }
 .pref-sub:has(+ .pref-section-title), .pref-sub:last-child { border-bottom: 0; }
 .pref-sub .pref-row { padding: 8px 0; border-bottom: 0; }
+.pref-off { opacity: 0.5; }   /* found by a search, but its switch is off */
 .pref-input.wide { flex: 1; width: auto; }
 .range-value { color: var(--muted); font-variant-numeric: tabular-nums; }
 

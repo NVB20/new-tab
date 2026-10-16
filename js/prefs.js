@@ -26,6 +26,8 @@ export function setupPrefs(store) {
   const redraw = () => show(current);
   // Image was picked but nothing is set yet (or it was just removed): keep its boxes up.
   let wantImage = false;
+  // What's typed in the search box. While it holds something, the panel lists matches from every section.
+  let query = '';
 
   // ---- control builders ----
   // Switches and choices redraw the section, so the options that depend on them appear or go.
@@ -37,7 +39,8 @@ export function setupPrefs(store) {
     control);
 
   // Options that only matter while the switch or choice above them is on, indented under it.
-  const sub = (on, ...rows) => on && el('div', { class: 'pref-sub' }, rows);
+  // A search finds them even while it's off, dimmed, so it's clear what to turn on first.
+  const sub = (on, ...rows) => (on || query ? el('div', { class: on ? 'pref-sub' : 'pref-sub pref-off' }, rows) : false);
 
   // Rows that open(id, anchor) can scroll to, e.g. from a widget's own "set up" button.
   const group = (anchor, ...rows) => el('div', { dataset: { anchor } }, rows);
@@ -374,19 +377,49 @@ export function setupPrefs(store) {
 
   const nav = el('nav', { class: 'prefs-nav', 'aria-label': 'Preference sections' });
   const content = el('div', { class: 'prefs-content' });
+  const search = el('input', {
+    type: 'search', class: 'pref-input', placeholder: 'Search', 'aria-label': 'Search preferences',
+    autocomplete: 'off', spellcheck: false,
+    oninput: () => {
+      setQuery(search.value);
+      redraw();
+    },
+    onkeydown: e => {
+      // Esc empties the box first; once it's empty, Esc closes the panel as usual.
+      if (e.key !== 'Escape' || !search.value) return;
+      e.preventDefault();
+      setQuery('');
+      redraw();
+    },
+  });
   const head = el('div', { class: 'prefs-head' },
     el('div', { class: 'prefs-grab', title: 'Drag to move · double-click to centre' }, icon('grip', 16), el('h2', { text: 'Preferences' })),
+    el('label', { class: 'prefs-search' }, icon('search', 16), search),
     el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
   const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' }, head, el('div', { class: 'prefs-body' }, nav, content));
   // Close on a click outside, but not when a drag that began inside (a slider, the header) ends there.
   let pressedOutside = false;
   dialog.addEventListener('pointerdown', e => { pressedOutside = e.target === dialog; });
   dialog.addEventListener('click', e => { if (e.target === dialog && pressedOutside) dialog.close(); });
+  // Ctrl+F searches the preferences rather than the page behind them.
+  dialog.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'f') return;
+    e.preventDefault();
+    search.focus();
+    search.select();
+  });
   document.body.append(dialog);
 
+  function setQuery(text) {
+    search.value = text;
+    query = text.trim();
+  }
+
+  let shownQuery = '';
   function show(id) {
-    const same = id === current;
+    const same = id === current && query === shownQuery;
     current = id;
+    shownQuery = query;
     // Redrawing replaces the controls, so focus goes back to the one that was just used.
     const active = document.activeElement;
     const navFocused = nav.contains(active);
@@ -394,16 +427,72 @@ export function setupPrefs(store) {
 
     nav.replaceChildren(...sections.map(s => el('button', {
       type: 'button',
-      'aria-current': String(s.id === id),
-      onclick: () => show(s.id),
+      'aria-current': String(!query && s.id === id),
+      onclick: () => {
+        setQuery('');
+        show(s.id);
+      },
     }, icon(s.icon, 17), el('span', { text: s.label }))));
     const scroll = content.scrollTop;
-    content.replaceChildren(...sections.find(s => s.id === id).build().filter(Boolean));
+    content.replaceChildren(...(query ? results() : sections.find(s => s.id === id).build().filter(Boolean)));
     content.scrollTop = same ? scroll : 0;
 
     if (navFocused) nav.querySelector('[aria-current="true"]').focus();
     const target = key && [...content.querySelectorAll('[data-key]')].find(n => n.dataset.key === key);
     if (target) (target.classList.contains('seg') ? target.querySelector('[aria-pressed="true"]') : target).focus({ preventScroll: true });
+  }
+
+  // The panel spells colour and behaviour the British way; either spelling finds them.
+  const fold = text => text.toLowerCase().replace(/colour/g, 'color').replace(/behaviour/g, 'behavior');
+
+  // Rows from every section that contain each word typed, under "Section · Group" titles.
+  function results() {
+    const words = fold(query).split(/\s+/);
+    const matches = (node, group) => {
+      const labels = [...node.querySelectorAll('[aria-label]')].map(n => n.ariaLabel);
+      const text = fold([group, node.textContent, ...labels].join(' '));
+      return words.every(w => text.includes(w));
+    };
+    const label = row => row.querySelector('.pref-text > div, .pref-label > span')?.textContent ?? '';
+    // Drops the rows that don't match, from nested groups too, and returns the nodes left.
+    const keep = (nodes, group) => {
+      // Sub-options hang from the nearest row above them, and are found by its name too.
+      const parentOf = i => nodes[nodes.findLastIndex((m, j) => j < i && !m.matches('.pref-sub'))];
+      const hit = nodes.map((n, i) => {
+        if (n.matches('.pref-row') || !n.querySelector('.pref-row')) return matches(n, group);
+        const parent = n.matches('.pref-sub') && parentOf(i);
+        return keep([...n.children], parent ? `${group} ${label(parent)}` : group).length > 0;
+      });
+      // A sub-option that's kept keeps its row too, so it's clear what it belongs to.
+      nodes.forEach((n, i) => {
+        const parent = hit[i] && n.matches('.pref-sub') && parentOf(i);
+        if (parent) hit[nodes.indexOf(parent)] = true;
+      });
+      nodes.forEach((n, i) => { if (!hit[i]) n.remove(); });
+      return nodes.filter((n, i) => hit[i]);
+    };
+
+    const found = sections.flatMap(s => {
+      const out = [];
+      let group = s.label;
+      let rows = [];
+      const flush = () => {
+        const kept = keep(rows, group);
+        if (kept.length) out.push(title(group), ...kept);
+        rows = [];
+      };
+      for (const node of s.build().filter(Boolean)) {
+        if (!node.matches('.pref-section-title')) {
+          rows.push(node);
+          continue;
+        }
+        flush();
+        group = node.textContent === s.label ? s.label : `${s.label} · ${node.textContent}`;
+      }
+      flush();
+      return out;
+    });
+    return found.length ? found : [el('p', { class: 'prefs-empty', text: `No preferences match “${query}”` })];
   }
 
   // ---- moving the panel ----
@@ -437,7 +526,7 @@ export function setupPrefs(store) {
   }
 
   head.addEventListener('pointerdown', e => {
-    if (e.button !== 0 || e.target.closest('button')) return;
+    if (e.button !== 0 || e.target.closest('button, .prefs-search')) return;
     e.preventDefault();
     const start = { x: e.clientX - offset.x, y: e.clientY - offset.y };
     const move = ev => place(ev.clientX - start.x, ev.clientY - start.y);
@@ -451,18 +540,21 @@ export function setupPrefs(store) {
     }, { once: true });
   });
   head.addEventListener('dblclick', e => {
-    if (e.target.closest('button')) return;
+    if (e.target.closest('button, .prefs-search')) return;
     place(0, 0);
     saveOffset();
   });
   addEventListener('resize', () => { if (dialog.open) place(offset.x, offset.y); });
 
   return {
-    // anchor: a group to scroll to; its first empty text box gets the focus.
+    // Opens with the cursor in the search box. anchor: a group to scroll to; its first empty text
+    // box gets the focus instead.
     open(id = current, anchor) {
       wantImage = false;
+      setQuery('');
       show(id);
       dialog.showModal();
+      search.focus();
       content.scrollTop = 0;
       place(offset.x, offset.y);
       const target = anchor && [...content.querySelectorAll('[data-anchor]')].find(n => n.dataset.anchor === anchor);
