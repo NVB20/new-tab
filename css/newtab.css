@@ -765,55 +765,48 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 /* ---------- Preferences ---------- */
 
 .prefs-dlg { width: min(880px, calc(100vw - 32px)); height: min(640px, calc(100vh - 48px)); }
-.prefs-dlg[open] { display: flex; flex-direction: column; }
+/* Laid out like Claude's settings: search and sections in a sidebar, the close button top right. */
+.prefs-dlg[open] { display: grid; grid-template-columns: 224px minmax(0, 1fr); }
 /* Nothing dims or blurs the page: it shows exactly how the settings look. */
 .prefs-dlg::backdrop { background: none; backdrop-filter: none; }
 
-/* The header is the handle for dragging the panel aside. */
-.prefs-head {
+/* The sidebar's empty space is the handle for dragging the panel aside. */
+.prefs-side {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 16px 16px 20px;
-  border-bottom: 1px solid var(--border);
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
   cursor: grab;
   user-select: none;
   touch-action: none;
 }
-.prefs-head.dragging { cursor: grabbing; }
-.prefs-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.prefs-side.dragging { cursor: grabbing; }
+.prefs-side-title { margin: 22px 10px 8px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.prefs-close { position: absolute; top: 12px; right: 12px; }
 /* Pressing in the search box types into it rather than dragging the panel. */
-.prefs-search { position: relative; flex: 0 1 260px; min-width: 0; margin-left: auto; cursor: text; }
+.prefs-search { position: relative; flex: none; cursor: text; }
 .prefs-search .icon { position: absolute; top: 50%; left: 11px; translate: 0 -50%; color: var(--muted); pointer-events: none; }
 .prefs-search .pref-input { width: 100%; padding-block: 7px; padding-left: 34px; }
 .prefs-empty { margin: 48px 0; text-align: center; color: var(--muted); }
 
-.prefs-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px 1fr; }
-
-.prefs-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 14px 12px;
-  border-right: 1px solid var(--border);
-  background: var(--surface-2);
-}
+.prefs-nav { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; }
 .prefs-nav button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border: 0;
   border-radius: 9px;
   background: none;
-  color: var(--muted);
+  color: var(--text);
   text-align: start;
 }
-.prefs-nav button:hover { background: var(--hover); color: var(--text); }
-.prefs-nav button[aria-current="true"] { background: var(--accent); color: #fff; }
+.prefs-nav button:hover { background: var(--hover); }
+.prefs-nav button[aria-current="true"] { background: var(--border); font-weight: 600; }
 
-.prefs-content { overflow-y: auto; padding: 20px 32px 32px; }
+.prefs-content { overflow-y: auto; padding: 56px 32px 32px; }
 
 .pref-section-title {
   margin: 22px 0 4px;
@@ -1025,8 +1018,10 @@ kbd {
   body.widgets-right .side-widgets { grid-row: 2; }
   .grid-wrap { grid-column: 1; grid-row: 3; justify-self: center; width: min(100%, var(--width)); }
   body.center-v .grid-wrap { align-self: start; }
-  .prefs-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .prefs-nav { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .prefs-dlg[open] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .prefs-side { padding-right: 56px; border-right: 0; border-bottom: 1px solid var(--border); }   /* clear of the close button */
+  .prefs-side-title { display: none; }
+  .prefs-nav { flex-direction: row; margin-top: 10px; overflow-x: auto; }
   .prefs-content { padding: 16px 20px 24px; }
   .pref-row { flex-wrap: wrap; }
 }

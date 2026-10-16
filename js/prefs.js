@@ -1,5 +1,5 @@
 // Preferences panel. Every control writes straight to the store, so the page updates live, and
-// the panel can be dragged aside by its header to watch the change happen behind it.
+// the panel can be dragged aside by its sidebar to watch the change happen behind it.
 
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
@@ -422,12 +422,14 @@ export function setupPrefs(store) {
       redraw();
     },
   });
-  const head = el('div', { class: 'prefs-head' },
-    el('h2', { text: 'Preferences', title: 'Drag to move · double-click to centre' }),
+  // The sidebar's empty space is the handle for dragging the panel aside.
+  const side = el('div', { class: 'prefs-side', title: 'Drag to move · double-click to centre' },
     el('label', { class: 'prefs-search' }, icon('search', 16), search),
-    el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
-  const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' }, head, el('div', { class: 'prefs-body' }, nav, content));
-  // Close on a click outside, but not when a drag that began inside (a slider, the header) ends there.
+    el('h2', { class: 'prefs-side-title', text: 'Preferences' }),
+    nav);
+  const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' }, side, content,
+    el('button', { class: 'icon-btn prefs-close', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
+  // Close on a click outside, but not when a drag that began inside (a slider, the sidebar) ends there.
   let pressedOutside = false;
   dialog.addEventListener('pointerdown', e => { pressedOutside = e.target === dialog; });
   dialog.addEventListener('click', e => { if (e.target === dialog && pressedOutside) dialog.close(); });
@@ -543,7 +545,7 @@ export function setupPrefs(store) {
     const top = r.top - offset.y;
     offset = {
       x: Math.round(clamp(x, KEEP_VISIBLE - r.width - left, innerWidth - KEEP_VISIBLE - left)),
-      y: Math.round(clamp(y, -top, innerHeight - head.offsetHeight - top)),
+      y: Math.round(clamp(y, -top, innerHeight - KEEP_VISIBLE - top)),
     };
     dialog.style.translate = `${offset.x}px ${offset.y}px`;
   }
@@ -556,21 +558,21 @@ export function setupPrefs(store) {
     }
   }
 
-  head.addEventListener('pointerdown', e => {
+  side.addEventListener('pointerdown', e => {
     if (e.button !== 0 || e.target.closest('button, .prefs-search')) return;
     e.preventDefault();
     const start = { x: e.clientX - offset.x, y: e.clientY - offset.y };
     const move = ev => place(ev.clientX - start.x, ev.clientY - start.y);
-    head.setPointerCapture(e.pointerId);
-    head.classList.add('dragging');
-    head.addEventListener('pointermove', move);
-    head.addEventListener('lostpointercapture', () => {
-      head.removeEventListener('pointermove', move);
-      head.classList.remove('dragging');
+    side.setPointerCapture(e.pointerId);
+    side.classList.add('dragging');
+    side.addEventListener('pointermove', move);
+    side.addEventListener('lostpointercapture', () => {
+      side.removeEventListener('pointermove', move);
+      side.classList.remove('dragging');
       saveOffset();
     }, { once: true });
   });
-  head.addEventListener('dblclick', e => {
+  side.addEventListener('dblclick', e => {
     if (e.target.closest('button, .prefs-search')) return;
     place(0, 0);
     saveOffset();
