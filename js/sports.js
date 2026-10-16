@@ -86,3 +86,146 @@ export const schedulePath = (sport, id) => `${sport === 'soccer' ? 'soccer/all' 
 
 // "United States Grand Prix" → "US GP".
 export const raceShort = name => String(name ?? '').replace('Grand Prix', 'GP').replace(/^United States\b/, 'US').trim();
+
+// ---- ESPN ----
+
+const STATES = ['pre', 'in', 'post'];
+const OFF = { STATUS_POSTPONED: 'Postponed', STATUS_CANCELED: 'Cancelled', STATUS_SUSPENDED: 'Suspended', STATUS_ABANDONED: 'Abandoned' };
+const LENGTH = { nba: 150, nfl: 210, soccer: 120 };   // minutes a game usually takes
+
+export const byStart = (a, b) => a.start - b.start || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+// How long an event usually takes, in ms (F1 sessions carry their own minutes).
+export const lengthOf = e => (e.minutes ?? LENGTH[e.sport] ?? 120) * MIN;
+
+// Schedules give the score as { displayValue }, scoreboards as a string.
+const scoreOf = s => {
+  const v = s !== null && typeof s === 'object' ? s.displayValue : s;
+  return v == null || v === '' ? null : String(v);
+};
+
+function side(competitors, where) {
+  const c = competitors.find(x => x?.homeAway === where);
+  const t = c?.team;
+  if (t?.id == null) return null;
+  return {
+    id: String(t.id),
+    abbr: String(t.abbreviation ?? ''),
+    name: String(t.displayName ?? t.abbreviation ?? ''),
+    logo: String(t.logo ?? t.logos?.[0]?.href ?? ''),
+    score: scoreOf(c.score),
+    winner: c.winner === true,
+  };
+}
+
+// One ESPN event, from a team's schedule or a scoreboard → a game, or null when it lacks an id, a
+// date or a side. league: the soccer competition's slug, for scoreboards (their events don't name it).
+export function parseEspnEvent(e, sport, league) {
+  const c = e?.competitions?.[0];
+  const start = Date.parse(e?.date ?? c?.date);
+  const competitors = Array.isArray(c?.competitors) ? c.competitors : [];
+  const home = side(competitors, 'home');
+  const away = side(competitors, 'away');
+  if (e?.id == null || !Number.isFinite(start) || !home || !away) return null;
+  const type = c.status?.type ?? e.status?.type ?? {};
+  const state = STATES.includes(type.state) ? type.state : 'pre';
+  const slug = sport === 'soccer' ? String(league ?? e.league?.slug ?? '') : sport;
+  const tv = Array.isArray(c.broadcasts) ? c.broadcasts[0] : null;
+  const scored = state !== 'pre';   // scoreboards show 0–0 before the start
+  return {
+    id: String(e.id),
+    sport,
+    league: slug,
+    tag: sport === 'soccer' ? competitionTag(slug, e.league?.abbreviation) : sport.toUpperCase(),
+    start,
+    timeValid: (e.timeValid ?? c.timeValid) !== false,
+    state,
+    detail: String(type.shortDetail ?? ''),
+    off: OFF[type.name] ?? null,
+    home: { ...home, score: scored ? home.score : null },
+    away: { ...away, score: scored ? away.score : null },
+    tv: String(tv?.media?.shortName ?? tv?.names?.[0] ?? ''),
+    url: String(e.links?.find(l => l?.rel?.includes('summary') && l.rel.includes('desktop'))?.href ?? ''),
+  };
+}
+
+// A team's schedule → { type, events }. type is the part of the season ESPN sent: for NBA and
+// NFL, 1 preseason, 2 regular season, 3 playoffs.
+export function parseSchedule(json, sport) {
+  const events = Array.isArray(json?.events) ? json.events.map(e => parseEspnEvent(e, sport)).filter(Boolean) : [];
+  const type = Number.isInteger(json?.requestedSeason?.type) ? json.requestedSeason.type : null;
+  return { type, events };
+}
+
+// ESPN sends only the current part of the season, so a schedule with no game still to come asks
+// for the next part too: the season type to add, else null.
+export function nextPhase({ type, events }) {
+  if (type !== 1 && type !== 2) return null;
+  return events.some(e => e.state !== 'post') ? null : type + 1;
+}
+
+export const parseScoreboard = (json, sport, league) =>
+  (Array.isArray(json?.events) ? json.events.map(e => parseEspnEvent(e, sport, league)).filter(Boolean) : []);
+
+// What a source keeps in the cache: games from 3 days ago to 60 days ahead, and its next game
+// when there's none sooner.
+export function trimEvents(events, now) {
+  const sorted = [...events].sort(byStart);
+  const kept = sorted.filter(e => e.start >= now - 3 * DAY && e.start <= now + 60 * DAY);
+  const next = sorted.find(e => e.start > now);
+  if (next && !kept.includes(next)) kept.push(next);
+  return kept;
+}
+
+// A scoreboard's copy of a game laid over the schedule's: its state, clock and score.
+export function applyLive(events, live) {
+  const byId = new Map(live.map(g => [g.id, g]));
+  return events.map(e => {
+    const g = e.sport === 'f1' ? null : byId.get(e.id);
+    if (!g) return e;
+    return {
+      ...e,
+      state: g.state,
+      detail: g.detail,
+      off: g.off,
+      home: { ...e.home, score: g.home.score, winner: g.home.winner },
+      away: { ...e.away, score: g.away.score, winner: g.away.winner },
+    };
+  });
+}
+
+const dateFormats = new Map();
+// The calendar day of a time in a time zone (undefined: the computer's), as 'YYYY-MM-DD'.
+function ymd(ms, timeZone) {
+  let f = dateFormats.get(timeZone);
+  if (!f) dateFormats.set(timeZone, (f = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })));
+  const p = Object.fromEntries(f.formatToParts(ms).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+// The US Eastern day ESPN's scoreboards file a game under: '20261021'.
+export const etDay = ms => ymd(ms, 'America/New_York').replaceAll('-', '');
+
+// The scoreboards that matter, one per league and day, with the ids of their games: team games
+// that have started, are still listed and that their schedule doesn't call final yet.
+export function scoreboards(events, now) {
+  const out = new Map();
+  for (const e of events) {
+    if (e.sport === 'f1' || e.off || e.state === 'post' || e.start > now || now >= e.start + lengthOf(e) + DAY) continue;
+    if (e.sport === 'soccer' && !e.league) continue;
+    const path = leaguePath(e.sport, e.league);
+    const day = etDay(e.start);
+    const key = `${path}:${day}`;
+    if (!out.has(key)) out.set(key, { sport: e.sport, league: e.league, path, day, ids: [] });
+    out.get(key).ids.push(e.id);
+  }
+  return [...out.values()];
+}
+
+// How often to refresh a scoreboard, given what its saved copy (`live`) says: every 30 s while one
+// of its games may be under way, hourly for a game that ended by the clock without a final score
+// yet, never (null) once all are final.
+export function boardTtl(board, events, live, now) {
+  const open = applyLive(events.filter(e => board.ids.includes(e.id)), live).filter(e => e.state !== 'post' && !e.off);
+  if (!open.length) return null;
+  return open.some(e => now < e.start + 2 * lengthOf(e)) ? 30e3 : 3600e3;
+}
