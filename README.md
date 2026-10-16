@@ -32,8 +32,8 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
      fine-grained token at https://github.com/settings/personal-access-tokens/new with
      Contents and Pull requests set to read-only, which I paste into Preferences → Widgets →
      Access token myself. Never ask me to paste the token into this chat.
-   - Markets: pick the coins I want to follow (Preferences → Widgets → Coins; any Bybit spot
-     coin, priced in USDT).
+   - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
+     heading; any Bybit spot coin, priced in USDT, plus pairs such as USD/ILS and EUR/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
    on the extension's card in chrome://extensions.
 ```
@@ -46,8 +46,9 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | --- | --- |
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | BTC, SOL, XRP and ETH (or any coin on Bybit) with 24h sparklines, plus the USD/ILS rate. |
-| **GitHub** | Your latest commit in each repo and your open pull requests, including private repos with a token. |
+| **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
+| **GitHub** | Your contribution heatmap, latest commits and open pull requests, including private repos with a token. |
+| **Clock** | Five One UI–style faces, from a slim classic clock to big stacked stencil digits. |
 | **Tasks and notes** | A to-do list with a week of finished-task history, and a notes pad. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
@@ -96,12 +97,15 @@ A folder moves with its tiles when you move it to another group. Folders can't g
 
 The Markets widget sits in the column opposite the clock.
 
+- **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins
+  and currency pairs you want and untick the rest; the list updates as you go. To follow a coin
+  that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're done.
+  New picks go to the bottom of the list.
 - **Coins:** BTC, SOL, XRP and ETH by default, as Bybit spot prices in USDT. Each row shows the
-  price, its 24h change and a sparkline of the last 24 hours. Change the list in Preferences →
-  Widgets → **Coins** (comma separated, e.g. `BTC, ETH, DOGE`). A coin Bybit doesn't list shows a dash.
-- **USD/ILS:** the daily ECB reference rate, with a sparkline of the last 12 days. Turn it off in
-  the same place.
-- **Click a row** to open the coin's chart on Bybit (or USD/ILS on Google Finance).
+  price, its 24h change and a sparkline of the last 24 hours. A coin Bybit doesn't list shows a dash.
+- **Currency pairs:** USD/ILS by default; EUR/ILS, GBP/ILS, EUR/USD, GBP/USD, USD/JPY and USD/CHF
+  are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
+- **Click a row** to open the coin's chart on Bybit (or the pair on Google Finance).
 
 Prices refresh every 30 seconds while the tab is open and visible, and all open new tabs share one
 copy, so having many tabs open doesn't multiply the requests.
@@ -110,10 +114,17 @@ copy, so having many tabs open doesn't multiply the requests.
 
 Type your GitHub username into the widget and it shows:
 
-- **Your latest commit in each repo** you've committed to, in any account or organisation
-  (default branches), newest first. Private repos get a lock icon.
+- **Your contribution heatmap:** the past year as on your profile, with the yearly total. Hover a
+  square for that day's count; click the map to open your profile. Private contributions count if
+  you've switched on *Include private contributions on my profile* in your GitHub settings.
 - **Your open pull requests**: the most recently updated ones you opened, are assigned to,
   commented on or are mentioned in.
+- **Your latest commits**: the six newest, across every repo and organisation you've committed
+  to (default branches). Private repos get a lock icon.
+
+The heatmap is read from `github.com/users/<you>/contributions`, which is why the extension asks
+for access to github.com. After updating from an older version, press the extension's reload
+button on `chrome://extensions` once so Chrome grants it.
 
 The heading opens your GitHub profile. GitHub is checked at most once an hour to stay well inside
 its rate limit; **Refresh** next to the heading fetches straight away.
@@ -147,7 +158,10 @@ should, the widget says why (for example, missing *Contents* access or org appro
 - **Tasks:** Enter adds a task; tick to finish. **Clear done** (next to the heading) removes
   finished tasks. Finished tasks are kept in a history for 7 days, and the number completed per day
   is kept for good (counted on the day you tick it; unticking takes it back).
-- **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets.
+- **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
+  the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
+  Samsung One UI lock screen), Rounded, Serif or Dot. The faces' fonts are bundled in `fonts/`
+  (SIL Open Font License), so they work offline.
 - **Background:** Preferences → Appearance: ASCII or Plain, animation on or off, or upload a
   wallpaper (a wallpaper replaces the ASCII field while it's set).
 - **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper)
@@ -161,8 +175,8 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Widget | Talks to | How often |
 | --- | --- | --- |
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
-| Markets (USD/ILS) | `api.frankfurter.dev` (ECB rates) | once an hour |
-| GitHub | `api.github.com` | once an hour, or when you press Refresh |
+| Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
+| GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 
 Turn a widget off in Preferences → Widgets and it stops fetching. Tile images load from wherever
 their icon link points.
@@ -173,7 +187,6 @@ their icon link points.
   clicked the page. The search icon always works.
 - Imported tile logos are still loaded from Speed Dial 2's image server. If one stops showing,
   right-click → Edit and clear the icon field (uses the site's own icon) or paste another image link.
-- USD/ILS is the only currency pair for now.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development

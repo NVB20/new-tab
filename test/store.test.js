@@ -64,10 +64,19 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.equal(s.prefs.background.blur, 4);
   assert.equal(s.prefs.tiles.style, 'flat');
   assert.equal(s.prefs.tiles.icons, 'logo');
-  assert.equal(s.prefs.widgets.markets.coins, 'BTC, SOL, XRP, ETH');
-  assert.equal(s.prefs.widgets.markets.fx, true);
+  assert.deepEqual(s.prefs.widgets.markets.items, ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
+  assert.equal(s.prefs.widgets.clock.face, 'classic');
   assert.equal(s.prefs.widgets.github.user, '');
   assert.equal(s.prefs.tiles.color, '#ffffff');
+});
+
+test('Markets coins and USD/ILS switch from older versions become the item list', () => {
+  const items = prefs => normalizeState({ prefs: { widgets: { markets: prefs } } }).prefs.widgets.markets;
+  assert.deepEqual(items({ coins: 'btc, doge', fx: true }), { enabled: true, items: ['BTC', 'DOGE', 'USD/ILS'] });
+  assert.deepEqual(items({ coins: 'ETH', fx: false, enabled: false }), { enabled: false, items: ['ETH'] });
+  assert.deepEqual(items({ items: ['eur/ils', 'BTC', 'bad!'], coins: 'SOL' }).items, ['EUR/ILS', 'BTC']);
+  assert.deepEqual(items({ items: [] }).items, []);
+  assert.deepEqual(items({ items: 'BTC' }).items, DEFAULT_PREFS.widgets.markets.items);
 });
 
 test('normalizeState keeps task timestamps, history and daily counts, dropping junk', () => {
