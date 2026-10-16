@@ -186,13 +186,12 @@ export function setupPrefs(store) {
       textInput('Coins', 'widgets.markets.coins', 'BTC, SOL, XRP, ETH', { hint: 'Bybit spot tickers, priced in USDT' }),
       toggle('USD/ILS rate', 'widgets.markets.fx', 'Daily ECB reference rate'),
       title('GitHub'),
-      toggle('GitHub', 'widgets.github.enabled', 'Recently pushed repos and open pull requests'),
+      toggle('GitHub', 'widgets.github.enabled', 'Your latest commits in any repo, and open pull requests'),
       textInput('Username', 'widgets.github.user', 'NVB20'),
-      textInput('Organisations', 'widgets.github.orgs', 'eitan-capital, Investing-Academy', { maxLength: 200, hint: 'Their public repos are included' }),
       textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
         type: 'password',
         maxLength: 300,
-        hint: 'A read-only fine-grained token adds your private repos and PRs. Kept only in this browser and left out of backups.',
+        hint: 'A read-only token adds commits and PRs in private repos (e.g. eitan-capital). Kept only in this browser and left out of backups.',
       }),
     ];
   }

@@ -3,8 +3,8 @@
 import { el, icon } from './ui.js';
 import { feed, fetchJson, peek } from './net.js';
 import {
-  parseTicker, parseKline, parseFxSeries, parseRepos, parsePulls, mergeRepos,
-  formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, parseNames,
+  parseTicker, parseKline, parseFxSeries, parseCommits, parsePulls,
+  formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins,
 } from './feeds.js';
 
 const PRICE_TTL = 30e3;
@@ -137,10 +137,10 @@ export function mountSideWidgets(root, store) {
         if (user) store.update(s => { s.prefs.widgets.github.user = user; });
       },
     }, input, el('button', { class: 'btn', type: 'submit', text: 'Show' }));
-    githubBody.replaceChildren(form, empty('Shows your recently pushed repos and open pull requests.'));
+    githubBody.replaceChildren(form, empty('Shows your latest commits in any repo, and your open pull requests.'));
   }
 
-  function renderGithub({ data, error }) {
+  function renderGithub({ data, error }, user) {
     const parts = [];
     if (error && !data) {
       parts.push(empty(error.rateLimited
@@ -159,15 +159,17 @@ export function mountSideWidgets(root, store) {
           title: `${pr.repo} #${pr.number}${pr.draft ? ' (draft)' : ''}\n${pr.title}`,
         })));
       }
-      parts.push(sub('Recently pushed'), ...(data.repos.length
-        ? data.repos.map(r => githubRow({
-          href: r.url,
-          iconName: r.private ? 'lock' : 'branch',
-          name: r.name.split('/')[1],
-          meta: timeAgo(r.pushedAt),
-          title: `${r.name}${r.private ? ' (private)' : ''}`,
+      parts.push(sub('Recent commits'), ...(data.commits.length
+        ? data.commits.map(c => githubRow({
+          href: c.url,
+          iconName: c.private ? 'lock' : 'commit',
+          name: c.message,
+          // Repos of other owners (organisations) keep the owner, e.g. "eitan-capital/.github".
+          meta: `${c.repo.startsWith(`${user}/`) ? c.repo.slice(user.length + 1) : c.repo} · ${timeAgo(c.at)}`,
+          title: `${c.repo} @ ${c.sha}${c.private ? ' (private)' : ''}
+${c.message}`,
         }))
-        : [empty('No repos yet.')]));
+        : [empty('No commits found.')]));
     }
     githubBody.replaceChildren(...parts);
   }
@@ -181,29 +183,24 @@ export function mountSideWidgets(root, store) {
       renderGithubSetup();
       return;
     }
-    const orgs = parseNames(g.orgs);
     const headers = {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     const my = ++githubSeq;
-    const result = await feed(`github:${user}:${orgs.join(',')}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
-      // With a token /user/repos also lists private and organisation repos the token can see.
-      const ownRepos = token
-        ? `${GITHUB}/user/repos?sort=pushed&per_page=6&affiliation=owner,collaborator,organization_member`
-        : `${GITHUB}/users/${encodeURIComponent(user)}/repos?sort=pushed&per_page=6`;
-      const query = encodeURIComponent(`is:pr is:open involves:${user}`);
-      const [pulls, own, ...orgRepos] = await Promise.all([
-        fetchJson(`${GITHUB}/search/issues?q=${query}&sort=updated&per_page=4`, headers).then(parsePulls),
-        fetchJson(ownRepos, headers).then(parseRepos),
-        ...orgs.map(org => fetchJson(`${GITHUB}/orgs/${encodeURIComponent(org)}/repos?sort=pushed&per_page=6`, headers)
-          .then(parseRepos)
-          .catch(() => [])),
+    const result = await feed(`github-activity:${user}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
+      // Commit search finds the user's commits in every repo and organisation (default branches);
+      // GitHub's events feed returns nothing for this account. A token adds private repos.
+      const commitQuery = encodeURIComponent(`author:${user}`);
+      const prQuery = encodeURIComponent(`is:pr is:open involves:${user}`);
+      const [commits, pulls] = await Promise.all([
+        fetchJson(`${GITHUB}/search/commits?q=${commitQuery}&sort=author-date&order=desc&per_page=7`, headers).then(parseCommits),
+        fetchJson(`${GITHUB}/search/issues?q=${prQuery}&sort=updated&per_page=4`, headers).then(parsePulls),
       ]);
-      return { repos: mergeRepos([own, ...orgRepos], 5), pulls };
+      return { commits, pulls };
     });
-    if (my === githubSeq) renderGithub(result);
+    if (my === githubSeq) renderGithub(result, user);
   }
 
   // ---- wiring ----
@@ -227,7 +224,7 @@ export function mountSideWidgets(root, store) {
       clearTimeout(marketsTimer);
       marketsTimer = setTimeout(loadMarkets, first ? 0 : RECONFIGURE_MS);
     }
-    const nextGithub = JSON.stringify([w.github.user, w.github.orgs, w.github.token, state.prefs.openInNewTab]);
+    const nextGithub = JSON.stringify([w.github.user, w.github.token, state.prefs.openInNewTab]);
     if (w.github.enabled && nextGithub !== githubConf) {
       const first = githubConf === null;
       githubConf = nextGithub;

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseTicker, parseKline, parseFxSeries, parseRepos, parsePulls, mergeRepos,
-  formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, parseNames,
+  parseTicker, parseKline, parseFxSeries, parseCommits, parsePulls,
+  formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins,
 } from '../js/feeds.js';
 
 test('parseTicker reads Bybit last price and 24h change', () => {
@@ -28,16 +28,16 @@ test('parseFxSeries gives the latest rate and the change from the day before', (
   assert.equal(parseFxSeries({ rates: {} }, 'ILS'), null);
 });
 
-test('parseRepos keeps name, link, push time and visibility', () => {
-  const json = [{ full_name: 'NVB20/devops-ai', html_url: 'https://github.com/NVB20/devops-ai', pushed_at: '2026-10-15T22:27:00Z', private: false, extra: 1 }];
-  assert.deepEqual(parseRepos(json), [{ name: 'NVB20/devops-ai', url: 'https://github.com/NVB20/devops-ai', pushedAt: Date.parse('2026-10-15T22:27:00Z'), private: false }]);
-  assert.deepEqual(parseRepos({ message: 'Not Found' }), []);
-});
-
-test('mergeRepos de-duplicates and sorts by most recent push', () => {
-  const a = [{ name: 'x/a', pushedAt: 1 }, { name: 'x/b', pushedAt: 5 }];
-  const b = [{ name: 'x/b', pushedAt: 5 }, { name: 'y/c', pushedAt: 3 }];
-  assert.deepEqual(mergeRepos([a, b], 2).map(r => r.name), ['x/b', 'y/c']);
+test('parseCommits reads commit search results, newest first, first line of the message', () => {
+  const json = { items: [
+    { sha: 'edf33f2c7e86aaaa', html_url: 'https://github.com/NVB20/devops-ai/commit/edf33f2c', commit: { message: 'Step 01: echo bot', author: { date: '2026-10-15T21:46:28.000+03:00' } }, repository: { full_name: 'NVB20/devops-ai', private: false } },
+    { sha: '22bd6a013b49bbbb', html_url: 'https://github.com/NVB20/devops-ai/commit/22bd6a01', commit: { message: 'Step 02: AI answers\n\nlong body', author: { date: '2026-10-16T01:26:57.000+03:00' } }, repository: { full_name: 'eitan-capital/crm', private: true } },
+  ] };
+  assert.deepEqual(parseCommits(json), [
+    { sha: '22bd6a0', message: 'Step 02: AI answers', repo: 'eitan-capital/crm', url: 'https://github.com/NVB20/devops-ai/commit/22bd6a01', at: Date.parse('2026-10-16T01:26:57.000+03:00'), private: true },
+    { sha: 'edf33f2', message: 'Step 01: echo bot', repo: 'NVB20/devops-ai', url: 'https://github.com/NVB20/devops-ai/commit/edf33f2c', at: Date.parse('2026-10-15T21:46:28.000+03:00'), private: false },
+  ]);
+  assert.deepEqual(parseCommits({ message: 'Validation Failed' }), []);
 });
 
 test('parsePulls reads search results into PR rows', () => {
@@ -80,7 +80,3 @@ test('parseCoins upper-cases, de-duplicates and drops junk', () => {
   assert.deepEqual(parseCoins('btc, SOL xrp,eth  btc ;; $doge'), ['BTC', 'SOL', 'XRP', 'ETH']);
 });
 
-test('parseNames splits on commas and spaces, keeping case', () => {
-  assert.deepEqual(parseNames(' eitan-capital, Investing-Academy  '), ['eitan-capital', 'Investing-Academy']);
-  assert.deepEqual(parseNames(''), []);
-});

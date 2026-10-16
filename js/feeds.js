@@ -30,17 +30,19 @@ export function parseFxSeries(json, currency) {
   return { rate, change: prev ? rate / prev - 1 : 0, date: days.at(-1)[0], series };
 }
 
-export function parseRepos(json) {
-  if (!Array.isArray(json)) return [];
-  return json
-    .filter(r => r && typeof r.full_name === 'string')
-    .map(r => ({ name: r.full_name, url: r.html_url, pushedAt: Date.parse(r.pushed_at) || 0, private: !!r.private }));
-}
-
-export function mergeRepos(lists, limit) {
-  const byName = new Map();
-  for (const repo of lists.flat()) if (!byName.has(repo.name)) byName.set(repo.name, repo);
-  return [...byName.values()].sort((a, b) => b.pushedAt - a.pushedAt).slice(0, limit);
+// GitHub commit search results → commit rows, newest first, with the message's first line.
+export function parseCommits(json) {
+  if (!Array.isArray(json?.items)) return [];
+  return json.items
+    .map(i => ({
+      sha: String(i.sha ?? '').slice(0, 7),
+      message: String(i.commit?.message ?? '').split('\n')[0],
+      repo: String(i.repository?.full_name ?? ''),
+      url: i.html_url,
+      at: Date.parse(i.commit?.author?.date) || 0,
+      private: !!i.repository?.private,
+    }))
+    .sort((a, b) => b.at - a.at);
 }
 
 // GitHub issue search results (is:pr) → PR rows.
@@ -98,8 +100,4 @@ export function timeAgo(ms, now = Date.now()) {
 export function parseCoins(text) {
   const coins = String(text ?? '').toUpperCase().split(/[\s,;]+/).filter(c => /^[A-Z0-9]{2,10}$/.test(c));
   return [...new Set(coins)];
-}
-
-export function parseNames(text) {
-  return String(text ?? '').split(/[\s,]+/).filter(Boolean);
 }
