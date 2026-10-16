@@ -128,6 +128,10 @@ export async function webSearch(text, { newTab = false } = {}) {
 
 export const canFrameSites = hasChrome && !!c.permissions && !!c.declarativeNetRequest;
 export const extensionId = hasChrome ? c.runtime.id : '';
+// The extension, still running with the permissions it had before the Website widget: Chrome reads
+// new files on every new tab, but a new manifest only when the extension is reloaded.
+export const framingNeedsReload = hasChrome && !canFrameSites;
+export const reloadExtension = () => c.runtime.reload();
 
 export async function hasSiteAccess(pattern) {
   return canFrameSites && c.permissions.contains({ origins: [pattern] });

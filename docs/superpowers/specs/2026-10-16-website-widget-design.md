@@ -46,7 +46,12 @@ address`).
 
 What the widget shows, in order of precedence:
 
-1. **Outside the extension** (Live Server preview): "Websites show in the extension only." and a
+1. **The extension, not reloaded since the update** (the APIs are missing: Chrome reads new files
+   on every new tab but a new manifest only on a reload): it says so, with **Reload the
+   extension** (`chrome.runtime.reload()`). The new permissions add no install warning, so the
+   reload grants them without a prompt (unpacked extensions need Developer mode on to reload,
+   which they have, since that's how they're loaded).
+   **Outside the extension** (Live Server preview): "Websites show in the extension only." and a
    link to the address.
 2. **No address:** an address field and **Show**. Show asks Chrome for access to the site (the
    prompt needs the click), saves the address and, once access is granted, loads it.

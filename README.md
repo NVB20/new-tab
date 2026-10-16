@@ -174,8 +174,9 @@ The widget shows:
   commented on or are mentioned in. They're always at the top.
 - **Your open issues:** the five most recently updated open issues you opened, are assigned to,
   commented on or are mentioned in, in any repo (archived repos are left out).
-- **Your latest commits:** the six newest, across every repo and organisation you've committed
-  to (default branches). Private repos get a lock icon.
+- **Your latest commits:** the newest, as many as fill the widget down to its bottom (at least
+  six), across every repo and organisation you've committed to (default branches). Private repos
+  get a lock icon.
 
 Which of these a copy shows is up to its four switches under Preferences → Layout. Everything is
 fetched either way, so switching is instant, and every copy shares one fetch an hour.
@@ -259,7 +260,7 @@ you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's 
   and F1, and pick the F1 sessions you want (Practice, Sprint, Qualifying, Race). Changes apply as
   you go; **✓** closes the editor. A new widget follows Inter Miami, Argentina and F1.
 - **A row:** the league or competition (NBA, NFL, MLS, Leagues Cup, World Cup, F1, …), the
-  teams with yours in bold, the start time and the TV channel. A moon marks games that start
+  teams with yours in bold (F1: a race car, the race and the session), the start time and the TV channel. A moon marks games that start
   between midnight and 7 in the morning. Times follow the Clock's 12/24-hour setting.
 - **Live:** a red dot, the score and the clock (Q3 5:21, 67'). Scores refresh every 30 seconds
   while the tab is in view. F1 sessions read LIVE while they're scheduled to run.
@@ -294,6 +295,9 @@ in it and press **Show**.
   and **Zoom** (50–100%). Sites lay themselves out for the widget's width, so a narrow widget gets
   the phone layout; at 60% a site is drawn as if the widget were two thirds wider, so more fits.
 - Only in the extension: on the Live Server preview the widget is a link to the site.
+- **After updating the files:** Chrome keeps the extension's old permissions until it's reloaded,
+  so the widget says so and offers **Reload the extension** (or press ↻ on New Tab in
+  chrome://extensions).
 
 ## Search bar and AI chats
 
