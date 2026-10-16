@@ -4,12 +4,22 @@ import { backgroundImage } from './util.js';
 
 const cssUrl = url => `url("${url.replace(/["\\\n\r]/g, encodeURIComponent)}")`;
 
+// Read by boot.js before first paint.
+function remember(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // only used to avoid a flash on the next load
+  }
+}
+
 export function mountTheme(store) {
   const root = document.documentElement;
   const bg = document.getElementById('bg');
   const media = matchMedia('(prefers-color-scheme: dark)');
   let shownMode = null;
   let shownImage = null;
+  let shownPlain = null;
 
   function apply() {
     const p = store.get().prefs;
@@ -17,14 +27,18 @@ export function mountTheme(store) {
     if (mode !== shownMode) {
       shownMode = mode;
       root.dataset.theme = mode;
-      try {
-        localStorage.setItem('newtab:mode', mode);
-      } catch {
-        // only used to avoid a flash on the next load
-      }
+      remember('newtab:mode', mode);
     }
 
     const image = backgroundImage(p.background, store.wallpaper);
+    // The plain background's own colour, when one is picked; the theme's background otherwise.
+    const plain = !image && p.background.pattern === 'none' ? p.background.color[mode === 'light' ? 'light' : 'dark'] : '';
+    if (plain !== shownPlain) {
+      shownPlain = plain;
+      if (plain) root.style.setProperty('--plain-bg', plain);
+      else root.style.removeProperty('--plain-bg');
+      remember('newtab:plain-bg', plain);
+    }
     const vars = {
       '--accent': p.accent,
       '--gap': p.spacing + 'px',

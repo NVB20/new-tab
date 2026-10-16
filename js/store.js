@@ -18,7 +18,9 @@ export const DEFAULT_PREFS = {
   tiles: { style: 'flat', icons: 'logo', radius: 10, showTitle: true, color: '#ffffff', textColor: '#202124' },
   // pattern 'ascii' is the animated letter field. An image (the upload when useUpload, else url)
   // covers it while showImage is on; picking a pattern turns showImage off and keeps the image.
-  background: { pattern: 'ascii', motion: true, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
+  // pattern 'none' is a plain fill: color.light under the light theme, color.dark under the others
+  // (text keeps the theme's colour), or the theme's own background when that is ''.
+  background: { pattern: 'ascii', motion: true, color: { dark: '', light: '' }, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
   // The engines the search bar offers; mode is the one Enter goes to.
   search: { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' },
   // One username and one token for every GitHub widget. The token is optional (read-only), only
