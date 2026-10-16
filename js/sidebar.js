@@ -33,12 +33,23 @@ function linkRow(url, title, meta, onActivate) {
     meta && el('span', { class: 'side-meta', text: meta }));
 }
 
+// A folder's contents are built the first time it opens, so a big bookmark tree costs nothing
+// (no rows, no favicon requests) until it is browsed.
 function folderNode(node, open) {
-  return el('details', { class: 'side-folder', open },
-    el('summary', {}, icon('chevron', 14), icon('folder', 16), el('span', { class: 'side-title', dir: 'auto', text: node.title || 'Folder' })),
-    el('div', { class: 'side-children' }, (node.children ?? []).map(child => (child.url
+  const children = el('div', { class: 'side-children' });
+  let filled = false;
+  const fill = () => {
+    if (filled || !details.open) return;
+    filled = true;
+    children.append(...(node.children ?? []).map(child => (child.url
       ? linkRow(child.url, child.title)
-      : folderNode(child, false)))));
+      : folderNode(child, false))));
+  };
+  const details = el('details', { class: 'side-folder', open, ontoggle: fill },
+    el('summary', {}, icon('chevron', 14), icon('folder', 16), el('span', { class: 'side-title', dir: 'auto', text: node.title || 'Folder' })),
+    children);
+  fill();
+  return details;
 }
 
 export function setupSidebar() {

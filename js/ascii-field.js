@@ -25,15 +25,23 @@ export function valueNoise(x, y, seed = 0) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
+// How much cell (c, r) uses diagonal rather than flat streaks (0..1); doesn't change over time.
+export function streakBlend(c, r, seed = 0) {
+  return smooth(Math.min(1, Math.max(0, (valueNoise(c / 80, r / 25, seed + 3) - 0.3) / 0.4)));
+}
+
+// Vertical sway (in rows) of column c after t seconds.
+export const streakSway = (c, t) => Math.sin(c / 16 + t * 0.9) * 0.9;
+
 // Brightness (0..1) of the resting field at cell (c, r) after t seconds of flow. Two layers of
 // noise stretched into streaks — one flat, one diagonal — blended region by region, then cut off
 // high so most of the screen stays empty and each streak fades out at its ends. The streaks
 // flow sideways (flat ones one way, diagonal ones the other) and sway on a slow sine wave.
-export function streakField(c, r, t, seed = 0) {
-  const rw = r + Math.sin(c / 16 + t * 0.9) * 0.9;
+// blend and sway can be passed in precomputed: blend never changes, sway is the same for a column.
+export function streakField(c, r, t, seed = 0, blend = streakBlend(c, r, seed), sway = streakSway(c, t)) {
+  const rw = r + sway;
   const flat = valueNoise(c / 14 + t * 0.25, rw / 2.2, seed);
   const diagonal = valueNoise((c - rw * 2.5) / 14 - t * 0.18, rw / 6, seed + 5);
-  const blend = smooth(Math.min(1, Math.max(0, (valueNoise(c / 80, r / 25, seed + 3) - 0.3) / 0.4)));
   const n = flat * (1 - blend) + diagonal * blend;
   return Math.min(1, Math.max(0, (n - 0.6) / 0.3));
 }

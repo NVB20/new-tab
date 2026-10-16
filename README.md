@@ -28,10 +28,12 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: I type my username into the widget. For private repos, help me create a
-     fine-grained token at https://github.com/settings/personal-access-tokens/new with
-     Contents and Pull requests set to read-only, which I paste into Preferences → Widgets →
-     Access token myself. Never ask me to paste the token into this chat.
+   - GitHub widget: everything is in Preferences → Widgets → GitHub (the ✎ on the widget opens
+     it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
+     making a token as described under "Tokens for private repos" in the README: usually a
+     fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
+     Issues and Pull requests set to read-only. I paste it into the Access token box myself.
+     Never ask me to paste the token into this chat.
    - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
      heading; any Bybit spot coin, priced in USDT, plus pairs such as USD/ILS and EUR/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
@@ -47,9 +49,9 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
-| **GitHub** | Your contribution heatmap, latest commits and open pull requests, including private repos with a token. |
+| **GitHub** | Your contribution heatmap, open pull requests, and your open issues, latest commits or both, including private repos with a token. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
-| **Tasks and notes** | A to-do list with a week of finished-task history, and a notes pad. |
+| **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -112,15 +114,24 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-Type your GitHub username into the widget and it shows:
+All of the widget's settings are in one place: **Preferences → Widgets → GitHub**. That's your
+username, what to show and an optional access token. Hover the widget and click **✎** to go
+straight there; a widget without a username has a **Set up GitHub** button that does the same.
+
+The widget shows:
 
 - **Your contribution heatmap:** the past year as on your profile, with the yearly total. Hover a
   square for that day's count; click the map to open your profile. Private contributions count if
   you've switched on *Include private contributions on my profile* in your GitHub settings.
-- **Your open pull requests**: the most recently updated ones you opened, are assigned to,
-  commented on or are mentioned in.
-- **Your latest commits**: the six newest, across every repo and organisation you've committed
+- **Your open pull requests:** the four most recently updated ones you opened, are assigned to,
+  commented on or are mentioned in. They're always at the top.
+- **Your open issues:** the five most recently updated open issues you opened, are assigned to,
+  commented on or are mentioned in, in any repo (archived repos are left out).
+- **Your latest commits:** the six newest, across every repo and organisation you've committed
   to (default branches). Private repos get a lock icon.
+
+**Show** picks what comes under the pull requests: **Commits**, **Issues**, or **Both** (the
+default, issues first). Both lists are fetched either way, so switching is instant.
 
 The heatmap is read from `github.com/users/<you>/contributions`, which is why the extension asks
 for access to github.com. After updating from an older version, press the extension's reload
@@ -129,21 +140,67 @@ button on `chrome://extensions` once so Chrome grants it.
 The heading opens your GitHub profile. GitHub is checked at most once an hour to stay well inside
 its rate limit; **Refresh** next to the heading fetches straight away.
 
-### Private repos
+### Tokens for private repos
 
-Without a token only public repos show. To include private ones, add a read-only token:
+Without a token the widget shows public repos only. To add your private repos' commits, issues and
+pull requests, give it a personal access token. GitHub has two kinds:
 
-1. Create a fine-grained token at <https://github.com/settings/personal-access-tokens/new>.
-2. **Resource owner:** you, or the organisation whose private repos you want to see. A
-   fine-grained token covers one owner.
-3. **Repository access:** all repositories, or just the ones you want.
-4. **Permissions:** *Contents* and *Pull requests*, both read-only.
-5. If the organisation requires approval, an owner approves it under the organisation's
-   **Settings → Personal access tokens**.
-6. Paste it into Preferences → Widgets → **Access token**, then press **Refresh** on the widget.
+- **Fine-grained token** (recommended): read-only and limited to the repos you pick. One token
+  covers one owner: your own account *or* one organisation.
+- **Classic token**: only if your private repos belong to more than one owner (say, your account
+  and an organisation). It reaches every repo your account can.
 
-The token stays in this browser and is never written into backup files. If it can't see what it
-should, the widget says why (for example, missing *Contents* access or org approval still pending).
+#### Fine-grained token
+
+1. Open <https://github.com/settings/personal-access-tokens/new> (your avatar → **Settings** →
+   **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new
+   token**). If GitHub asks, verify your email address first.
+2. **Token name:** anything, e.g. `New Tab`. **Expiration:** up to you; when it runs out the widget
+   says GitHub rejected the token, and you make a new one.
+3. **Resource owner:** you, or the organisation whose private repos you want to see.
+4. **Repository access:** **All repositories**, or **Only select repositories** and pick them.
+5. **Permissions:** add these repository permissions, each set to **Read-only**. *Metadata*
+   (read-only) is added on its own; leave everything else out.
+
+   | Permission | Lets the widget show |
+   | --- | --- |
+   | Contents | your commits in private repos |
+   | Issues | open issues in private repos |
+   | Pull requests | open pull requests in private repos |
+
+6. Click **Generate token** and copy it. GitHub shows it only once.
+7. If the owner is an organisation that requires approval, the token is *pending* and sees only
+   public repos until an organisation owner approves it under the organisation's **Settings →
+   Personal access tokens**. Organisation owners are approved automatically.
+
+#### Classic token
+
+A classic token can't be limited to reading: the `repo` scope, the only one that opens private
+repos, also allows changes. Treat it like a password.
+
+1. Open <https://github.com/settings/tokens/new> (**Settings** → **Developer settings** →
+   **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**).
+2. **Note:** e.g. `New Tab`. Pick an **Expiration**.
+3. Tick **repo** and nothing else.
+4. Click **Generate token** and copy it.
+5. If an organisation uses SAML single sign-on, click **Configure SSO** next to the token on the
+   tokens page and **Authorize** it for that organisation. Until you do, its private repos stay
+   hidden.
+
+#### Add the token
+
+Paste it into Preferences → Widgets → GitHub → **Access token**, then press **Refresh** on the
+widget (otherwise it checks again within the hour). The token stays in this browser and is never
+written into backup files.
+
+#### If something is missing
+
+| What you see | What to do |
+| --- | --- |
+| "GitHub rejected the token" | It expired, was deleted or was pasted incompletely. Make a new one. |
+| "Token works but sees no private repos in …" | Fine-grained: check the resource owner, the repositories it can access and *Contents*; an organisation may still have to approve it. Classic: authorise SSO. |
+| "Token sees N private repos but can't read commits in …" | Give it *Contents: Read-only*. |
+| Private issues or pull requests don't show | Give it *Issues* or *Pull requests: Read-only*. A fine-grained token only sees repos of its own owner. |
 
 ## Everything else
 
@@ -155,9 +212,14 @@ should, the widget says why (for example, missing *Contents* access or org appro
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar:** the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
-- **Tasks:** Enter adds a task; tick to finish. **Clear done** (next to the heading) removes
-  finished tasks. Finished tasks are kept in a history for 7 days, and the number completed per day
-  is kept for good (counted on the day you tick it; unticking takes it back).
+- **Tasks:** Enter adds a task; tick to finish. Right-click a task to give it a due date (today,
+  tomorrow or any date), a priority (high, medium or low, shown as a red, amber or blue ring), to
+  edit its text or delete it. The due date shows on the right as *Today*, *Tomorrow*, a weekday or a
+  date, in red once it has passed. Drag tasks to reorder them; **Sort** (next to the heading) puts
+  them in order once (unfinished first, then by due date, then priority) and you can keep dragging
+  after. **Clear done** removes finished tasks. Finished tasks are kept in a history for 7 days, and
+  the number completed per day is kept for good (counted on the day you tick it; unticking takes it
+  back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
@@ -171,8 +233,12 @@ should, the widget says why (for example, missing *Contents* access or org appro
   double-click the header to put it back in the middle. Type in the search box (it has the cursor
   when the panel opens, or press Ctrl+F) to list matching settings from every section; options
   whose switch is off show dimmed. Esc clears the search, then closes the panel.
-- **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper)
-  to one file you can import again on another computer.
+- **Tile logos:** each tile's logo is saved in this Chrome profile the first time it loads, so tiles
+  keep their logos even if the server they came from (such as Speed Dial 2's) goes away. Speed Dial 2
+  logos are always saved; logos from other sites are saved when the site allows it, otherwise they
+  keep loading from their link.
+- **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper
+  and the saved tile logos) to one file you can import again on another computer.
 
 ## Your data
 
@@ -184,16 +250,17 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
+| Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 
-Turn a widget off in Preferences → Widgets and it stops fetching. Tile images load from wherever
-their icon link points.
+Turn a widget off in Preferences → Widgets and it stops fetching.
 
 ## Known limits
 
 - On a fresh new tab Chrome keeps the cursor in the address bar, so Ctrl+K and / work once you've
   clicked the page. The search icon always works.
-- Imported tile logos are still loaded from Speed Dial 2's image server. If one stops showing,
-  right-click → Edit and clear the icon field (uses the site's own icon) or paste another image link.
+- A tile logo from a site that doesn't allow saving it (no CORS headers) still loads from its link.
+  If one stops showing, right-click → Edit and clear the icon field (uses the site's own icon) or
+  paste another image link.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development

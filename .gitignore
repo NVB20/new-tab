@@ -1,3 +1,5 @@
 node_modules/
+# other sessions' isolated checkouts
+.claude/worktrees/
 # local secrets (e.g. the GitHub token) never belong in git
 .env*

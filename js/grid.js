@@ -4,16 +4,22 @@
 import { el, icon, tileIcon, showMenu, openDialog, confirmDialog, field, TILE_MIME } from './ui.js';
 import {
   addTile, updateTile, deleteTile, moveTileToGroup, reorderTile,
-  isFolder, folderChildren, topLevel, createFolder, addToFolder, removeFromFolder, dissolveFolder,
+  isFolder, topLevel, createFolder, addToFolder, removeFromFolder, dissolveFolder,
 } from './actions.js';
 import { openFolder, settleFolder } from './folders.js';
 import { openUrl } from './chrome-api.js';
 import { normalizeUrl, hostOf } from './util.js';
 
 const isWeb = url => /^https?:/i.test(url);
+const MARKS = ['drop-before', 'drop-after', 'drop-into'];
+// The only prefs the tiles themselves use; the rest are CSS variables set by theme.js.
+const tilePrefs = p => `${p.showAddButton}|${p.openInNewTab}|${p.tiles.icons}`;
 
 export function mountGrid(root, store) {
   let dragId = null;
+  let canNest = false;
+  let marked = null;   // the tile showing a drop mark
+  let shownPrefs = '';
 
   function tileMenu(e, tile) {
     const others = store.get().groups.filter(g => g.id !== tile.groupId);
@@ -64,8 +70,7 @@ export function mountGrid(root, store) {
   const open = (folder, focusName = false) => openFolder(store, folder.id, { tileNode, focusName });
 
   // A folder shows up to four of its tiles' icons in a rounded box.
-  function folderNode(folder, prefs) {
-    const kids = folderChildren(store.get(), folder.id);
+  function folderNode(folder, prefs, kids) {
     return el('div', {
       class: 'tile tile-folder',
       role: 'button',
@@ -86,8 +91,9 @@ export function mountGrid(root, store) {
       el('div', { class: 'tile-title', dir: 'auto', text: folder.title }));
   }
 
-  function tileNode(tile, prefs) {
-    if (isFolder(tile)) return folderNode(tile, prefs);
+  // kids: a folder's tiles (only used for folders).
+  function tileNode(tile, prefs, kids = []) {
+    if (isFolder(tile)) return folderNode(tile, prefs, kids);
     return el('a', {
       class: 'tile',
       href: tile.url,
@@ -113,8 +119,9 @@ export function mountGrid(root, store) {
 
   function render() {
     const { tiles, activeGroupId, prefs } = store.get();
-    const list = topLevel({ tiles }, activeGroupId);
-    const nodes = list.map(t => tileNode(t, prefs));
+    shownPrefs = tilePrefs(prefs);
+    const kids = Map.groupBy(tiles.filter(t => t.folderId), t => t.folderId);
+    const nodes = topLevel({ tiles }, activeGroupId).map(t => tileNode(t, prefs, kids.get(t.id)));
     if (prefs.showAddButton) {
       nodes.push(el('button', {
         class: 'tile tile-add',
@@ -130,13 +137,17 @@ export function mountGrid(root, store) {
     root.replaceChildren(...nodes);
   }
 
-  const clearMarks = () => root.querySelectorAll('.drop-before, .drop-after, .drop-into')
-    .forEach(n => n.classList.remove('drop-before', 'drop-after', 'drop-into'));
+  const clearMarks = () => {
+    marked?.classList.remove(...MARKS);
+    marked = null;
+  };
 
   root.addEventListener('dragstart', e => {
     const tile = e.target.closest?.('.tile[data-id]');
     if (!tile) return;
     dragId = tile.dataset.id;
+    // Folders can't go inside folders.
+    canNest = !tile.classList.contains('tile-folder');
     e.dataTransfer.setData(TILE_MIME, dragId);
     if (tile.href) {
       e.dataTransfer.setData('text/uri-list', tile.href);
@@ -160,25 +171,25 @@ export function mountGrid(root, store) {
     const tile = e.target.closest?.('.tile[data-id]');
     if (!tile || tile.dataset.id === dragId) return;
     // Edges reorder; the middle drops the tile into the target (making a folder if needed).
-    // Folders can't go inside folders.
     const r = tile.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
-    const dragged = store.get().tiles.find(t => t.id === dragId);
-    const canNest = !isFolder(dragged);
     if (canNest && x > 0.28 && x < 0.72) tile.classList.add('drop-into');
     else tile.classList.add(x < 0.5 ? 'drop-before' : 'drop-after');
+    marked = tile;
   });
 
   root.addEventListener('drop', e => {
     if (!dragId) return;
     e.preventDefault();
-    const into = root.querySelector('.drop-into');
+    const mark = marked;
+    const id = dragId;
+    if (!mark) return;
+    const targetId = mark.dataset.id;
+    const into = mark.classList.contains('drop-into');
+    const after = mark.classList.contains('drop-after');
+    clearMarks();
     if (into) {
-      const id = dragId;
-      const targetId = into.dataset.id;
-      clearMarks();
-      const target = store.get().tiles.find(t => t.id === targetId);
-      if (isFolder(target)) {
+      if (mark.classList.contains('tile-folder')) {
         store.update(s => addToFolder(s, id, targetId));
         return;
       }
@@ -187,17 +198,14 @@ export function mountGrid(root, store) {
       if (folder) open(folder, true);   // name it right away
       return;
     }
-    const mark = root.querySelector('.drop-before, .drop-after');
-    if (!mark) return;
-    const beforeId = mark.classList.contains('drop-after')
-      ? (mark.nextElementSibling?.dataset?.id ?? null)
-      : mark.dataset.id;
-    const id = dragId;
-    clearMarks();
+    const beforeId = after ? (mark.nextElementSibling?.dataset?.id ?? null) : targetId;
     store.update(s => reorderTile(s, id, beforeId));
   });
 
-  store.subscribe(render, ['tiles', 'groups', 'activeGroupId', 'prefs']);
+  store.subscribe((s, changed) => {
+    if (changed.every(k => k === 'prefs') && tilePrefs(s.prefs) === shownPrefs) return;
+    render();
+  }, ['tiles', 'groups', 'activeGroupId', 'prefs']);
   render();
 }
 

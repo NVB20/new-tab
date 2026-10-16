@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_PREFS, deepMerge, normalizeState, createStore } from '../js/store.js';
+import { DEFAULT_PREFS, THEME_ACCENTS, deepMerge, normalizeState, createStore, setTheme } from '../js/store.js';
 
 function memoryAdapter(initial = {}) {
   const data = { ...initial };
@@ -80,6 +80,14 @@ test('Markets coins and USD/ILS switch from older versions become the item list'
   assert.deepEqual(items({ items: 'BTC' }).items, DEFAULT_PREFS.widgets.markets.items);
 });
 
+test('GitHub shows commits and issues unless the saved choice is a valid one', () => {
+  const show = github => normalizeState({ prefs: { widgets: { github } } }).prefs.widgets.github.show;
+  assert.equal(show({ user: 'octo' }), 'both');
+  assert.equal(show({ show: 'issues' }), 'issues');
+  assert.equal(show({ show: 'commits' }), 'commits');
+  assert.equal(show({ show: 'everything' }), 'both');
+});
+
 test('the old switch that hid every widget becomes each widget switched off', () => {
   const w = normalizeState({ prefs: { widgets: { enabled: false, tasks: { enabled: true }, markets: { enabled: true } } } }).prefs.widgets;
   assert.equal(w.enabled, true);
@@ -105,13 +113,24 @@ test('normalizeState keeps task timestamps, history and daily counts, dropping j
     taskStats: { '2026-10-16': 4, '2026-10-15': -1, nonsense: 2, '2026-10-14': 'x' },
   });
   assert.deepEqual(s.tasks, [
-    { id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9 },
-    { id: 'u', text: 'old task', done: false, createdAt: null, doneAt: null },
+    { id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9, due: null, priority: null },
+    { id: 'u', text: 'old task', done: false, createdAt: null, doneAt: null, due: null, priority: null },
   ]);
   assert.deepEqual(s.taskHistory, [{ id: 'h', text: 'x', createdAt: 1, doneAt: 2, clearedAt: 3 }]);
   assert.deepEqual(s.taskStats, { '2026-10-16': 4 });
   assert.deepEqual(normalizeState(null).taskStats, {});
   assert.deepEqual(normalizeState(null).taskHistory, []);
+});
+
+test('normalizeState keeps valid due dates and priorities and drops invalid ones', () => {
+  const s = normalizeState({
+    tasks: [
+      { id: 'a', text: 'a', due: '2026-10-20', priority: 'high' },
+      { id: 'b', text: 'b', due: 'tomorrow', priority: 'urgent' },
+      { id: 'c', text: 'c', due: 20261020, priority: 1 },
+    ],
+  });
+  assert.deepEqual(s.tasks.map(t => [t.due, t.priority]), [['2026-10-20', 'high'], [null, null], [null, null]]);
 });
 
 test('normalizeState keeps folders and their tiles, and repairs broken folder links', () => {
@@ -125,6 +144,20 @@ test('normalizeState keeps folders and their tiles, and repairs broken folder li
     ],
   });
   assert.deepEqual(s.tiles.map(t => [t.id, t.kind ?? '', t.folderId ?? '']), [['f', 'folder', ''], ['a', '', 'f'], ['b', '', '']]);
+});
+
+test('switching theme brings its accent unless the user picked another one', () => {
+  const p = structuredClone(DEFAULT_PREFS);
+  setTheme(p, 'github');
+  assert.equal(p.theme, 'github');
+  assert.equal(p.accent, THEME_ACCENTS.github);
+  setTheme(p, 'blue');
+  assert.equal(p.accent, THEME_ACCENTS.blue);
+  setTheme(p, 'light');
+  assert.equal(p.accent, DEFAULT_PREFS.accent);
+  p.accent = '#8b5cf6';
+  setTheme(p, 'github');
+  assert.equal(p.accent, '#8b5cf6');
 });
 
 test('store notifies only subscribers whose keys changed', async () => {
@@ -159,6 +192,87 @@ test('store wallpaper is stored under its own key', async () => {
   assert.equal(adapter.data.wallpaper, 'data:image/png;base64,AAAA');
   assert.equal(store.wallpaper, 'data:image/png;base64,AAAA');
   assert.equal(hits, 1);
+});
+
+test('store reads the wallpaper only when it is shown', async () => {
+  const adapter = memoryAdapter({ wallpaper: 'data:image/png;base64,AAAA' });
+  const reads = [];
+  const get = adapter.get;
+  adapter.get = key => { reads.push(key); return get(key); };
+  await createStore(adapter).load();
+  assert.deepEqual(reads, ['state']);
+
+  adapter.data.state = { prefs: { background: { useUpload: true } } };
+  reads.length = 0;
+  const store = createStore(adapter);
+  await store.load();
+  assert.deepEqual(reads, ['state', 'wallpaper']);
+  assert.equal(store.wallpaper, 'data:image/png;base64,AAAA');
+});
+
+// Like the extension's adapter: chrome.storage plus a synchronous localStorage copy of the state.
+function cachingAdapter(initial = {}, copy = undefined) {
+  const adapter = memoryAdapter(initial);
+  adapter.copy = copy;
+  adapter.cached = () => adapter.copy;
+  adapter.cache = value => { adapter.copy = structuredClone(value); };
+  return adapter;
+}
+
+const settle = () => new Promise(resolve => setTimeout(resolve));
+
+test('store loads from the localStorage copy without waiting for chrome.storage', async () => {
+  const adapter = cachingAdapter({}, { notes: 'from copy' });
+  adapter.get = () => new Promise(() => {});   // chrome.storage never answers
+  const store = createStore(adapter);
+  await store.load();
+  assert.equal(store.get().notes, 'from copy');
+});
+
+test('store keeps the localStorage copy in step with chrome.storage', async () => {
+  const adapter = cachingAdapter({ state: { notes: 'saved' } });
+  const store = createStore(adapter);
+  await store.load();
+  assert.equal(adapter.copy.notes, 'saved');   // copied on the first load without one
+  store.update(s => { s.notes = 'edited'; });
+  await store.flush();
+  assert.equal(adapter.copy.notes, 'edited');
+  assert.equal(adapter.data.state.notes, 'edited');
+});
+
+test('store takes chrome.storage over a stale localStorage copy', async () => {
+  const adapter = cachingAdapter({ state: { notes: 'newer' } }, { notes: 'stale' });
+  const store = createStore(adapter);
+  let calls = 0;
+  store.subscribe(() => calls++, ['notes']);
+  await store.load();
+  await settle();
+  assert.equal(store.get().notes, 'newer');
+  assert.equal(adapter.copy.notes, 'newer');
+  assert.equal(calls, 1);
+});
+
+test('store changes nothing when the localStorage copy matches chrome.storage', async () => {
+  const saved = normalizeState({ notes: 'same' });
+  const store = createStore(cachingAdapter({ state: saved }, structuredClone(saved)));
+  let calls = 0;
+  store.subscribe(() => calls++);
+  await store.load();
+  await settle();
+  assert.equal(calls, 0);
+});
+
+test('store keeps an edit made before chrome.storage answers', async () => {
+  const adapter = cachingAdapter({ state: { notes: 'newer' } }, { notes: 'stale' });
+  const get = adapter.get;
+  let answer;
+  adapter.get = key => (key === 'state' ? new Promise(resolve => { answer = () => resolve(get(key)); }) : get(key));
+  const store = createStore(adapter);
+  await store.load();
+  store.update(s => { s.notes = 'typed'; });
+  answer();
+  await settle();
+  assert.equal(store.get().notes, 'typed');
 });
 
 test('store falls back to defaults when saved state is corrupt', async () => {

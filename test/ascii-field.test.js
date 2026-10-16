@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GLYPHS, hash2, valueNoise, streakField, falloff, ringOffset, level } from '../js/ascii-field.js';
+import { GLYPHS, hash2, valueNoise, streakField, streakBlend, streakSway, falloff, ringOffset, level } from '../js/ascii-field.js';
 
 test('GLYPHS are letters and digits', () => {
   assert.match(GLYPHS, /^[A-Za-z0-9]+$/);
@@ -33,6 +33,13 @@ test('streakField is deterministic, bounded and mostly empty', () => {
   const empty = values.filter(v => v === 0).length / values.length;
   assert.ok(empty > 0.6 && empty < 0.95, `empty share ${empty.toFixed(2)} should leave sparse streaks`);
   assert.ok(values.some(v => v > 0.4), 'streaks have brighter middles');
+});
+
+test('streakField gives the same value with precomputed blend and sway', () => {
+  for (let i = 0; i < 300; i++) {
+    const c = i % 40, r = Math.floor(i / 40), t = i * 0.07;
+    assert.equal(streakField(c, r, t, 9, streakBlend(c, r, 9), streakSway(c, t)), streakField(c, r, t, 9));
+  }
 });
 
 function changedShare(t0, t1, threshold) {

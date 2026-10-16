@@ -4,6 +4,8 @@
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
 import { CLOCK_FACES } from './widgets.js';
+import { setTheme } from './store.js';
+import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const TILE_PRESETS = [
@@ -120,11 +122,14 @@ export function setupPrefs(store) {
 
     return [
       title('Colours'),
-      segmented('Theme', 'theme', [
+      // A theme brings its own accent, unless a different accent was picked by hand.
+      row('Theme', choice('Theme', p.theme, [
         { value: 'auto', label: 'Auto', icon: 'auto' },
         { value: 'light', label: 'Light', icon: 'sun' },
         { value: 'dark', label: 'Dark', icon: 'moon' },
-      ]),
+        { value: 'blue', label: 'Blue', icon: 'drop' },
+        { value: 'github', label: 'GitHub', icon: 'branch' },
+      ], value => store.update(s => setTheme(s.prefs, value)))),
       row('Accent', el('div', { class: 'swatches' }, swatches, custom)),
       title('Background'),
       row('Style', choice('Background', shown, [
@@ -243,19 +248,18 @@ export function setupPrefs(store) {
       title(`${far} column`),
       toggle('Markets', 'widgets.markets.enabled', 'Use ✎ on the widget to choose coins and currency pairs'),
       group('github',
-        toggle('GitHub', 'widgets.github.enabled', 'Your latest commits, open pull requests and a year of activity'),
+        toggle('GitHub', 'widgets.github.enabled', 'A year of activity, open pull requests, and your issues and commits'),
         sub(w.github.enabled,
           textInput('Username', 'widgets.github.user', 'NVB20'),
-          // Arrives with the GitHub issues feature.
-          w.github.show && segmented('Show', 'widgets.github.show', [
+          segmented('Show', 'widgets.github.show', [
             { value: 'commits', label: 'Commits' },
             { value: 'issues', label: 'Issues' },
             { value: 'both', label: 'Both' },
-          ]),
-          textInput('Access token', 'widgets.github.token', 'github_pat_…', {
+          ], 'Listed under your open pull requests'),
+          textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
             type: 'password',
             maxLength: 300,
-            hint: 'Optional and read-only; adds private repos (e.g. eitan-capital). Kept only in this browser, never in backups.',
+            hint: 'Adds private repos (e.g. eitan-capital). A fine-grained token with Contents, Issues and Pull requests set to read-only. Kept only in this browser and left out of backups.',
           }))),
     ];
   }
@@ -314,7 +318,7 @@ export function setupPrefs(store) {
   function exportBackup() {
     const state = structuredClone(store.get());
     state.prefs.widgets.github.token = '';   // a backup file shouldn't carry a credential
-    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper };
+    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper, icons: iconsFor(state.tiles) };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `new-tab-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a);
@@ -338,6 +342,7 @@ export function setupPrefs(store) {
       if (!await confirmDialog(`Replace everything here with this backup (${n} tiles)?`, { title: 'Restore backup', confirmLabel: 'Restore' })) return;
       store.replace(json.state);
       await store.setWallpaper(typeof json.wallpaper === 'string' ? json.wallpaper : '');
+      await addSavedIcons(json.icons);
       redraw();
       return;
     }
@@ -362,6 +367,7 @@ export function setupPrefs(store) {
     if (!await confirmDialog('This deletes all tiles, groups, settings, tasks, notes and the wallpaper. Download a backup first if you might want them back.', { title: 'Reset everything?', confirmLabel: 'Reset', danger: true })) return;
     store.replace(null);
     await store.setWallpaper('');
+    await clearSavedIcons();
     show('page');
   }
 

@@ -8,15 +8,20 @@ export function mountTheme(store) {
   const root = document.documentElement;
   const bg = document.getElementById('bg');
   const media = matchMedia('(prefers-color-scheme: dark)');
+  let shownMode = null;
+  let shownImage = null;
 
   function apply() {
     const p = store.get().prefs;
     const mode = p.theme === 'auto' ? (media.matches ? 'dark' : 'light') : p.theme;
-    root.dataset.theme = mode;
-    try {
-      localStorage.setItem('newtab:mode', mode);
-    } catch {
-      // only used to avoid a flash on the next load
+    if (mode !== shownMode) {
+      shownMode = mode;
+      root.dataset.theme = mode;
+      try {
+        localStorage.setItem('newtab:mode', mode);
+      } catch {
+        // only used to avoid a flash on the next load
+      }
     }
 
     const image = backgroundImage(p.background, store.wallpaper);
@@ -34,7 +39,11 @@ export function mountTheme(store) {
     };
     for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, String(value));
 
-    bg.style.backgroundImage = image ? cssUrl(image) : '';
+    // An uploaded wallpaper is a data URL of up to a few MB: only set it when it changes.
+    if (image !== shownImage) {
+      shownImage = image;
+      bg.style.backgroundImage = image ? cssUrl(image) : '';
+    }
 
     const cl = document.body.classList;
     cl.toggle('has-wallpaper', !!image);

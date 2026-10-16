@@ -32,8 +32,8 @@ export function moveTileToGroup(s, id, groupId) {
   if (i < 0 || s.tiles[i].groupId === groupId || !s.groups.some(g => g.id === groupId)) return;
   const tile = s.tiles[i];
   if (tile.folderId) removeFromFolder(s, id);
-  const moving = isFolder(tile) ? [tile, ...folderChildren(s, tile.id)] : [tile];
-  s.tiles = s.tiles.filter(t => !moving.includes(t));
+  const moving = new Set(isFolder(tile) ? [tile, ...folderChildren(s, tile.id)] : [tile]);
+  s.tiles = s.tiles.filter(t => !moving.has(t));
   moving.forEach(t => { t.groupId = groupId; });
   s.tiles.push(...moving);
 }
@@ -99,8 +99,8 @@ export function removeFromFolder(s, tileId) {
 // Removes a folder and puts its tiles, in order, where the folder was.
 export function dissolveFolder(s, folderId) {
   const children = folderChildren(s, folderId);
+  const rest = s.tiles.filter(t => t.folderId !== folderId);
   children.forEach(t => { delete t.folderId; });
-  const rest = s.tiles.filter(t => !children.includes(t));
   const at = rest.findIndex(t => t.id === folderId);
   if (at >= 0) rest.splice(at, 1, ...children);
   s.tiles = rest;

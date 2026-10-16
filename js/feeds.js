@@ -65,8 +65,8 @@ export function latestCommits(commits, limit) {
     .slice(0, limit);
 }
 
-// GitHub issue search results (is:pr) → PR rows.
-export function parsePulls(json) {
+// GitHub issue search results (is:pr or is:issue) → PR or issue rows.
+export function parseIssues(json) {
   if (!Array.isArray(json?.items)) return [];
   return json.items.map(i => ({
     title: String(i.title ?? ''),

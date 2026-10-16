@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCommits, latestCommits, parsePulls,
+  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCommits, latestCommits, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
   parseContributions, heatmapLayout,
 } from '../js/feeds.js';
@@ -106,10 +106,16 @@ test('heatmapLayout puts weeks in columns with Sunday on top, and labels months'
   assert.deepEqual(heatmapLayout(weeks).months, [{ col: 1, label: 'Nov' }, { col: 6, label: 'Dec' }]);
 });
 
-test('parsePulls reads search results into PR rows', () => {
-  const json = { items: [{ title: 'Fix login', number: 12, html_url: 'https://github.com/o/r/pull/12', repository_url: 'https://api.github.com/repos/o/r', updated_at: '2026-10-16T08:00:00Z', draft: true }] };
-  assert.deepEqual(parsePulls(json), [{ title: 'Fix login', number: 12, url: 'https://github.com/o/r/pull/12', repo: 'o/r', updatedAt: Date.parse('2026-10-16T08:00:00Z'), draft: true }]);
-  assert.deepEqual(parsePulls({ message: 'rate limited' }), []);
+test('parseIssues reads search results into PR and issue rows', () => {
+  const json = { items: [
+    { title: 'Fix login', number: 12, html_url: 'https://github.com/o/r/pull/12', repository_url: 'https://api.github.com/repos/o/r', updated_at: '2026-10-16T08:00:00Z', draft: true },
+    { title: 'Crash on start', number: 7, html_url: 'https://github.com/o/r/issues/7', repository_url: 'https://api.github.com/repos/o/r', updated_at: '2026-10-15T08:00:00Z' },
+  ] };
+  assert.deepEqual(parseIssues(json), [
+    { title: 'Fix login', number: 12, url: 'https://github.com/o/r/pull/12', repo: 'o/r', updatedAt: Date.parse('2026-10-16T08:00:00Z'), draft: true },
+    { title: 'Crash on start', number: 7, url: 'https://github.com/o/r/issues/7', repo: 'o/r', updatedAt: Date.parse('2026-10-15T08:00:00Z'), draft: false },
+  ]);
+  assert.deepEqual(parseIssues({ message: 'rate limited' }), []);
 });
 
 test('formatPrice adapts decimals to the size of the price', () => {

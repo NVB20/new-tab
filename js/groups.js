@@ -66,8 +66,11 @@ export function mountGroups(root, store) {
     );
   }
 
-  const clearMarks = () => root.querySelectorAll('.drop-target, .drop-before, .drop-after')
-    .forEach(n => n.classList.remove('drop-target', 'drop-before', 'drop-after'));
+  let marked = null;   // the tab showing a drop mark
+  const clearMarks = () => {
+    marked?.classList.remove('drop-target', 'drop-before', 'drop-after');
+    marked = null;
+  };
   const tabAt = e => e.target.closest?.('.group-tab');
   const isAfter = (tab, e) => {
     const r = tab.getBoundingClientRect();
@@ -90,6 +93,7 @@ export function mountGroups(root, store) {
     clearMarks();
     if (types.includes(TILE_MIME)) tab.classList.add('drop-target');
     else tab.classList.add(isAfter(tab, e) ? 'drop-after' : 'drop-before');
+    marked = tab;
   });
 
   root.addEventListener('dragleave', e => {

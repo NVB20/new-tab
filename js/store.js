@@ -3,6 +3,7 @@
 
 import { uid } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
+import { isDay, PRIORITIES } from './tasks.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
@@ -32,11 +33,24 @@ export const DEFAULT_PREFS = {
     // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')
     // and ECB currency pairs ('EUR/ILS'), in display order.
     markets: { enabled: true, items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] },
-    // token is optional (read-only) and only adds private repos' commits and PRs; never exported in backups.
-    github: { enabled: true, user: '', token: '' },
+    // show: which lists follow the open PRs, 'commits' | 'issues' | 'both'.
+    // token is optional (read-only) and only adds private repos' commits, issues and PRs; never exported in backups.
+    github: { enabled: true, user: '', token: '', show: 'both' },
   },
   sidebar: { enabled: true },
 };
+
+export const GITHUB_SHOW = ['commits', 'issues', 'both'];
+
+// theme is 'auto' | 'light' | 'dark' | 'blue' | 'github'; these two bring their own accent.
+export const THEME_ACCENTS = { blue: '#2563eb', github: '#238636' };
+const themeAccent = theme => THEME_ACCENTS[theme] ?? DEFAULT_PREFS.accent;
+
+// The accent follows the theme until the user picks a different one.
+export function setTheme(prefs, theme) {
+  if (prefs.accent === themeAccent(prefs.theme)) prefs.accent = themeAccent(theme);
+  prefs.theme = theme;
+}
 
 const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'prefs'];
 
@@ -100,12 +114,21 @@ export function normalizeState(raw) {
   for (const t of tiles) {
     if (t.folderId && (t.kind === 'folder' || folders.get(t.folderId)?.groupId !== t.groupId)) delete t.folderId;
   }
-  s.tiles = tiles.filter(t => t.kind !== 'folder' || tiles.some(c => c.folderId === t.id));
+  const used = new Set(tiles.map(t => t.folderId));
+  s.tiles = tiles.filter(t => t.kind !== 'folder' || used.has(t.id));
 
   s.activeGroupId = ids.has(raw.activeGroupId) ? raw.activeGroupId : s.groups[0].id;
   s.tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])
     .filter(t => isObj(t) && typeof t.text === 'string')
-    .map(t => ({ id: str(t.id) || uid(), text: t.text, done: !!t.done, createdAt: time(t.createdAt), doneAt: t.done ? time(t.doneAt) : null }));
+    .map(t => ({
+      id: str(t.id) || uid(),
+      text: t.text,
+      done: !!t.done,
+      createdAt: time(t.createdAt),
+      doneAt: t.done ? time(t.doneAt) : null,
+      due: isDay(t.due) ? t.due : null,
+      priority: PRIORITIES.includes(t.priority) ? t.priority : null,
+    }));
   s.taskHistory = (Array.isArray(raw.taskHistory) ? raw.taskHistory : [])
     .filter(t => isObj(t) && typeof t.text === 'string' && Number.isFinite(t.clearedAt))
     .map(t => ({ id: str(t.id) || uid(), text: t.text, createdAt: time(t.createdAt), doneAt: time(t.doneAt), clearedAt: t.clearedAt }));
@@ -114,6 +137,7 @@ export function normalizeState(raw) {
   s.notes = str(raw.notes);
   s.prefs = deepMerge(DEFAULT_PREFS, raw.prefs);
   s.prefs.widgets.markets = normalizeMarkets(raw.prefs?.widgets?.markets);
+  if (!GITHUB_SHOW.includes(s.prefs.widgets.github.show)) s.prefs.widgets.github.show = DEFAULT_PREFS.widgets.github.show;
   // Older versions had one switch that hid every widget; it becomes each widget switched off.
   if (!s.prefs.widgets.enabled) {
     for (const w of Object.values(s.prefs.widgets)) if (isObj(w)) w.enabled = false;
@@ -133,20 +157,44 @@ function normalizeMarkets(raw) {
 }
 
 export function pickAdapter() {
-  const area = globalThis.chrome?.storage?.local;
-  if (area) {
-    return {
-      get: async key => (await area.get(key))[key],
-      set: (key, value) => area.set({ [key]: value }),
-    };
-  }
-  return {
-    async get(key) {
+  const local = {
+    get(key) {
       const raw = localStorage.getItem('newtab:' + key);
       return raw == null ? undefined : JSON.parse(raw);
     },
-    async set(key, value) {
+    set(key, value) {
       localStorage.setItem('newtab:' + key, JSON.stringify(value));
+    },
+  };
+  const area = globalThis.chrome?.storage?.local;
+  if (!area) {
+    return {
+      get: async key => local.get(key),
+      set: async (key, value) => local.set(key, value),
+    };
+  }
+  return {
+    get: async key => (await area.get(key))[key],
+    set: (key, value) => area.set({ [key]: value }),
+    // A copy of the state in localStorage, which reads synchronously, so a new tab can render
+    // without waiting for chrome.storage. A failed write removes it rather than leave it stale.
+    cached() {
+      try {
+        return local.get('state');
+      } catch {
+        return undefined;
+      }
+    },
+    cache(value) {
+      try {
+        local.set('state', value);
+      } catch {
+        try {
+          localStorage.removeItem('newtab:state');
+        } catch {
+          // storage unavailable; chrome.storage still has everything
+        }
+      }
     },
   };
 }
@@ -156,9 +204,11 @@ export function createStore(adapter) {
   let wallpaper = '';
   let timer = null;
   let pending = null;
+  let edited = false;
   const subs = new Set();
 
   const snapshot = () => Object.fromEntries(KEYS.map(k => [k, JSON.stringify(state[k])]));
+  const readWallpaper = () => adapter.get('wallpaper').then(v => str(v), () => '');
 
   function notify(changed) {
     for (const sub of subs) {
@@ -166,27 +216,58 @@ export function createStore(adapter) {
     }
   }
 
+  function save() {
+    adapter.cache?.(state);
+    return adapter.set('state', state);
+  }
+
   function scheduleSave() {
     clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
-      pending = adapter.set('state', state);
+      pending = save();
     }, 200);
   }
 
+  // chrome.storage is the source of truth. If it disagrees with the localStorage copy the page
+  // started from (only after a failed copy, or an older version of the extension saving), its
+  // state replaces the copy, unless something was edited in the meantime.
+  async function verify() {
+    let fresh;
+    try {
+      fresh = await adapter.get('state');
+    } catch {
+      return;
+    }
+    if (fresh === undefined || edited) return;
+    const next = normalizeState(fresh);
+    if (JSON.stringify(next) === JSON.stringify(state)) return;
+    if (next.prefs.background.useUpload && !wallpaper) wallpaper = await readWallpaper();
+    if (edited) return;
+    state = next;
+    adapter.cache?.(state);
+    notify([...KEYS, 'wallpaper']);
+  }
+
   return {
+    // Resolves as soon as the state is known: straight away from the localStorage copy when
+    // there is one (chrome.storage is then checked in the background). The wallpaper, a data
+    // URL of up to a few MB, is only read when it is shown.
     async load() {
-      try {
-        state = normalizeState(await adapter.get('state'));
-      } catch (err) {
-        console.warn('Saved state unreadable, starting from defaults.', err);
-        state = defaultState();
+      const cached = adapter.cached?.();
+      if (cached !== undefined) {
+        state = normalizeState(cached);
+        verify();
+      } else {
+        try {
+          state = normalizeState(await adapter.get('state'));
+          adapter.cache?.(state);
+        } catch (err) {
+          console.warn('Saved state unreadable, starting from defaults.', err);
+          state = defaultState();
+        }
       }
-      try {
-        wallpaper = str(await adapter.get('wallpaper'));
-      } catch {
-        wallpaper = '';
-      }
+      wallpaper = state.prefs.background.useUpload ? await readWallpaper() : '';
       return state;
     },
 
@@ -203,12 +284,14 @@ export function createStore(adapter) {
       const after = snapshot();
       const changed = KEYS.filter(k => before[k] !== after[k]);
       if (!changed.length) return;
+      edited = true;
       scheduleSave();
       notify(changed);
     },
 
     replace(next) {
       state = normalizeState(next);
+      edited = true;
       scheduleSave();
       notify([...KEYS]);
     },
@@ -230,7 +313,7 @@ export function createStore(adapter) {
       if (timer) {
         clearTimeout(timer);
         timer = null;
-        await adapter.set('state', state);
+        await save();
       } else if (pending) {
         await pending;
       }

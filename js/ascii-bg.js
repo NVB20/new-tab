@@ -2,7 +2,7 @@
 // drift slowly, brighten softly around the mouse, and ripple outwards from a click on the page.
 // Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
 
-import { GLYPHS, hash2, streakField, falloff, ringOffset, level } from './ascii-field.js';
+import { GLYPHS, hash2, streakField, streakBlend, streakSway, falloff, ringOffset, level } from './ascii-field.js';
 import { backgroundImage } from './util.js';
 
 const CHARSET = GLYPHS;
@@ -28,7 +28,8 @@ const RIPPLE = { speed: 240, maxRadius: 480, thickness: 48 }; // px/s, px, px
 const NO_RIPPLE = 'a, button, input, textarea, select, label, summary, dialog, .menu, .sidebar, .widgets';
 
 // Resting letters are the theme's text colour at very low opacity, so they melt into the
-// background; hover light makes them brighter and slightly cooler; the click ripple is blue.
+// background; hover light makes them brighter and slightly cooler; the click ripple is blue
+// (green in the GitHub theme).
 const PALETTES = {
   dark: {
     ink: [250, 249, 245], field: [0.03, 0.12], glowTo: [196, 224, 244], glow: [0.06, 0.5],
@@ -37,6 +38,14 @@ const PALETTES = {
   light: {
     ink: [20, 20, 19], field: [0.04, 0.15], glowTo: [24, 92, 140], glow: [0.07, 0.55],
     blueFrom: [24, 120, 176], blueTo: [10, 82, 140], blue: [0.16, 0.8],
+  },
+  blue: {
+    ink: [214, 228, 255], field: [0.03, 0.12], glowTo: [170, 205, 255], glow: [0.06, 0.5],
+    blueFrom: [37, 99, 235], blueTo: [147, 197, 253], blue: [0.14, 0.8],
+  },
+  github: {
+    ink: [230, 237, 243], field: [0.03, 0.12], glowTo: [175, 235, 185], glow: [0.06, 0.5],
+    blueFrom: [35, 134, 54], blueTo: [86, 211, 100], blue: [0.14, 0.8],
   },
 };
 
@@ -50,7 +59,7 @@ export function mountAsciiBackground(canvas, store) {
   const seed = Math.floor(Math.random() * 1e6);
 
   let cols = 0, rows = 0, cw = 0, ch = 0, cwPx = 0, chPx = 0;
-  let chars, base, glow, fadeMs, blue, drawn;
+  let chars, base, glow, fadeMs, blue, drawn, blend, sway;
   let atlas = null;
   let mode = null;
   let enabled = false;
@@ -118,11 +127,14 @@ export function mountAsciiBackground(canvas, store) {
   // Recomputes the flowing streaks; letters that newly appear get a fresh glyph.
   function updateField() {
     const t = motion ? flowTime : 0;
-    for (let i = 0; i < cols * rows; i++) {
-      const v = streakField(i % cols, Math.floor(i / cols), t, seed);
-      if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
-      base[i] = v;
-      drawCell(i);
+    for (let c = 0; c < cols; c++) sway[c] = streakSway(c, t);
+    for (let r = 0, i = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++, i++) {
+        const v = streakField(c, r, t, seed, blend[i], sway[c]);
+        if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
+        base[i] = v;
+        drawCell(i);
+      }
     }
   }
 
@@ -145,9 +157,14 @@ export function mountAsciiBackground(canvas, store) {
     fadeMs = new Float32Array(n);
     blue = new Uint8Array(n);
     drawn = new Int16Array(n).fill(-2);
+    blend = new Float32Array(n);
+    sway = new Float32Array(cols);
     active.clear();
     ripples.length = 0;
-    for (let i = 0; i < n; i++) chars[i] = Math.floor(hash2(i % cols, Math.floor(i / cols), seed) * GLYPHS.length);
+    for (let i = 0; i < n; i++) {
+      chars[i] = Math.floor(hash2(i % cols, Math.floor(i / cols), seed) * GLYPHS.length);
+      blend[i] = streakBlend(i % cols, Math.floor(i / cols), seed);
+    }
     buildAtlas(dpr);
     updateField();
   }
@@ -257,7 +274,8 @@ export function mountAsciiBackground(canvas, store) {
   function sync() {
     const p = store.get().prefs;
     const want = p.background.pattern === 'ascii' && !backgroundImage(p.background, store.wallpaper);
-    const nextMode = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    const theme = document.documentElement.dataset.theme;
+    const nextMode = theme in PALETTES ? theme : 'dark';
 
     canvas.hidden = !want;
     document.body.classList.toggle('has-pattern', want);

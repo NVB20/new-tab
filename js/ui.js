@@ -1,6 +1,7 @@
 // Shared DOM helpers: element builder, icons, context menu, dialogs, tile icons.
 
 import { faviconUrl } from './chrome-api.js';
+import { localIcon } from './icon-cache.js';
 import { hostOf } from './util.js';
 
 export const TILE_MIME = 'application/x-newtab-tile';
@@ -49,6 +50,7 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
+  drop: '<path d="M12 3s-6 6.6-6 11a6 6 0 0 0 12 0c0-4.4-6-11-6-11z"/>',
   sliders: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
   palette: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.6 0-1.3-1-1.6-1-2.7 0-.9.7-1.4 1.6-1.4H17a4 4 0 0 0 4-4c0-4.6-4-8.3-9-8.3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7.2" r="1.2"/><circle cx="15" cy="7.8" r="1.2"/>',
   grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
@@ -62,14 +64,27 @@ const ICONS = {
   branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 4-4 5-8 6"/>',
   pr: '<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8M18 16V9a3 3 0 0 0-3-3h-4"/><path d="m13 4-2 2 2 2"/>',
   commit: '<circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/>',
+  issue: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   grip: '<g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></g>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  dot: '<circle cx="12" cy="12" r="5" fill="currentColor"/>',
+  circle: '<circle cx="12" cy="12" r="5"/>',
 };
 
+const iconCache = new Map();
+
+// Each icon's markup is parsed once per size; later calls clone it.
 export function icon(name, size = 18) {
-  const wrap = document.createElement('span');
-  wrap.innerHTML = `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] ?? ''}</svg>`;
-  return wrap.firstElementChild;
+  const key = `${name}:${size}`;
+  let svg = iconCache.get(key);
+  if (!svg) {
+    const wrap = document.createElement('span');
+    wrap.innerHTML = `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] ?? ''}</svg>`;
+    svg = wrap.firstElementChild;
+    iconCache.set(key, svg);
+  }
+  return svg.cloneNode(true);
 }
 
 // Image for a tile or link: custom icon → Chrome favicon → letter avatar.
@@ -86,9 +101,17 @@ export function tileIcon(url, iconUrl, title, { mini = false, preferSite = mini 
 
   const img = el('img', { class: mini ? 'mini-img' : 'tile-img', alt: '', draggable: false, decoding: 'async', referrerpolicy: 'no-referrer' });
   let i = 0;
+  // A custom icon link uses its saved copy when there is one; data-icon lets a copy saved
+  // later replace the image on screen.
+  const show = () => {
+    const src = candidates[i];
+    if (src === iconUrl) img.dataset.icon = src;
+    else delete img.dataset.icon;
+    img.src = localIcon(src) || src;
+  };
   img.addEventListener('error', () => {
     i += 1;
-    if (i < candidates.length) img.src = candidates[i];
+    if (i < candidates.length) show();
     else img.replaceWith(letter());
   });
   // Wide images get a wide box in the flat layout instead of shrinking into a square one.
@@ -96,9 +119,9 @@ export function tileIcon(url, iconUrl, title, { mini = false, preferSite = mini 
   // also cropped to their centre.
   img.addEventListener('load', () => {
     img.classList.toggle('wide', img.naturalWidth / img.naturalHeight > 1.3);
-    img.classList.toggle('banner', SD2_BANNER.test(img.currentSrc));
+    img.classList.toggle('banner', SD2_BANNER.test(candidates[i]));
   });
-  img.src = candidates[0];
+  show();
   return img;
 }
 
@@ -113,18 +136,22 @@ export function closeMenu() {
   menuEl = null;
 }
 
-// items: { label, icon?, action, danger? } | { heading } | { separator: true }
+// items: { label, icon?, action, danger?, className?, checked? } | { heading } | { separator: true }
+// checked (true or false) makes the item one of a set of choices, ticked when true.
 export function showMenu(x, y, items) {
   closeMenu();
   const menu = el('div', { class: 'menu', role: 'menu' }, items.map(item => {
     if (item.separator) return el('div', { class: 'menu-sep', role: 'separator' });
     if (item.heading) return el('div', { class: 'menu-heading', text: item.heading });
+    const choice = typeof item.checked === 'boolean';
     return el('button', {
-      class: 'menu-item' + (item.danger ? ' danger' : ''),
+      class: 'menu-item' + (item.danger ? ' danger' : '') + (item.className ? ' ' + item.className : ''),
       type: 'button',
-      role: 'menuitem',
+      role: choice ? 'menuitemradio' : 'menuitem',
+      'aria-checked': choice ? String(item.checked) : null,
       onclick: () => { closeMenu(); item.action(); },
-    }, item.icon && icon(item.icon, 16), el('span', { dir: 'auto', text: item.label }));
+    }, item.icon && icon(item.icon, 16), el('span', { dir: 'auto', text: item.label }),
+    item.checked && el('span', { class: 'menu-check' }, icon('check', 14)));
   }));
   menu.addEventListener('keydown', e => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
