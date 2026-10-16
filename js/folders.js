@@ -42,14 +42,12 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
     onkeydown: e => { if (e.key === 'Enter') nameInput.blur(); },
   });
   const grid = el('div', { class: 'grid folder-grid' });
-  const hint = el('p', { class: 'folder-hint', text: 'Drag a tile outside this window to take it out of the folder.' });
   const dialog = el('dialog', { class: 'dlg folder-dlg', 'aria-label': 'Folder' },
     el('div', { class: 'folder-head' },
       icon('folder', 18),
       nameInput,
       el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x'))),
-    grid,
-    hint);
+    grid);
 
   function render() {
     const s = store.get();
@@ -57,7 +55,9 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
       dialog.close();
       return;
     }
-    grid.replaceChildren(...folderChildren(s, folderId).map(t => tileNode(t, s.prefs)));
+    const children = folderChildren(s, folderId);
+    grid.style.setProperty('--folder-cols', String(Math.min(5, Math.max(1, children.length))));
+    grid.replaceChildren(...children.map(t => tileNode(t, s.prefs)));
   }
 
   // ---- drag: reorder inside, or drop outside the window to take the tile out ----
@@ -66,7 +66,6 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
     .forEach(n => n.classList.remove('drop-before', 'drop-after'));
   const setOutside = on => {
     dialog.classList.toggle('drag-out', on);
-    hint.textContent = on ? 'Release to take it out of the folder' : 'Drag a tile outside this window to take it out of the folder.';
   };
 
   grid.addEventListener('dragstart', e => {

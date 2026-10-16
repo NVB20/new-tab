@@ -470,9 +470,10 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .tile.drop-into .tile-thumb { transform: scale(1.08); }
 .tile.drop-into { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.folder-dlg { width: min(620px, calc(100vw - 32px)); padding: 18px 20px 14px; transition: box-shadow 0.15s; }
+/* The window fits its tiles: fixed-width columns, at most five per row. */
+.folder-dlg { width: fit-content; min-width: 300px; max-width: calc(100vw - 32px); padding: 16px 18px 18px; transition: box-shadow 0.15s; }
 .folder-dlg.drag-out { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
-.folder-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--muted); }
+.folder-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--muted); }
 .folder-name {
   flex: 1;
   min-width: 0;
@@ -487,8 +488,11 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 }
 .folder-name:hover { border-color: var(--border); }
 .folder-name:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.folder-grid { --cols: 4; }
-.folder-hint { margin: 12px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+.folder-grid {
+  grid-template-columns: repeat(var(--folder-cols, 3), 104px);
+  gap: 6px 10px;
+  justify-content: center;
+}
 
 .grid-empty { grid-column: 1 / -1; margin: 40px 0; text-align: center; color: var(--muted); }
 
