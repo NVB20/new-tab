@@ -259,6 +259,13 @@ test('prefsSection says where Preferences keeps a type’s settings', () => {
   assert.equal(prefsSection('weather'), 'layout');   // an unknown type falls back to its own group
 });
 
+test('Tasks: a view and whether Finished is open, cleaned to valid values', () => {
+  assert.deepEqual(TYPES.tasks.defaults(), { view: 'all', showDone: false });
+  assert.deepEqual(TYPES.tasks.clean({}), { view: 'all', showDone: false });
+  assert.deepEqual(TYPES.tasks.clean({ view: 'upcoming', showDone: true }), { view: 'upcoming', showDone: true });
+  assert.deepEqual(TYPES.tasks.clean({ view: 'someday', showDone: 'yes' }), { view: 'all', showDone: false });
+});
+
 test('Sports: its own settings, never added to an old page, kept by Reset layout under Markets and GitHub', () => {
   assert.deepEqual(TYPES.sports.defaults(), { follow: ['soccer:20232', 'soccer:202', 'f1'], f1Sessions: ['sprint', 'qualifying', 'race'], edited: false });
   assert.deepEqual(TYPES.sports.clean({ follow: ['nba:13', 'junk'] }).follow, ['nba:13']);

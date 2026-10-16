@@ -6,6 +6,7 @@ import { uid, clamp } from './util.js';
 import { cleanMarketItems } from './feeds.js';
 import { cleanSports } from './sports.js';
 import { siteUrl, siteDomain } from './website.js';
+import { VIEWS as TASK_VIEWS } from './tasks.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -36,7 +37,11 @@ export const TYPES = {
       colon: bool(s.colon, true),
     }),
   },
-  tasks: { label: 'Tasks', icon: 'check-circle', size: [3, 4], min: [2, 3], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
+  tasks: {
+    label: 'Tasks', icon: 'check-circle', size: [3, 4], min: [2, 3], max: 1, prefs: null,
+    defaults: () => ({ view: 'all', showDone: false }),
+    clean: s => ({ view: TASK_VIEWS.includes(s.view) ? s.view : 'all', showDone: bool(s.showDone, false) }),
+  },
   notes: { label: 'Notes', icon: 'note', size: [3, 3], min: [2, 2], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
   claude: { label: 'Claude', icon: 'claude', size: [3, 2], min: [2, 2], max: 5, prefs: null, defaults: () => ({}), clean: () => ({}) },
   markets: {
