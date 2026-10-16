@@ -86,13 +86,24 @@ test('normalizeState keeps task timestamps, history and daily counts, dropping j
     taskStats: { '2026-10-16': 4, '2026-10-15': -1, nonsense: 2, '2026-10-14': 'x' },
   });
   assert.deepEqual(s.tasks, [
-    { id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9 },
-    { id: 'u', text: 'old task', done: false, createdAt: null, doneAt: null },
+    { id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9, due: null, priority: null },
+    { id: 'u', text: 'old task', done: false, createdAt: null, doneAt: null, due: null, priority: null },
   ]);
   assert.deepEqual(s.taskHistory, [{ id: 'h', text: 'x', createdAt: 1, doneAt: 2, clearedAt: 3 }]);
   assert.deepEqual(s.taskStats, { '2026-10-16': 4 });
   assert.deepEqual(normalizeState(null).taskStats, {});
   assert.deepEqual(normalizeState(null).taskHistory, []);
+});
+
+test('normalizeState keeps valid due dates and priorities and drops invalid ones', () => {
+  const s = normalizeState({
+    tasks: [
+      { id: 'a', text: 'a', due: '2026-10-20', priority: 'high' },
+      { id: 'b', text: 'b', due: 'tomorrow', priority: 'urgent' },
+      { id: 'c', text: 'c', due: 20261020, priority: 1 },
+    ],
+  });
+  assert.deepEqual(s.tasks.map(t => [t.due, t.priority]), [['2026-10-20', 'high'], [null, null], [null, null]]);
 });
 
 test('normalizeState keeps folders and their tiles, and repairs broken folder links', () => {

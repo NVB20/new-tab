@@ -49,7 +49,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
 | **GitHub** | Your contribution heatmap, latest commits and open pull requests, including private repos with a token. |
 | **Clock** | Five One UI–style faces, from a slim classic clock to big stacked stencil digits. |
-| **Tasks and notes** | A to-do list with a week of finished-task history, and a notes pad. |
+| **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -155,9 +155,14 @@ should, the widget says why (for example, missing *Contents* access or org appro
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar:** the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
-- **Tasks:** Enter adds a task; tick to finish. **Clear done** (next to the heading) removes
-  finished tasks. Finished tasks are kept in a history for 7 days, and the number completed per day
-  is kept for good (counted on the day you tick it; unticking takes it back).
+- **Tasks:** Enter adds a task; tick to finish. Right-click a task to give it a due date (today,
+  tomorrow or any date), a priority (high, medium or low, shown as a red, amber or blue ring), to
+  edit its text or delete it. The due date shows on the right as *Today*, *Tomorrow*, a weekday or a
+  date, in red once it has passed. Drag tasks to reorder them; **Sort** (next to the heading) puts
+  them in order once (unfinished first, then by due date, then priority) and you can keep dragging
+  after. **Clear done** removes finished tasks. Finished tasks are kept in a history for 7 days, and
+  the number completed per day is kept for good (counted on the day you tick it; unticking takes it
+  back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. The faces' fonts are bundled in `fonts/`

@@ -63,6 +63,9 @@ const ICONS = {
   pr: '<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8M18 16V9a3 3 0 0 0-3-3h-4"/><path d="m13 4-2 2 2 2"/>',
   commit: '<circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  dot: '<circle cx="12" cy="12" r="5" fill="currentColor"/>',
+  circle: '<circle cx="12" cy="12" r="5"/>',
 };
 
 export function icon(name, size = 18) {
@@ -112,18 +115,22 @@ export function closeMenu() {
   menuEl = null;
 }
 
-// items: { label, icon?, action, danger? } | { heading } | { separator: true }
+// items: { label, icon?, action, danger?, className?, checked? } | { heading } | { separator: true }
+// checked (true or false) makes the item one of a set of choices, ticked when true.
 export function showMenu(x, y, items) {
   closeMenu();
   const menu = el('div', { class: 'menu', role: 'menu' }, items.map(item => {
     if (item.separator) return el('div', { class: 'menu-sep', role: 'separator' });
     if (item.heading) return el('div', { class: 'menu-heading', text: item.heading });
+    const choice = typeof item.checked === 'boolean';
     return el('button', {
-      class: 'menu-item' + (item.danger ? ' danger' : ''),
+      class: 'menu-item' + (item.danger ? ' danger' : '') + (item.className ? ' ' + item.className : ''),
       type: 'button',
-      role: 'menuitem',
+      role: choice ? 'menuitemradio' : 'menuitem',
+      'aria-checked': choice ? String(item.checked) : null,
       onclick: () => { closeMenu(); item.action(); },
-    }, item.icon && icon(item.icon, 16), el('span', { dir: 'auto', text: item.label }));
+    }, item.icon && icon(item.icon, 16), el('span', { dir: 'auto', text: item.label }),
+    item.checked && el('span', { class: 'menu-check' }, icon('check', 14)));
   }));
   menu.addEventListener('keydown', e => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;

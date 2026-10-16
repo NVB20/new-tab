@@ -3,6 +3,7 @@
 
 import { uid } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
+import { isDay, PRIORITIES } from './tasks.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
@@ -102,7 +103,15 @@ export function normalizeState(raw) {
   s.activeGroupId = ids.has(raw.activeGroupId) ? raw.activeGroupId : s.groups[0].id;
   s.tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])
     .filter(t => isObj(t) && typeof t.text === 'string')
-    .map(t => ({ id: str(t.id) || uid(), text: t.text, done: !!t.done, createdAt: time(t.createdAt), doneAt: t.done ? time(t.doneAt) : null }));
+    .map(t => ({
+      id: str(t.id) || uid(),
+      text: t.text,
+      done: !!t.done,
+      createdAt: time(t.createdAt),
+      doneAt: t.done ? time(t.doneAt) : null,
+      due: isDay(t.due) ? t.due : null,
+      priority: PRIORITIES.includes(t.priority) ? t.priority : null,
+    }));
   s.taskHistory = (Array.isArray(raw.taskHistory) ? raw.taskHistory : [])
     .filter(t => isObj(t) && typeof t.text === 'string' && Number.isFinite(t.clearedAt))
     .map(t => ({ id: str(t.id) || uid(), text: t.text, createdAt: time(t.createdAt), doneAt: time(t.doneAt), clearedAt: t.clearedAt }));

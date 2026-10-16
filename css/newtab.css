@@ -379,6 +379,23 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 .task-del { width: 24px; height: 24px; border-radius: 6px; opacity: 0; }
 .task:hover .task-del, .task-del:focus-visible { opacity: 1; }
 
+/* Priority colours the checkbox ring (and the dots in the task menu). */
+:root { --prio-high: #e5534b; --prio-medium: #d4a72c; --prio-low: #4c8df6; }
+.task.prio-high:not(.done) .task-check { border-color: var(--prio-high); }
+.task.prio-medium:not(.done) .task-check { border-color: var(--prio-medium); }
+.task.prio-low:not(.done) .task-check { border-color: var(--prio-low); }
+.menu-item.prio-high .icon { color: var(--prio-high); }
+.menu-item.prio-medium .icon { color: var(--prio-medium); }
+.menu-item.prio-low .icon { color: var(--prio-low); }
+
+.task-due { flex: none; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.task-due.overdue { color: var(--danger); }
+.task-edit { flex: 1; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid var(--accent); background: none; font: inherit; outline: none; }
+.task.dragging { opacity: 0.4; }
+.task.drop-before { box-shadow: inset 0 2px var(--accent); }
+.task.drop-after { box-shadow: inset 0 -2px var(--accent); }
+.task-actions { display: inline-flex; gap: 10px; }
+
 .task-add { display: flex; align-items: center; gap: 10px; padding: 5px 0; color: var(--muted); cursor: text; }
 
 .task-input, .notes-input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; outline: none; }
@@ -610,6 +627,8 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .menu-item.danger, .menu-item.danger .icon { color: var(--danger); }
 .menu-heading { padding: 6px 10px 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .menu-sep { height: 1px; margin: 5px 4px; background: var(--border); }
+.menu-check { display: inline-flex; margin-left: auto; }
+.menu-item .menu-check .icon { color: var(--accent); }
 
 /* ---------- Dialogs and form controls ---------- */
 
