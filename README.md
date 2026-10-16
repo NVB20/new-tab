@@ -56,7 +56,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
-| **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
+| **Tasks and notes** | A to-do list with importance flags, due dates, repeats, subtasks, Today / Upcoming / High views, search, quick-add shorthand and a week of finished-task history, and a notes pad. |
 | **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
@@ -358,14 +358,20 @@ rearrange them.
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar:** the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
-- **Tasks:** Enter adds a task; tick to finish. Right-click a task to give it a due date (today,
-  tomorrow or any date), a priority (high, medium or low, shown as a red, amber or blue ring), to
-  edit its text or delete it. The due date shows on the right as *Today*, *Tomorrow*, a weekday or a
-  date, in red once it has passed. Drag tasks to reorder them; **Sort** (next to the heading) puts
-  them in order once (unfinished first, then by due date, then priority) and you can keep dragging
-  after. **Clear done** removes finished tasks. Finished tasks are kept in a history for 7 days, and
-  the number completed per day is kept for good (counted on the day you tick it; unticking takes it
-  back).
+- **Tasks:** type in the add bar and press Enter; tick to finish. Shorthand at the end of the text
+  sets the date and repeat (`today`, `tomorrow`, `fri`, `next week`, `in 3 days`, `oct 30`,
+  `every monday`, `daily`, `weekdays`, `weekly`, `monthly`, `yearly`), and `!high` / `!med` /
+  `!low` anywhere sets the importance. The add bar's flag and calendar buttons show what Enter will
+  set, or set it themselves. On a task, click the text to retype it, the flag to change its
+  importance (High red, Medium amber, Low blue), and **⌄** (or right-click) for the details tray:
+  importance, due date, repeat, subtasks and Delete. The due date shows as *Today*, *Tomorrow*, a
+  weekday or a date, in red once it has passed. Ticking a repeating task moves it on to its next
+  date (an overdue daily one to tomorrow) and counts it as finished today. The tabs show **All**,
+  **Today** (due today or overdue, with a count), **Upcoming** (by date) and **High**; ⌕ searches
+  every task and subtask. Drag to reorder (not in Upcoming); **Sort** puts them in order once
+  (by due date, then importance). Finished tasks fold under **Finished** at the bottom of All, and
+  **Clear** removes them. Finished tasks are kept in a history for 7 days, and the number completed
+  per day is kept for good (counted on the day you tick it; unticking takes it back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set under Preferences → Layout → Clock. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
