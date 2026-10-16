@@ -174,8 +174,9 @@ The widget shows:
   commented on or are mentioned in. They're always at the top.
 - **Your open issues:** the five most recently updated open issues you opened, are assigned to,
   commented on or are mentioned in, in any repo (archived repos are left out).
-- **Your latest commits:** the six newest, across every repo and organisation you've committed
-  to (default branches). Private repos get a lock icon.
+- **Your latest commits:** the newest, as many as fill the widget down to its bottom (at least
+  six), across every repo and organisation you've committed to (default branches). Private repos
+  get a lock icon.
 
 Which of these a copy shows is up to its four switches under Preferences → Layout. Everything is
 fetched either way, so switching is instant, and every copy shares one fetch an hour.
