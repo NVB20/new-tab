@@ -310,7 +310,8 @@ export function mountAsciiBackground(canvas, store) {
 
   function sync() {
     const p = store.get().prefs;
-    const want = p.background.pattern === 'ascii' && !backgroundImage(p.background, store.wallpaper);
+    // Not while an uploaded wallpaper is still being read (null): it's about to cover the page.
+    const want = p.background.pattern === 'ascii' && backgroundImage(p.background, store.wallpaper) === '';
     const theme = document.documentElement.dataset.theme;
     const nextMode = theme in PALETTES ? theme : 'dark';
 

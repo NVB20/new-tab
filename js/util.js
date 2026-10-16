@@ -9,6 +9,7 @@ export function clamp(n, min, max) {
 }
 
 // The image shown behind the page, or '' when the ASCII or plain background shows instead.
+// wallpaper is null while the uploaded one is still being read, and so is the result then.
 export function backgroundImage(background, wallpaper) {
   if (!background.showImage) return '';
   return background.useUpload ? wallpaper : background.url;

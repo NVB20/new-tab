@@ -11,6 +11,8 @@ function memoryAdapter(initial = {}) {
   };
 }
 
+const settle = () => new Promise(resolve => setTimeout(resolve));
+
 test('deepMerge keeps defaults for missing keys', () => {
   const out = deepMerge({ a: 1, b: { c: 2, d: 3 } }, { b: { c: 9 } });
   assert.deepEqual(out, { a: 1, b: { c: 9, d: 3 } });
@@ -269,14 +271,81 @@ test('store reads the wallpaper only when it is shown', async () => {
   const get = adapter.get;
   adapter.get = key => { reads.push(key); return get(key); };
   await createStore(adapter).load();
+  await settle();
+  assert.deepEqual(reads, ['state']);
+
+  // Uploaded but hidden behind the ASCII background: still not read.
+  adapter.data.state = { prefs: { background: { useUpload: true, showImage: false } } };
+  reads.length = 0;
+  await createStore(adapter).load();
+  await settle();
   assert.deepEqual(reads, ['state']);
 
   adapter.data.state = { prefs: { background: { useUpload: true } } };
   reads.length = 0;
   const store = createStore(adapter);
+  let hits = 0;
+  store.subscribe(() => hits++, ['wallpaper']);
   await store.load();
+  await settle();
   assert.deepEqual(reads, ['state', 'wallpaper']);
   assert.equal(store.wallpaper, 'data:image/png;base64,AAAA');
+  assert.equal(hits, 1);
+});
+
+test('store doesn’t wait for the wallpaper to load', async () => {
+  const adapter = memoryAdapter({ state: { prefs: { background: { useUpload: true } } } });
+  const get = adapter.get;
+  adapter.get = key => (key === 'wallpaper' ? new Promise(() => {}) : get(key));   // a slow read
+  const store = createStore(adapter);
+  await store.load();
+  assert.equal(store.get().prefs.background.useUpload, true);
+  assert.equal(store.wallpaper, null);   // not read yet
+});
+
+test('store reads the wallpaper once it is shown again', async () => {
+  const adapter = memoryAdapter({ wallpaper: 'data:image/png;base64,AAAA', state: { prefs: { background: { useUpload: true, showImage: false } } } });
+  const store = createStore(adapter);
+  await store.load();
+  let hits = 0;
+  store.subscribe(() => hits++, ['wallpaper']);
+  store.update(s => { s.prefs.background.showImage = true; });
+  await settle();
+  assert.equal(store.wallpaper, 'data:image/png;base64,AAAA');
+  assert.equal(hits, 1);
+});
+
+test('store.loadWallpaper reads a hidden wallpaper, for a backup', async () => {
+  const adapter = memoryAdapter({ wallpaper: 'data:image/png;base64,AAAA', state: { prefs: { background: { useUpload: true, showImage: false } } } });
+  const store = createStore(adapter);
+  await store.load();
+  assert.equal(await store.loadWallpaper(), 'data:image/png;base64,AAAA');
+  assert.equal(await createStore(memoryAdapter()).loadWallpaper(), '');
+});
+
+test('store.setWallpaper wins over a read still on its way', async () => {
+  let answer;
+  const adapter = memoryAdapter({ state: { prefs: { background: { useUpload: true } } } });
+  const get = adapter.get;
+  adapter.get = key => (key === 'wallpaper' ? new Promise(r => { answer = r; }) : get(key));
+  const store = createStore(adapter);
+  await store.load();
+  await store.setWallpaper('data:image/png;base64,NEW');
+  answer('data:image/png;base64,OLD');
+  await settle();
+  assert.equal(store.wallpaper, 'data:image/png;base64,NEW');
+});
+
+test('store.update with keys compares only those', async () => {
+  const store = createStore(memoryAdapter());
+  await store.load();
+  const seen = [];
+  store.subscribe((s, changed) => seen.push(changed));
+  store.update(s => { s.notes = 'typed'; }, ['notes']);
+  store.update(s => { s.notes = 'typed'; }, ['notes']);   // unchanged: nobody is told
+  store.update(s => { s.prefs.spacing = 12; }, ['prefs']);
+  assert.deepEqual(seen, [['notes'], ['prefs']]);
+  assert.equal(store.get().notes, 'typed');
 });
 
 // Like the extension's adapter: chrome.storage plus a synchronous localStorage copy of the state.
@@ -287,8 +356,6 @@ function cachingAdapter(initial = {}, copy = undefined) {
   adapter.cache = value => { adapter.copy = structuredClone(value); };
   return adapter;
 }
-
-const settle = () => new Promise(resolve => setTimeout(resolve));
 
 test('store loads from the localStorage copy without waiting for chrome.storage', async () => {
   const adapter = cachingAdapter({}, { notes: 'from copy' });
