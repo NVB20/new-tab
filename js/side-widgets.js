@@ -44,7 +44,8 @@ export function mountSideWidgets(root, store) {
   // The heading opens the user's GitHub profile.
   const githubLink = el('a', { class: 'widget-head-link', title: 'Open your GitHub profile' },
     icon('branch', 18), el('span', { text: 'GitHub' }), icon('external', 13));
-  const githubHead = el('h2', { class: 'widget-head' }, githubLink);
+  const githubStatus = el('span', { class: 'widget-head-status', title: 'Checked at most once an hour' });
+  const githubHead = el('h2', { class: 'widget-head' }, githubLink, githubStatus);
   const github = el('section', { class: 'widget widget-github' }, githubHead, githubBody);
   root.append(markets, github);
 
@@ -175,23 +176,22 @@ export function mountSideWidgets(root, store) {
           title: `${c.repo} @ ${c.sha}${c.private ? ' (private)' : ''}\n${c.message}`,
         }))
         : [empty('No commits found.')]));
+      // Only speak up about the token when it isn't working.
       const t = data.tokenInfo;
-      if (t) {
+      if (t && (!t.privateRepos || t.unreadable)) {
         parts.push(el('p', {
           class: 'widget-note',
           text: !t.privateRepos
             ? `Token works but sees no private repos in ${t.owners.join(', ')}. It needs Contents: read-only, and an organisation may still have to approve it.`
-            : t.unreadable
-              ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only.`
-              : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}.`,
+            : `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only.`,
         }));
       }
     }
-    // GitHub is checked at most once an hour; Refresh skips the wait (e.g. after changing the token).
-    parts.push(el('p', { class: 'widget-note' },
-      at ? `Updated ${timeAgo(at) === 'now' ? 'just now' : `${timeAgo(at)} ago`} · ` : '',
-      el('button', { type: 'button', class: 'link-btn', text: 'Refresh', onclick: () => loadGithub(true) })));
     githubBody.replaceChildren(...parts);
+    // GitHub is checked at most once an hour; Refresh skips the wait (e.g. after changing the token).
+    githubStatus.replaceChildren(
+      at ? `${timeAgo(at) === 'now' ? 'just now' : `${timeAgo(at)} ago`} · ` : '',
+      el('button', { type: 'button', class: 'link-btn', text: 'Refresh', title: 'Fetch from GitHub now', onclick: () => loadGithub(true) }));
   }
 
   let githubSeq = 0;
