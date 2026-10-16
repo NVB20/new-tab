@@ -109,7 +109,8 @@ or `Final` when none is known.
   teams**" (opens the editor) until its editor has been opened once (`settings.edited`).
 - A source that fails keeps its last data and adds one muted line under the list: "ESPN
   unreachable · data from 3h ago" (or "Jolpica …"). With no saved data, the line names what's
-  missing ("Couldn't load the Lakers' schedule"). Other sources are unaffected.
+  missing ("Couldn't load the schedule for Los Angeles Lakers", "Couldn't load the F1
+  calendar"). Other sources are unaffected.
 
 ### Narrow widget
 
@@ -161,15 +162,18 @@ and a failure isn't retried before the TTL.
 | `sports-v1:f1:last` | round and top three of the latest race | 1 h |
 | `sports-v1:live:<sport>/<league>:<YYYYMMDD>` | live states and scores by event id | 30 s |
 
-- Parsed data only goes into the cache, trimmed to finished games of the last 3 days and games of
-  the next 60 days (at least the next one), so large responses (Inter Miami's results are about
-  540 KB) don't fill `localStorage`.
-- A league's scoreboard is fetched only while the tab is visible and a followed team game in that
-  league has started and is either in its live window or finished without a known score (a game
-  that ended while no tab was open gets its final score from one fetch). A 30-second interval runs
-  while any game is in its live window. Otherwise the widget redraws once a minute (for the day
-  headings, live windows and finished games dropping off) and reloads schedules when their TTL has
-  passed.
+- Parsed data only goes into the cache, trimmed to games from 3 days ago to 60 days ahead (plus
+  the next one when none is sooner), so large responses (Inter Miami's results are about 540 KB)
+  don't fill `localStorage`. Scoreboard entries are one per league and day; on mount the widget
+  removes those more than 3 days old (`sweep` in `net.js`).
+- A league's scoreboard for a day is read for followed team games that have started, are still
+  listed and aren't known to be final. It is refreshed every 30 s while one of them may be under
+  way (within twice its usual length), hourly for a game that ended by the clock without a final
+  score yet (a game that ended while no tab was open gets its score from the first of those), and
+  not at all once its saved copy says every game is final.
+- While the tab is visible the widget ticks every 30 seconds: it redraws (day headings, live
+  windows, finished games dropping off) and reloads whatever the cache says is due, so network
+  requests happen only when a TTL has passed.
 - The F1 result is fetched once a race's usual end has passed and the saved result is for an
   earlier round.
 - A finished game's score comes from the live scoreboard when it was seen, else from the team's
