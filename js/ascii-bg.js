@@ -1,7 +1,7 @@
 // Animated ASCII background: a dim field of letters that scrambles slowly and lights up blue
 // around the mouse. Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
 
-import { GLYPHS, hash2, density, falloff, level } from './ascii-field.js';
+import { GLYPHS, hash2, valueNoise, density, falloff, level } from './ascii-field.js';
 
 const FONT = '"Cascadia Mono", Consolas, "SF Mono", Menlo, monospace';
 const FONT_SIZE = 12;
@@ -9,8 +9,8 @@ const CELL_W = 8.2;
 const CELL_H = 14;
 const GRAY_LEVELS = 8;
 const BLUE_LEVELS = 10;
-const RADIUS = 240;          // px around the cursor that lights up
-const DECAY_MS = 650;        // how fast the glow fades behind the cursor
+const RADIUS = 120;          // typical px around the cursor that lights up (the edge wobbles ±45%)
+const DECAY_MS = 500;        // how fast the glow fades behind the cursor
 const IDLE_AFTER_MS = 2500;  // a still mouse stops lighting cells
 const ACTIVE_FRAME_MS = 1000 / 40;
 const IDLE_FRAME_MS = 1000 / 12;
@@ -117,19 +117,25 @@ export function mountAsciiBackground(canvas, store) {
     drawAll();
   }
 
-  function lightAroundPointer() {
+  // Lights a scattered, irregular patch around the cursor: the edge wobbles with drifting noise
+  // and only some cells catch the light, so it doesn't read as a clean circle.
+  function lightAroundPointer(now) {
     const { x, y } = pointer;
-    const c0 = Math.max(0, Math.floor((x - RADIUS) / cw));
-    const c1 = Math.min(cols - 1, Math.ceil((x + RADIUS) / cw));
-    const r0 = Math.max(0, Math.floor((y - RADIUS) / ch));
-    const r1 = Math.min(rows - 1, Math.ceil((y + RADIUS) / ch));
+    const reach = RADIUS * 1.45;
+    const drift = now / 1500;
+    const c0 = Math.max(0, Math.floor((x - reach) / cw));
+    const c1 = Math.min(cols - 1, Math.ceil((x + reach) / cw));
+    const r0 = Math.max(0, Math.floor((y - reach) / ch));
+    const r1 = Math.min(rows - 1, Math.ceil((y + reach) / ch));
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        const f = falloff(Math.hypot(c * cw + cw / 2 - x, r * ch + ch / 2 - y), RADIUS) * (0.65 + 0.35 * Math.random());
-        if (f <= 0) continue;
+        const edge = 0.55 + 0.9 * valueNoise(c / 3 + drift, r / 2 - drift, seed + 1);
+        const f = falloff(Math.hypot(c * cw + cw / 2 - x, r * ch + ch / 2 - y), RADIUS * edge);
+        if (f <= 0 || Math.random() > 0.25 + 0.6 * f) continue;
+        const strength = f * (0.35 + 0.65 * Math.random());
         const i = r * cols + c;
-        if (f > glow[i]) {
-          glow[i] = f;
+        if (strength > glow[i]) {
+          glow[i] = strength;
           active.add(i);
         }
         if (Math.random() < f * 0.3) chars[i] = randomGlyph();
@@ -145,7 +151,7 @@ export function mountAsciiBackground(canvas, store) {
     const dt = Math.min(120, now - lastFrame);
     lastFrame = now;
 
-    if (pointer) lightAroundPointer();
+    if (pointer) lightAroundPointer(now);
 
     const keep = Math.exp(-dt / DECAY_MS);
     for (const i of active) {
