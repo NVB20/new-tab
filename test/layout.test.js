@@ -145,16 +145,23 @@ test('addCopy takes the default size, else the minimum, else refuses; duplicates
   assert.equal(duplicateCopy(l, 'nope'), null);
 });
 
-test('a new tiles copy is pinned to the first group no block shows', () => {
-  const l = { cols: COLS, rows: ROWS, widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: null, columns: 5, bar: null } }] };
-  const groups = [{ id: 'g1' }, { id: 'g2' }];
-  const a = addCopy(l, 'tiles', undefined, groups);
-  assert.equal(a.settings.group, 'g1');
-  const b = duplicateCopy(l, 't', groups);
-  assert.equal(b.settings.group, 'g2');
-  assert.equal(b.settings.columns, 5);
-  const c = addCopy(l, 'tiles', undefined, groups);
+test('a new tiles copy is pinned to the first group no block shows; a block following the tabs shows the active one', () => {
+  const l = { cols: COLS, rows: ROWS, widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: null, columns: 4, bar: 0 } }] };
+  const groups = [{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }];
+  const a = addCopy(l, 'tiles', undefined, groups, 'g1');
+  assert.equal(a.settings.group, 'g2');
+  assert.deepEqual(rect(a), [3, 0, 6, 6]);
+  assert.equal(a.settings.columns, 5);   // columns suit the width: 6 wide → 5
+  const b = duplicateCopy(l, 't', groups, 'g1');
+  assert.equal(b.settings.group, 'g3');
+  assert.equal(b.settings.bar, null);    // a duplicate block starts without a bar
+  const c = addCopy(l, 'tiles', undefined, groups, 'g1');
   assert.equal(c.settings.group, null);
+  // A narrow spot gets fewer columns.
+  const n = { cols: COLS, rows: ROWS, widgets: [{ id: 'big', type: 'tiles', x: 0, y: 0, w: 9, h: 12, settings: { group: null, columns: 5, bar: null } }] };
+  const d = addCopy(n, 'tiles', undefined, groups, 'g1');
+  assert.deepEqual(rect(d), [9, 0, 3, 3]);
+  assert.equal(d.settings.columns, 3);
 });
 
 test('moveCopy refuses overlaps, the edge and sizes under the minimum', () => {

@@ -216,13 +216,15 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
 .widget-tiles { display: flex; flex-direction: column; }
 .tiles-head { flex: none; }
 .widget-tiles .grid-wrap { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
+.widget-tiles .grid-wrap.more-below { mask-image: linear-gradient(#000 calc(100% - 36px), transparent); -webkit-mask-image: linear-gradient(#000 calc(100% - 36px), transparent); }
 .grid-wrap {
   display: grid;
   grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
   align-content: start;
   gap: var(--gap);
 }
-body.center-v .grid-wrap { align-content: center; }
+/* "safe": a block too short for its tiles scrolls from the top instead of hiding the first rows. */
+body.center-v .grid-wrap { align-content: safe center; }
 
 /* ---------- Search bar ---------- */
 
@@ -1112,6 +1114,7 @@ body.layout-editing .widget-frame:focus-visible { outline: 2px solid var(--accen
 body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
 .widget-frame.lifted { z-index: 6; cursor: grabbing; box-shadow: var(--shadow); outline-color: var(--accent); background: var(--surface); }
 .widget-frame.lifted .widget-root { opacity: 0.9; }
+.widget-frame.lifted.bad { outline-color: var(--danger); }
 
 .frame-label {
   position: absolute;

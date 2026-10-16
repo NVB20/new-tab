@@ -176,33 +176,44 @@ export function normalizeLayout(raw, state) {
 
 // ---- what Layout mode does ----
 
-// The first group no tiles block is pinned to, or null (follow the tabs).
-function unshownGroup(layout, groups) {
-  const shown = new Set(layout.widgets.filter(c => c.type === 'tiles').map(c => c.settings.group));
+// The first group no tiles block shows (a block that follows the tabs shows the active group),
+// or null (follow the tabs).
+function unshownGroup(layout, groups, activeGroupId) {
+  const shown = new Set(layout.widgets.filter(c => c.type === 'tiles').map(c => c.settings.group ?? activeGroupId));
   return groups.find(g => !shown.has(g.id))?.id ?? null;
 }
 
 // Adds a copy at the first spot that takes its default size, else its minimum size. Returns the
-// copy, or null when the type is at its limit or nothing fits.
-export function addCopy(layout, type, settings, groups = []) {
+// copy, or null when the type is at its limit or nothing fits. A new tiles block is pinned to
+// the first group no block shows.
+export function addCopy(layout, type, settings, groups = [], activeGroupId = null) {
   const t = TYPES[type];
   if (!t || countOf(layout, type) >= t.max) return null;
   const spot = firstFree(layout, ...t.size) ?? firstFree(layout, ...t.min);
   if (!spot) return null;
   const own = { ...t.defaults(), ...(isObj(settings) ? structuredClone(settings) : {}) };
-  if (type === 'tiles' && !(isObj(settings) && 'group' in settings)) own.group = unshownGroup(layout, groups);
+  if (type === 'tiles') {
+    if (!(isObj(settings) && 'group' in settings)) own.group = unshownGroup(layout, groups, activeGroupId);
+    // Columns to suit the width it landed in: the default block is 6 wide with 5 columns.
+    if (!(isObj(settings) && 'columns' in settings)) own.columns = clamp(Math.round(spot.w * 5 / 6), 2, 10);
+  }
   const copy = { id: uid(), type, ...spot, settings: own };
   layout.widgets.push(copy);
   return copy;
 }
 
-// A copy with the same settings; a tiles block is pinned to the next group not shown yet.
-export function duplicateCopy(layout, id, groups = []) {
+// A copy with the same settings. A tiles block is pinned to the next group not shown yet, gets
+// columns to suit its width, and starts without a docked search bar (one bar is enough).
+export function duplicateCopy(layout, id, groups = [], activeGroupId = null) {
   const from = layout.widgets.find(c => c.id === id);
   if (!from) return null;
   const settings = structuredClone(from.settings);
-  if (from.type === 'tiles') delete settings.group;
-  return addCopy(layout, from.type, settings, groups);
+  if (from.type === 'tiles') {
+    delete settings.group;
+    delete settings.columns;
+    settings.bar = null;
+  }
+  return addCopy(layout, from.type, settings, groups, activeGroupId);
 }
 
 export function removeCopy(layout, id) {

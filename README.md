@@ -28,8 +28,9 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: everything is in the GitHub section of Preferences (the ✎ on the widget
-     opens it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
+   - GitHub widget: my username and what it shows (activity map, pull requests, issues, commits)
+     are under Preferences → Layout (the ✎ on the widget opens them); the access token is in the
+     GitHub section of Preferences. For private repos, walk me through
      making a token as described under "Tokens for private repos" in the README: usually a
      fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
@@ -47,12 +48,13 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | Feature | What it does |
 | --- | --- |
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
+| **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
-| **GitHub** | Your contribution heatmap, open pull requests, and your open issues, latest commits or both, including private repos with a token. |
+| **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
-| **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; drag it between rows of tiles. Also a Claude box for the widget column. |
+| **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; it sits among a block's rows of tiles or anywhere on its own. Also a Claude box widget. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -98,7 +100,8 @@ A folder moves with its tiles when you move it to another group. Folders can't g
 
 ## Markets
 
-The Markets widget sits in the column opposite the clock.
+The Markets widget starts on the right of the page; Layout mode moves it anywhere, and up to five
+copies can each follow their own list (say, coins in one and currencies in another).
 
 - **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins
   and currency pairs you want and untick the rest; the list updates as you go. To follow a coin
@@ -115,10 +118,12 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-All of the widget's settings are in one place, the **GitHub** section of Preferences: the widget's
-switch, your username, what to show and an optional access token, with a short how-to for getting
-one. Hover the widget and click **✎** to go straight there; a widget without a username has a
-**Set up GitHub** button that does the same.
+Each GitHub widget has its own group under Preferences → **Layout**: your username, and which parts
+it shows (activity map, pull requests, issues, commits, in any combination). Hover the widget and
+click **✎** to go straight there; a widget without a username has a **Set up GitHub** button that
+does the same. The optional access token is shared by every copy and lives in the **GitHub**
+section of Preferences, with a short how-to for getting one. Up to five copies can split the parts
+up: the map in one corner, commits in another, issues in a third; they share one fetch an hour.
 
 The widget shows:
 
@@ -132,8 +137,8 @@ The widget shows:
 - **Your latest commits:** the six newest, across every repo and organisation you've committed
   to (default branches). Private repos get a lock icon.
 
-**Show** picks what comes under the pull requests: **Commits**, **Issues**, or **Both** (the
-default, issues first). Both lists are fetched either way, so switching is instant.
+Which of these a copy shows is up to its four switches under Preferences → Layout. Everything is
+fetched either way, so switching is instant, and every copy shares one fetch an hour.
 
 The heatmap is read from `github.com/users/<you>/contributions`, which is why the extension asks
 for access to github.com. After updating from an older version, press the extension's reload
@@ -217,19 +222,47 @@ start with). The icon on the left shows the engine in use; click it to pick anot
   straight away. You need to be signed in to that site in this browser.
 - Enter opens in this tab, or in a new tab when *Open tiles in a new tab* is on. Ctrl+Enter always
   opens a new tab.
-- **Move it:** drag the ⠿ grip at the right end of the bar. A line shows where it will land: above
-  the tiles, between any two rows, or below them. Esc cancels. With the grip focused, ↑ and ↓ move
-  it one row. The spot is the same in every group; a group with fewer rows shows the bar under its
-  tiles.
+- **Move it:** the bar lives inside a block of tiles. Drag the ⠿ grip at its right end: a line shows
+  where it will land, above the tiles, between any two rows, or below them. Esc cancels. With the
+  grip focused, ↑ and ↓ move it one row. The spot is the same in every group; a group with fewer
+  rows shows the bar under its tiles. The block's Search bar setting (Preferences → Layout) also
+  turns it off or puts it above or below the tiles.
+- **A bar anywhere else:** add a **Search bar** widget in [Layout mode](#layout-mode) and put it
+  where you like. Every bar offers the same engines; Ctrl+Space goes to the first one on the page.
 
-The **Claude** widget (Preferences → Widgets, off by default) sends to Claude from a box under
-Notes, with room for longer messages: Enter sends, Shift+Enter starts a new line.
+The **Claude** widget (add it in Layout mode) sends to Claude from a box with room for longer
+messages: Enter sends, Shift+Enter starts a new line.
 
 How the message gets there: it waits in the extension's own storage, and a small script the
 extension runs on claude.ai, chatgpt.com and gemini.google.com types it into the message box and
 presses send. Only a random id goes in the address, so your message isn't in your history, and the
 script leaves alone any page the new tab didn't open. That script is why Chrome lists the extension
 as able to read and change your data on those three sites.
+
+## Layout mode
+
+Everything under the top bar sits on one grid of 12 × 12 cells that scales with the window. Each
+widget, each block of tiles and each search bar on its own takes a rectangle of cells, and Layout
+mode lets you rearrange them.
+
+- **Enter it** with the layout button in the top bar, by right-clicking the empty background, or
+  from Preferences → Layout → **Edit layout**. **Done** or Esc keeps the result; **Cancel** undoes
+  everything since you entered. It needs a window at least 900px wide.
+- **Drag** a widget anywhere on it; an outline shows the cells it will snap to. Nothing else moves.
+  A spot that is taken, or off the canvas, shows red, and letting go there puts the widget back.
+- **Resize** from any corner or edge. Lists scroll inside their widget; the clock grows with it.
+- **Each widget's toolbar:** settings (its group in Preferences), duplicate, remove. Removing Tasks
+  or Notes only takes them off the page; their content comes back when you add them again.
+- **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks and
+  Notes are single; Markets, GitHub, tiles blocks, the search bar and Claude allow five each. A
+  chip is greyed out at the limit or when nothing fits. **Reset layout** puts one copy of each
+  widget back in its default place, keeping its settings.
+- **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its
+  heading), with its own number of columns (Preferences → Layout). Two blocks can show Work and
+  Personal side by side. Drag a tile from one block onto another to move it to that group.
+- **Keyboard:** Tab moves between widgets; arrows move the focused one by a cell, Shift+arrows
+  resize it, D duplicates, Delete removes.
+- Under 900px the widgets stack in one column, top to bottom then left to right.
 
 ## Everything else
 
@@ -249,7 +282,7 @@ as able to read and change your data on those three sites.
   after. **Clear done** removes finished tasks. Finished tasks are kept in a history for 7 days, and
   the number completed per day is kept for good (counted on the day you tick it; unticking takes it
   back).
-- **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
+- **Clock:** your name, a greeting and 12/24-hour time, all set under Preferences → Layout → Clock. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
   line (the second row of the picker, or **Hours over minutes** off in Preferences), and one-line
@@ -282,7 +315,7 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 
-Turn a widget off in Preferences (Widgets, or GitHub for the GitHub widget) and it stops fetching.
+Remove a widget in Layout mode and it stops fetching.
 
 ## Known limits
 

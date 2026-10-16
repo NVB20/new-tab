@@ -100,7 +100,7 @@ export function setupEditMode(store, canvas, ctx) {
 
   function add(type) {
     let copy = null;
-    store.update(s => { copy = addCopy(s.prefs.layout, type, undefined, s.groups); });
+    store.update(s => { copy = addCopy(s.prefs.layout, type, undefined, s.groups, s.activeGroupId); });
     if (copy) focusFrame(copy.id);
     else noRoom();
   }
@@ -109,7 +109,7 @@ export function setupEditMode(store, canvas, ctx) {
     const own = copyById(store.get(), id);
     if (!own || countOf(layout(), own.type) >= TYPES[own.type].max) return;
     let copy = null;
-    store.update(s => { copy = duplicateCopy(s.prefs.layout, id, s.groups); });
+    store.update(s => { copy = duplicateCopy(s.prefs.layout, id, s.groups, s.activeGroupId); });
     if (copy) focusFrame(copy.id);
     else noRoom();
   }
@@ -183,10 +183,11 @@ export function setupEditMode(store, canvas, ctx) {
       valid = fits(layout(), target, copy.id);
       ghost.style.gridArea = gridArea(target);
       ghost.classList.toggle('bad', !valid);
+      frame.classList.toggle('bad', !valid);   // the frame may sit right over the ghost
     };
     const up = () => {
       frame.removeEventListener('pointermove', move);
-      frame.classList.remove('lifted');
+      frame.classList.remove('lifted', 'bad');
       frame.style.transform = '';
       ghost.hidden = true;
       const changed = ['x', 'y', 'w', 'h'].some(k => target[k] !== start[k]);

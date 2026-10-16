@@ -167,7 +167,14 @@ export function mountTiles(root, store, copy, ctx) {
     }
     grid.replaceChildren(...nodes);
     search.place();
+    fade();
   }
+
+  // A soft fade along the bottom edge while there are more rows below.
+  const fade = () => wrap.classList.toggle('more-below', wrap.scrollTop + wrap.clientHeight < wrap.scrollHeight - 2);
+  wrap.addEventListener('scroll', fade, { passive: true });
+  const sizes = new ResizeObserver(fade);
+  sizes.observe(wrap);
 
   const clearMarks = () => {
     marked?.classList.remove(...MARKS);
@@ -258,6 +265,7 @@ export function mountTiles(root, store, copy, ctx) {
   return {
     destroy() {
       unsubscribe();
+      sizes.disconnect();
       search.destroy();
     },
   };
