@@ -38,6 +38,7 @@ test('the default conversion mirrors today\'s page', () => {
   assert.deepEqual(t.clock.settings, { hour24: true, name: 'Niv', greeting: true, face: 'serif', colon: true });
   assert.deepEqual(t.tiles.settings, { group: null, columns: 5 });
   assert.deepEqual(t.search.settings, {});
+  assert.deepEqual(t.tasks.settings, { view: 'all', showDone: false });
   assert.deepEqual(t.markets.settings, { items: ['BTC', 'USD/ILS'] });
   assert.deepEqual(t.github.settings, { parts: GITHUB_PARTS });
   assert.ok(l.widgets.every(c => typeof c.id === 'string' && c.id));

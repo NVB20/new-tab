@@ -171,7 +171,7 @@ export function defaultLayout(old) {
   // The bar used to sit among the tiles; a bar under them all (-1) stays at the bottom.
   if (old.search.enabled !== false) types.push('search');
   const widgets = defaultPositions([...types, 'tiles'], w.position, old.search.row === -1 ? 'bottom' : 'top').map(p => ({
-    id: uid(), ...p, settings: settings[p.type] ? settings[p.type]() : {},
+    id: uid(), ...p, settings: settings[p.type] ? settings[p.type]() : TYPES[p.type].defaults(),
   }));
   return { cols: COLS, rows: ROWS, widgets };
 }
