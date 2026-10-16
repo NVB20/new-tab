@@ -1,1 +1,3 @@
 node_modules/
+# local secrets (e.g. the GitHub token) never belong in git
+.env*
