@@ -399,7 +399,7 @@ export function setupPrefs(store) {
     },
   });
   const head = el('div', { class: 'prefs-head' },
-    el('div', { class: 'prefs-grab', title: 'Drag to move · double-click to centre' }, icon('grip', 16), el('h2', { text: 'Preferences' })),
+    el('h2', { text: 'Preferences', title: 'Drag to move · double-click to centre' }),
     el('label', { class: 'prefs-search' }, icon('search', 16), search),
     el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
   const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' }, head, el('div', { class: 'prefs-body' }, nav, content));

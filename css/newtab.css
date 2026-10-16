@@ -736,8 +736,6 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
   touch-action: none;
 }
 .prefs-head.dragging { cursor: grabbing; }
-.prefs-grab { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.prefs-grab .icon { color: var(--muted); }
 .prefs-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
 /* Pressing in the search box types into it rather than dragging the panel. */
 .prefs-search { position: relative; flex: 0 1 260px; min-width: 0; margin-left: auto; cursor: text; }
