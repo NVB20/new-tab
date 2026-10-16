@@ -28,9 +28,9 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: my username and what it shows (activity map, pull requests, issues, commits)
-     are under Preferences → Layout (the ✎ on the widget opens them); the access token is in the
-     GitHub section of Preferences. For private repos, walk me through
+   - GitHub widget: my username and the access token are in the GitHub section of Preferences;
+     what each widget shows (activity map, pull requests, issues, commits) is under Preferences →
+     Layout (the ✎ on the widget opens it). For private repos, walk me through
      making a token as described under "Tokens for private repos" in the README: usually a
      fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
@@ -118,12 +118,13 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-Each GitHub widget has its own group under Preferences → **Layout**: your username, and which parts
-it shows (activity map, pull requests, issues, commits, in any combination). Hover the widget and
-click **✎** to go straight there; a widget without a username has a **Set up GitHub** button that
-does the same. The optional access token is shared by every copy and lives in the **GitHub**
-section of Preferences, with a short how-to for getting one. Up to five copies can split the parts
-up: the map in one corner, commits in another, issues in a third; they share one fetch an hour.
+Your username and the optional access token live in the **GitHub** section of Preferences, with a
+short how-to for getting a token; every copy of the widget uses them. Until there's a username the
+widget shows a **Set up GitHub** button that opens that section. Each copy has its own group under
+Preferences → **Layout** for which parts it shows (activity map, pull requests, issues, commits, in
+any combination); hover the widget and click **✎** to go straight there. Up to five copies can split
+the parts up: the map in one corner, commits in another, issues in a third; they share one fetch an
+hour.
 
 The widget shows:
 
@@ -212,7 +213,7 @@ written into backup files.
 ## Search bar and AI chats
 
 The bar searches Google or sends your message to **Claude**, **ChatGPT** or **Gemini**. Choose
-which of the four it offers in Preferences → Page → **Search bar** (Google and Claude are on to
+which of the four it offers in the **Search bar** section of Preferences (Google and Claude are on to
 start with). The icon on the left shows the engine in use; click it to pick another, or press
 **Tab** in the bar to go to the next one. The bar remembers the one you used last.
 

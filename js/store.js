@@ -23,9 +23,9 @@ export const DEFAULT_PREFS = {
   // The engines every search bar offers (docked in a tiles block or on its own); mode is the one
   // Enter goes to.
   search: { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' },
-  // One token for every GitHub widget. Optional (read-only), only adds private repos' commits,
-  // issues and PRs; never exported in backups.
-  github: { token: '' },
+  // One username and one token for every GitHub widget. The token is optional (read-only), only
+  // adds private repos' commits, issues and PRs, and is never exported in backups.
+  github: { user: '', token: '' },
   // The widget copies on the 12 × 12 canvas (see layout.js). null here: defaultState and
   // normalizeState fill it in.
   layout: null,
@@ -155,6 +155,10 @@ export function normalizeState(raw) {
     const token = rp.widgets?.github?.token;
     if (typeof token === 'string' && !s.prefs.github.token) s.prefs.github.token = token;
   }
+  // The username was each GitHub copy's own setting (or the old widget's) before they shared one.
+  const copies = Array.isArray(rp.layout?.widgets) ? rp.layout.widgets : [];
+  const user = [...copies.map(c => c?.settings?.user), rp.widgets?.github?.user].find(u => typeof u === 'string' && u.trim());
+  if (user && !s.prefs.github.user.trim()) s.prefs.github.user = user.trim();
   for (const k of ['columns', 'width', 'widgets']) delete s.prefs[k];
   delete s.prefs.search.enabled;
   delete s.prefs.search.row;

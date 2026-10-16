@@ -40,13 +40,15 @@ function heatmapSvg(days, total) {
   return svg;
 }
 
-// ctx.openPrefs(section, anchor) opens Preferences there; the copy's settings are its own group.
+// ctx.openPrefs(section, anchor) opens Preferences there: the copy's parts are its own group under
+// Layout, the username every copy shares is under GitHub.
 export function mountGithub(root, store, copy, ctx) {
   const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.github.defaults();
   const prefs = () => store.get().prefs;
   const token = () => prefs().github.token.trim();
   const linkProps = href => (prefs().openInNewTab ? { href, target: '_blank', rel: 'noopener' } : { href });
   const openSettings = () => ctx.openPrefs('layout', copy.id);
+  const openAccount = () => ctx.openPrefs('github', 'account');
 
   const body = el('div', { class: 'gh-body' });
   // The heading opens the user's GitHub profile.
@@ -78,7 +80,7 @@ export function mountGithub(root, store, copy, ctx) {
   function renderSetup() {
     body.replaceChildren(
       widgetEmpty('Shows a year of your activity, your open pull requests, and your open issues and latest commits.'),
-      el('div', { class: 'gh-setup' }, el('button', { type: 'button', class: 'btn', text: 'Set up GitHub', onclick: openSettings })));
+      el('div', { class: 'gh-setup' }, el('button', { type: 'button', class: 'btn', text: 'Set up GitHub', onclick: openAccount })));
     status.replaceChildren();
   }
 
@@ -117,7 +119,7 @@ export function mountGithub(root, store, copy, ctx) {
       out.push(widgetEmpty(error.rateLimited
         ? 'GitHub’s hourly limit is used up. The widget tries again in an hour (or press Refresh later).'
         : error.status === 401 ? 'GitHub rejected the token (it may have expired). Check it in Preferences → GitHub.'
-          : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → Layout.'
+          : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → GitHub.'
             : 'Couldn’t reach GitHub.'));
     } else if (lists && !data) {
       out.push(widgetEmpty('Loading…'));
@@ -152,8 +154,8 @@ export function mountGithub(root, store, copy, ctx) {
   let seq = 0;
   let shown = null;   // what was last drawn
   async function load(force = false) {
-    const { user: rawUser, parts } = settings();
-    const user = rawUser.trim();
+    const { parts } = settings();
+    const user = prefs().github.user.trim();
     const tok = token();
     const profile = linkProps(`https://github.com/${encodeURIComponent(user)}`);
     link.href = user ? profile.href : 'https://github.com/';
@@ -239,7 +241,7 @@ export function mountGithub(root, store, copy, ctx) {
   function onPrefs(state) {
     const own = copyById(state, copy.id);
     if (!own) return;
-    const next = JSON.stringify([own.settings.user, state.prefs.github.token, own.settings.parts, state.prefs.openInNewTab]);
+    const next = JSON.stringify([state.prefs.github.user, state.prefs.github.token, own.settings.parts, state.prefs.openInNewTab]);
     if (next === conf) return;
     const first = conf === null;
     conf = next;

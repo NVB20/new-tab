@@ -58,7 +58,8 @@ test('a saved state from before Layout mode converts to the same page, and loses
   assert.deepEqual([c.clock.x, c.clock.settings.name, c.clock.settings.face, c.clock.settings.hour24], [9, 'Niv', 'dot', true]);
   assert.equal(c.notes, undefined);
   assert.deepEqual(c.markets.settings.items, ['BTC', 'DOGE']);
-  assert.deepEqual(c.github.settings, { user: 'octo', parts: ['heatmap', 'pulls', 'issues'] });
+  assert.deepEqual(c.github.settings, { parts: ['heatmap', 'pulls', 'issues'] });
+  assert.equal(s.prefs.github.user, 'octo');
   assert.deepEqual(c.tiles.settings, { group: null, columns: 7, bar: 1 });
   assert.equal(s.prefs.github.token, 'ghp_x');
   assert.deepEqual(s.prefs.search, { google: true, claude: false, chatgpt: true, gemini: false, mode: 'chatgpt' });
@@ -97,6 +98,15 @@ test('normalizeState merges saved prefs over defaults', () => {
   assert.equal(s.prefs.accent, DEFAULT_PREFS.accent);
 });
 
+test('a GitHub copy’s own username becomes the one every copy shares', () => {
+  const layout = users => ({ widgets: users.map((user, i) => ({ id: `g${i}`, type: 'github', x: i * 3, y: 0, w: 3, h: 3, settings: { user, parts: ['heatmap'] } })) });
+  const s = normalizeState({ prefs: { layout: layout(['', ' octo ', 'other']) } });
+  assert.equal(s.prefs.github.user, 'octo');
+  assert.ok(s.prefs.layout.widgets.every(c => !('user' in c.settings)));
+  assert.equal(normalizeState({ prefs: { layout: layout(['octo']), github: { user: 'mine' } } }).prefs.github.user, 'mine');
+  assert.equal(normalizeState({ prefs: { layout: layout(['']) } }).prefs.github.user, '');
+});
+
 test('older saved prefs get the ASCII background and flat tiles by default', () => {
   const s = normalizeState({ prefs: { background: { blur: 4 }, tiles: { color: '#ffffff' } } });
   assert.equal(s.prefs.background.pattern, 'ascii');
@@ -108,7 +118,7 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.deepEqual(c.markets.settings.items, ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
   assert.equal(c.clock.settings.face, 'classic');
   assert.equal(c.clock.settings.colon, true);
-  assert.equal(c.github.settings.user, '');
+  assert.equal(s.prefs.github.user, '');
   assert.equal(s.prefs.tiles.color, '#ffffff');
 });
 

@@ -37,7 +37,7 @@ test('the default conversion mirrors today\'s page', () => {
   assert.deepEqual(t.clock.settings, { hour24: true, name: 'Niv', greeting: true, face: 'serif', colon: true });
   assert.deepEqual(t.tiles.settings, { group: null, columns: 5, bar: 0 });
   assert.deepEqual(t.markets.settings, { items: ['BTC', 'USD/ILS'] });
-  assert.deepEqual(t.github.settings, { user: 'octo', parts: GITHUB_PARTS });
+  assert.deepEqual(t.github.settings, { parts: GITHUB_PARTS });
   assert.ok(l.widgets.every(c => typeof c.id === 'string' && c.id));
   assert.equal(new Set(l.widgets.map(c => c.id)).size, l.widgets.length);
 });
@@ -110,7 +110,7 @@ test('normalizeLayout drops junk, clamps, resolves overlaps and enforces limits'
   assert.deepEqual(t.markets.settings.items, ['ETH']);
   assert.deepEqual(rect(t.tiles), [9, 9, 3, 3]);
   assert.deepEqual(t.tiles.settings, { group: null, columns: 10, bar: null });
-  assert.deepEqual(t.github.settings, { user: '', parts: ['heatmap', 'commits'] });
+  assert.deepEqual(t.github.settings, { parts: ['heatmap', 'commits'] });
   assert.ok(t.github.id);
   assert.equal(l.cols, COLS);
   assert.equal(l.rows, ROWS);

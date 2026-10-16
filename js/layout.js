@@ -42,11 +42,8 @@ export const TYPES = {
   },
   github: {
     label: 'GitHub', icon: 'branch', size: [3, 6], min: [3, 3], max: 5,
-    defaults: () => ({ user: '', parts: [...GITHUB_PARTS] }),
-    clean: s => ({
-      user: str(s.user),
-      parts: Array.isArray(s.parts) ? GITHUB_PARTS.filter(p => s.parts.includes(p)) : [...GITHUB_PARTS],
-    }),
+    defaults: () => ({ parts: [...GITHUB_PARTS] }),
+    clean: s => ({ parts: Array.isArray(s.parts) ? GITHUB_PARTS.filter(p => s.parts.includes(p)) : [...GITHUB_PARTS] }),
   },
   // group: a group id, or null to follow the tabs. bar: how many rows of tiles are above the
   // docked search bar (-1 keeps it under them all), or null for no bar.
@@ -141,7 +138,7 @@ export function defaultLayout(old) {
   const settings = {
     clock: () => ({ hour24: w.clock.hour24, name: w.clock.name, greeting: w.clock.greeting, face: w.clock.face, colon: w.clock.colon }),
     markets: () => ({ items: [...w.markets.items] }),
-    github: () => ({ user: w.github.user, parts: partsFromShow(w.github.show) }),
+    github: () => ({ parts: partsFromShow(w.github.show) }),
     tiles: () => ({
       group: null,
       columns: clamp(int(old.columns, 5), 2, 10),

@@ -57,7 +57,7 @@ export function mountSearchBar(root, store, { grid = null, copy = null, ctx = nu
   const shortcut = el('kbd', { class: 'sb-key', text: 'Ctrl Space', title: 'Ctrl+Space puts the cursor here from anywhere on the page' });
   // With every engine off the bar says so instead of disappearing.
   const note = el('span', { class: 'sb-note', hidden: true }, 'No search engine is on. ',
-    el('button', { type: 'button', class: 'link-btn', text: 'Preferences', onclick: () => ctx?.openPrefs('page') }));
+    el('button', { type: 'button', class: 'link-btn', text: 'Preferences', onclick: () => ctx?.openPrefs('search') }));
   const grip = docked && el('button', {
     type: 'button', class: 'sb-grip',
     title: 'Drag to move between rows of tiles (or focus and press ↑ ↓)',

@@ -170,14 +170,19 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
       ], pickBackground)),
       sub(shown === 'ascii', toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations')),
       sub(shown === 'image', imageRows(image)),
-      title('Search bar'),
+      title('Top bar'),
+      toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
+    ];
+  }
+
+  function searchBar() {
+    return [
+      title('Engines'),
       el('p', { class: 'pref-hint pref-intro', text: 'The engines every search bar offers. Ctrl+Space jumps to the bar; Tab or its icon picks an engine. A bar sits among a tiles block’s rows (drag its ⠿ to move it) or anywhere on its own: see Layout.' }),
       toggle('Google', 'search.google'),
       toggle('Claude', 'search.claude', 'Sends what you type to claude.ai and runs it'),
       toggle('ChatGPT', 'search.chatgpt', 'Sends what you type to chatgpt.com and runs it'),
       toggle('Gemini', 'search.gemini', 'Sends what you type to gemini.google.com and runs it'),
-      title('Top bar'),
-      toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
     ];
   }
 
@@ -309,16 +314,15 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
       }
       case 'github':
         return [
-          row('Username', textFor('Username', `${copy.id}.user`, s.user, 'NVB20', v => set('user', v))),
           ...GITHUB_PARTS.map(part => row(PART_NAMES[part], switchFor(PART_NAMES[part], `${copy.id}.${part}`, s.parts.includes(part),
             on => set('parts', GITHUB_PARTS.filter(p => (p === part ? on : s.parts.includes(p))))))),
-          row('Private repos', el('button', { type: 'button', class: 'btn', text: 'GitHub section', onclick: () => show('github') }),
-            'The access token is shared by every GitHub widget'),
+          row('Username and token', el('button', { type: 'button', class: 'btn', text: 'GitHub section', onclick: () => show('github') }),
+            'Shared by every GitHub widget'),
         ];
       case 'markets':
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
       case 'search':
-        return [row('Engines', el('button', { type: 'button', class: 'btn', text: 'Page section', onclick: () => show('page') }), 'Shared by every search bar')];
+        return [row('Engines', el('button', { type: 'button', class: 'btn', text: 'Search bar section', onclick: () => show('search') }), 'Shared by every search bar')];
       default:
         return [row('No settings', el('span'))];
     }
@@ -336,8 +340,11 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
     redraw();
   }
 
+  // open('github', 'account') scrolls to the username and puts the cursor in it while it's empty.
   function github() {
     return [
+      title('Account'),
+      group('account', textInput('Username', 'github.user', 'NVB20', { hint: 'Whose activity every GitHub widget shows' })),
       title('Private repos'),
       textInput('Access token (optional)', 'github.token', 'github_pat_…', {
         type: 'password',
@@ -345,7 +352,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         hint: 'One token for every GitHub widget. Only needed for private repos. Kept only in this browser and left out of backups.',
       }),
       tokenHelp(),
-      el('p', { class: 'pref-hint pref-intro', text: 'Each GitHub widget’s username and what it shows are under Layout.' }),
+      el('p', { class: 'pref-hint pref-intro', text: 'What each GitHub widget shows is under Layout.' }),
     ];
   }
 
@@ -478,6 +485,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
 
   const sections = [
     { id: 'page', label: 'Page', icon: 'palette', build: page },
+    { id: 'search', label: 'Search bar', icon: 'search', build: searchBar },
     { id: 'tiles', label: 'Tiles', icon: 'grid', build: tiles },
     { id: 'layout', label: 'Layout', icon: 'layout', build: layout },
     { id: 'github', label: 'GitHub', icon: 'branch', build: github },
