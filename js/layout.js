@@ -45,18 +45,17 @@ export const TYPES = {
     defaults: () => ({ parts: [...GITHUB_PARTS] }),
     clean: s => ({ parts: Array.isArray(s.parts) ? GITHUB_PARTS.filter(p => s.parts.includes(p)) : [...GITHUB_PARTS] }),
   },
-  // group: a group id, or null to follow the tabs. bar: how many rows of tiles are above the
-  // docked search bar (-1 keeps it under them all), or null for no bar.
+  // group: a group id, or null to follow the tabs.
   tiles: {
     label: 'Tiles', icon: 'grid', size: [6, 6], min: [3, 3], max: 5,
-    defaults: () => ({ group: null, columns: 5, bar: null }),
+    defaults: () => ({ group: null, columns: 5 }),
     clean: (s, state) => ({
       group: state?.groups?.some(g => g.id === s.group) ? s.group : null,
       columns: clamp(int(s.columns, 5), 2, 10),
-      bar: Number.isInteger(s.bar) && s.bar >= -1 ? s.bar : null,
     }),
   },
-  search: { label: 'Search bar', icon: 'search', size: [6, 1], min: [3, 1], max: 5, defaults: () => ({}), clean: () => ({}) },
+  // The one search bar on the page, a widget of its own.
+  search: { label: 'Search bar', icon: 'search', size: [6, 1], min: [3, 1], max: 1, defaults: () => ({}), clean: () => ({}) },
 };
 
 // ---- geometry ----
@@ -107,8 +106,9 @@ function column(items, fill) {
 }
 
 // Where copies of the given types go: the clock column on `side`, Markets and GitHub opposite,
-// the tiles block between them (or wider when a column is empty).
-export function defaultPositions(types, side = 'left') {
+// and between them the search bar (one row, at the top or the bottom) over the tiles block, which
+// is wider when a column is empty.
+export function defaultPositions(types, side = 'left', barAt = 'top') {
   const near = column(Object.keys(NEAR).filter(t => types.includes(t)).map(type => ({ type, h: NEAR[type] })), false);
   const far = column(Object.keys(FAR).filter(t => types.includes(t)).map(type => ({ type, h: FAR[type] })), true);
   const right = side === 'right';
@@ -120,9 +120,11 @@ export function defaultPositions(types, side = 'left') {
     ...near.map(it => ({ type: it.type, x: nearX, y: it.y, w: 3, h: it.h })),
     ...far.map(it => ({ type: it.type, x: farX, y: it.y, w: 3, h: it.h })),
   ];
-  if (types.includes('tiles')) {
-    out.push({ type: 'tiles', x: leftUsed ? 3 : 0, y: 0, w: COLS - (leftUsed ? 3 : 0) - (rightUsed ? 3 : 0), h: ROWS });
-  }
+  const x = leftUsed ? 3 : 0;
+  const w = COLS - (leftUsed ? 3 : 0) - (rightUsed ? 3 : 0);
+  const bar = types.includes('search');
+  if (bar) out.push({ type: 'search', x, y: barAt === 'bottom' ? ROWS - 1 : 0, w, h: 1 });
+  if (types.includes('tiles')) out.push({ type: 'tiles', x, y: bar && barAt !== 'bottom' ? 1 : 0, w, h: bar ? ROWS - 1 : ROWS });
   return out;
 }
 
@@ -139,13 +141,11 @@ export function defaultLayout(old) {
     clock: () => ({ hour24: w.clock.hour24, name: w.clock.name, greeting: w.clock.greeting, face: w.clock.face, colon: w.clock.colon }),
     markets: () => ({ items: [...w.markets.items] }),
     github: () => ({ parts: partsFromShow(w.github.show) }),
-    tiles: () => ({
-      group: null,
-      columns: clamp(int(old.columns, 5), 2, 10),
-      bar: old.search.enabled === false ? null : (Number.isInteger(old.search.row) && old.search.row >= -1 ? old.search.row : 0),
-    }),
+    tiles: () => ({ group: null, columns: clamp(int(old.columns, 5), 2, 10) }),
   };
-  const widgets = defaultPositions([...types, 'tiles'], w.position).map(p => ({
+  // The bar used to sit among the tiles; a bar under them all (-1) stays at the bottom.
+  if (old.search.enabled !== false) types.push('search');
+  const widgets = defaultPositions([...types, 'tiles'], w.position, old.search.row === -1 ? 'bottom' : 'top').map(p => ({
     id: uid(), ...p, settings: settings[p.type] ? settings[p.type]() : {},
   }));
   return { cols: COLS, rows: ROWS, widgets };
@@ -156,6 +156,7 @@ export function defaultLayout(old) {
 export function normalizeLayout(raw, state) {
   const layout = { cols: COLS, rows: ROWS, widgets: [] };
   const ids = new Set();
+  const docked = [];   // tiles blocks that still carry a docked bar (an earlier version of this)
   for (const c of Array.isArray(raw?.widgets) ? raw.widgets : []) {
     const t = isObj(c) && TYPES[c.type];
     if (!t || countOf(layout, c.type) >= t.max) continue;
@@ -166,7 +167,18 @@ export function normalizeLayout(raw, state) {
     if (!rect) continue;
     const id = str(c.id) && !ids.has(c.id) ? c.id : uid();
     ids.add(id);
-    layout.widgets.push({ id, type: c.type, ...rect, settings: t.clean(isObj(c.settings) ? c.settings : {}, state) });
+    const copy = { id, type: c.type, ...rect, settings: t.clean(isObj(c.settings) ? c.settings : {}, state) };
+    layout.widgets.push(copy);
+    if (c.type === 'tiles' && Number.isInteger(c.settings?.bar)) docked.push({ copy, bottom: c.settings.bar === -1 });
+  }
+  // A bar docked in a block becomes the page's bar: one row off the top (or bottom) of the block.
+  for (const { copy, bottom } of docked) {
+    if (countOf(layout, 'search') >= TYPES.search.max) break;
+    if (copy.h <= TYPES.tiles.min[1]) continue;
+    const bar = { id: uid(), type: 'search', x: copy.x, y: bottom ? copy.y + copy.h - 1 : copy.y, w: copy.w, h: 1, settings: {} };
+    copy.h -= 1;
+    if (!bottom) copy.y += 1;
+    layout.widgets.push(bar);
   }
   return layout;
 }
@@ -199,8 +211,8 @@ export function addCopy(layout, type, settings, groups = [], activeGroupId = nul
   return copy;
 }
 
-// A copy with the same settings. A tiles block is pinned to the next group not shown yet, gets
-// columns to suit its width, and starts without a docked search bar (one bar is enough).
+// A copy with the same settings. A tiles block is pinned to the next group not shown yet and gets
+// columns to suit its width.
 export function duplicateCopy(layout, id, groups = [], activeGroupId = null) {
   const from = layout.widgets.find(c => c.id === id);
   if (!from) return null;
@@ -208,7 +220,6 @@ export function duplicateCopy(layout, id, groups = [], activeGroupId = null) {
   if (from.type === 'tiles') {
     delete settings.group;
     delete settings.columns;
-    settings.bar = null;
   }
   return addCopy(layout, from.type, settings, groups, activeGroupId);
 }

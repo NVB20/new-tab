@@ -54,7 +54,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
-| **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; it sits among a block's rows of tiles or anywhere on its own. Also a Claude box widget. |
+| **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -223,13 +223,9 @@ start with). The icon on the left shows the engine in use; click it to pick anot
   straight away. You need to be signed in to that site in this browser.
 - Enter opens in this tab, or in a new tab when *Open tiles in a new tab* is on. Ctrl+Enter always
   opens a new tab.
-- **Move it:** the bar lives inside a block of tiles. Drag the ⠿ grip at its right end: a line shows
-  where it will land, above the tiles, between any two rows, or below them. Esc cancels. With the
-  grip focused, ↑ and ↓ move it one row. The spot is the same in every group; a group with fewer
-  rows shows the bar under its tiles. The block's Search bar setting (Preferences → Layout) also
-  turns it off or puts it above or below the tiles.
-- **A bar anywhere else:** add a **Search bar** widget in [Layout mode](#layout-mode) and put it
-  where you like. Every bar offers the same engines; Ctrl+Space goes to the first one on the page.
+- **Move it:** the bar is a widget of its own, and there is one on the page. In
+  [Layout mode](#layout-mode) drag it anywhere, make it wider or narrower, or remove it; the tray
+  brings it back.
 
 The **Claude** widget (add it in Layout mode) sends to Claude from a box with room for longer
 messages: Enter sends, Shift+Enter starts a new line.
@@ -243,8 +239,8 @@ as able to read and change your data on those three sites.
 ## Layout mode
 
 Everything under the top bar sits on one grid of 12 × 12 cells that scales with the window. Each
-widget, each block of tiles and each search bar on its own takes a rectangle of cells, and Layout
-mode lets you rearrange them.
+widget, each block of tiles and the search bar takes a rectangle of cells, and Layout mode lets you
+rearrange them.
 
 - **Enter it** with the layout button in the top bar, by right-clicking the empty background, or
   from Preferences → Layout → **Edit layout**. **Done** or Esc keeps the result; **Cancel** undoes
@@ -254,8 +250,8 @@ mode lets you rearrange them.
 - **Resize** from any corner or edge. Lists scroll inside their widget; the clock grows with it.
 - **Each widget's toolbar:** settings (its group in Preferences), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
-- **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks and
-  Notes are single; Markets, GitHub, tiles blocks, the search bar and Claude allow five each. A
+- **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
+  and the search bar are single; Markets, GitHub, tiles blocks and Claude allow five each. A
   chip is greyed out at the limit or when nothing fits. **Reset layout** puts one copy of each
   widget back in its default place, keeping its settings.
 - **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its

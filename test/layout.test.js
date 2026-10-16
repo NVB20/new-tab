@@ -30,12 +30,14 @@ test('the default conversion mirrors today\'s page', () => {
   assert.deepEqual(rect(t.clock), [0, 0, 3, 4]);
   assert.deepEqual(rect(t.tasks), [0, 4, 3, 4]);
   assert.deepEqual(rect(t.notes), [0, 8, 3, 4]);
-  assert.deepEqual(rect(t.tiles), [3, 0, 6, 12]);
+  assert.deepEqual(rect(t.search), [3, 0, 6, 1]);
+  assert.deepEqual(rect(t.tiles), [3, 1, 6, 11]);
   assert.deepEqual(rect(t.markets), [9, 0, 3, 5]);
   assert.deepEqual(rect(t.github), [9, 5, 3, 7]);
   assert.equal(t.claude, undefined);
   assert.deepEqual(t.clock.settings, { hour24: true, name: 'Niv', greeting: true, face: 'serif', colon: true });
-  assert.deepEqual(t.tiles.settings, { group: null, columns: 5, bar: 0 });
+  assert.deepEqual(t.tiles.settings, { group: null, columns: 5 });
+  assert.deepEqual(t.search.settings, {});
   assert.deepEqual(t.markets.settings, { items: ['BTC', 'USD/ILS'] });
   assert.deepEqual(t.github.settings, { parts: GITHUB_PARTS });
   assert.ok(l.widgets.every(c => typeof c.id === 'string' && c.id));
@@ -46,7 +48,7 @@ test('clock on the right swaps the columns; a lone far widget takes the column',
   const t = byType(defaultLayout(legacy({ widgets: { ...legacy().widgets, position: 'right', github: { enabled: false } } })));
   assert.deepEqual(rect(t.clock), [9, 0, 3, 4]);
   assert.deepEqual(rect(t.markets), [0, 0, 3, 12]);
-  assert.deepEqual(rect(t.tiles), [3, 0, 6, 12]);
+  assert.deepEqual(rect(t.tiles), [3, 1, 6, 11]);
 });
 
 test('with Claude on the near column shrinks the tallest first; with widgets off only the tiles remain', () => {
@@ -55,18 +57,23 @@ test('with Claude on the near column shrinks the tallest first; with widgets off
   assert.equal(on.claude.h, 2);
   assert.equal(on.claude.y, 10);
   const off = defaultLayout(legacy({ widgets: { ...legacy().widgets, enabled: false } }));
-  assert.deepEqual(off.widgets.map(c => c.type), ['tiles']);
-  assert.deepEqual(rect(off.widgets[0]), [0, 0, 12, 12]);
+  assert.deepEqual(off.widgets.map(c => c.type), ['search', 'tiles']);
+  assert.deepEqual(rect(off.widgets[0]), [0, 0, 12, 1]);
+  assert.deepEqual(rect(off.widgets[1]), [0, 1, 12, 11]);
   const oneSide = byType(defaultLayout(legacy({ widgets: { ...legacy().widgets, markets: { enabled: false }, github: { enabled: false } } })));
-  assert.deepEqual(rect(oneSide.tiles), [3, 0, 9, 12]);
+  assert.deepEqual(rect(oneSide.tiles), [3, 1, 9, 11]);
+  assert.deepEqual(rect(oneSide.search), [3, 0, 9, 1]);
 });
 
 test('the bar and GitHub Show convert', () => {
   const t = s => byType(defaultLayout(legacy(s)));
-  assert.equal(t({ search: { enabled: false, row: 0 } }).tiles.settings.bar, null);
-  assert.equal(t({ search: { enabled: true, row: 2 } }).tiles.settings.bar, 2);
-  assert.equal(t({ search: { enabled: true, row: -1 } }).tiles.settings.bar, -1);
-  assert.equal(t({ search: { enabled: true, row: 'x' } }).tiles.settings.bar, 0);
+  const off = t({ search: { enabled: false, row: 0 } });
+  assert.equal(off.search, undefined);
+  assert.deepEqual(rect(off.tiles), [3, 0, 6, 12]);
+  assert.deepEqual(rect(t({ search: { enabled: true, row: 2 } }).search), [3, 0, 6, 1]);   // a bar between the rows goes to the top
+  const bottom = t({ search: { enabled: true, row: -1 } });
+  assert.deepEqual(rect(bottom.search), [3, 11, 6, 1]);
+  assert.deepEqual(rect(bottom.tiles), [3, 0, 6, 11]);
   const parts = show => t({ widgets: { ...legacy().widgets, github: { enabled: true, user: 'o', show } } }).github.settings.parts;
   assert.deepEqual(parts('commits'), ['heatmap', 'pulls', 'commits']);
   assert.deepEqual(parts('issues'), ['heatmap', 'pulls', 'issues']);
@@ -75,8 +82,9 @@ test('the bar and GitHub Show convert', () => {
 
 test('fits and firstFree respect the canvas and other copies', () => {
   const l = defaultLayout(legacy());
-  assert.equal(fits(l, { x: 3, y: 0, w: 6, h: 12 }), false);
-  assert.equal(fits(l, { x: 3, y: 0, w: 6, h: 12 }, byType(l).tiles.id), true);
+  assert.equal(fits(l, { x: 3, y: 1, w: 6, h: 11 }), false);
+  assert.equal(fits(l, { x: 3, y: 1, w: 6, h: 11 }, byType(l).tiles.id), true);
+  assert.equal(fits(l, { x: 3, y: 0, w: 6, h: 12 }, byType(l).tiles.id), false);   // the bar's row
   assert.equal(fits(l, { x: 10, y: 0, w: 3, h: 1 }), false);
   assert.equal(fits(l, { x: -1, y: 0, w: 3, h: 1 }), false);
   assert.equal(firstFree(l, 3, 1), null);
@@ -109,7 +117,7 @@ test('normalizeLayout drops junk, clamps, resolves overlaps and enforces limits'
   assert.deepEqual(rect(t.markets), [2, 0, 3, 3]);   // moved off the clock to the first free spot
   assert.deepEqual(t.markets.settings.items, ['ETH']);
   assert.deepEqual(rect(t.tiles), [9, 9, 3, 3]);
-  assert.deepEqual(t.tiles.settings, { group: null, columns: 10, bar: null });
+  assert.deepEqual(t.tiles.settings, { group: null, columns: 10 });
   assert.deepEqual(t.github.settings, { parts: ['heatmap', 'commits'] });
   assert.ok(t.github.id);
   assert.equal(l.cols, COLS);
@@ -118,27 +126,46 @@ test('normalizeLayout drops junk, clamps, resolves overlaps and enforces limits'
 
 test('normalizeLayout keeps a pinned group that exists and makes duplicate ids unique', () => {
   const raw = { widgets: [
-    { id: 'same', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: 'g2', columns: 4, bar: -1 } },
+    { id: 'same', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: 'g2', columns: 4 } },
     { id: 'same', type: 'notes', x: 3, y: 0, w: 3, h: 3 },
   ] };
   const l = normalizeLayout(raw, state(raw));
-  assert.deepEqual(l.widgets[0].settings, { group: 'g2', columns: 4, bar: -1 });
+  assert.deepEqual(l.widgets[0].settings, { group: 'g2', columns: 4 });
   assert.equal(l.widgets[0].id, 'same');
   assert.notEqual(l.widgets[1].id, 'same');
+});
+
+test('a bar still docked in a block (an earlier layout) becomes the page\'s bar, one row off the block', () => {
+  const top = normalizeLayout({ widgets: [{ id: 't', type: 'tiles', x: 3, y: 0, w: 6, h: 12, settings: { group: null, columns: 5, bar: 2 } }] }, state());
+  assert.deepEqual(top.widgets.map(c => [c.type, ...rect(c)]), [['tiles', 3, 1, 6, 11], ['search', 3, 0, 6, 1]]);
+  assert.deepEqual(top.widgets[0].settings, { group: null, columns: 5 });
+  const bottom = normalizeLayout({ widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 6, h: 6, settings: { bar: -1 } }] }, state());
+  assert.deepEqual(bottom.widgets.map(c => [c.type, ...rect(c)]), [['tiles', 0, 0, 6, 5], ['search', 0, 5, 6, 1]]);
+  // A block at its minimum height keeps its rows; a page that already has a bar gets no second one.
+  const tiny = normalizeLayout({ widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { bar: 0 } }] }, state());
+  assert.deepEqual(tiny.widgets.map(c => c.type), ['tiles']);
+  const has = normalizeLayout({ widgets: [
+    { id: 's', type: 'search', x: 0, y: 11, w: 6, h: 1 },
+    { id: 't', type: 'tiles', x: 0, y: 0, w: 6, h: 11, settings: { bar: 0 } },
+  ] }, state());
+  assert.deepEqual(has.widgets.map(c => c.type), ['search', 'tiles']);
+  assert.deepEqual(rect(has.widgets[1]), [0, 0, 6, 11]);
 });
 
 test('addCopy takes the default size, else the minimum, else refuses; duplicates copy settings', () => {
   const l = defaultLayout(legacy());
   assert.equal(addCopy(l, 'clock'), null);                     // limit 1
-  assert.equal(addCopy(l, 'search'), null);                    // no room
+  assert.equal(addCopy(l, 'search'), null);                    // limit 1 too
   assert.equal(addCopy(l, 'weather'), null);
-  removeCopy(l, byType(l).notes.id);
+  assert.equal(addCopy(l, 'claude'), null);                    // no room
+  removeCopy(l, byType(l).search.id);
   const bar = addCopy(l, 'search');
-  assert.deepEqual(rect(bar), [0, 8, 3, 1]);                   // minimum size fits
+  assert.deepEqual(rect(bar), [3, 0, 6, 1]);                   // the default size fits where the bar was
   assert.deepEqual(bar.settings, {});
+  removeCopy(l, byType(l).notes.id);
   const original = byType(l).markets.id;
   const m = duplicateCopy(l, original);
-  assert.deepEqual(rect(m), [0, 9, 2, 3]);
+  assert.deepEqual(rect(m), [0, 8, 2, 3]);                     // where Notes was, at the minimum size
   assert.deepEqual(m.settings, { items: ['BTC', 'USD/ILS'] });
   assert.notEqual(m.id, original);
   assert.equal(countOf(l, 'markets'), 2);
@@ -146,7 +173,7 @@ test('addCopy takes the default size, else the minimum, else refuses; duplicates
 });
 
 test('a new tiles copy is pinned to the first group no block shows; a block following the tabs shows the active one', () => {
-  const l = { cols: COLS, rows: ROWS, widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: null, columns: 4, bar: 0 } }] };
+  const l = { cols: COLS, rows: ROWS, widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: null, columns: 4 } }] };
   const groups = [{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }];
   const a = addCopy(l, 'tiles', undefined, groups, 'g1');
   assert.equal(a.settings.group, 'g2');
@@ -154,11 +181,10 @@ test('a new tiles copy is pinned to the first group no block shows; a block foll
   assert.equal(a.settings.columns, 5);   // columns suit the width: 6 wide → 5
   const b = duplicateCopy(l, 't', groups, 'g1');
   assert.equal(b.settings.group, 'g3');
-  assert.equal(b.settings.bar, null);    // a duplicate block starts without a bar
   const c = addCopy(l, 'tiles', undefined, groups, 'g1');
   assert.equal(c.settings.group, null);
   // A narrow spot gets fewer columns.
-  const n = { cols: COLS, rows: ROWS, widgets: [{ id: 'big', type: 'tiles', x: 0, y: 0, w: 9, h: 12, settings: { group: null, columns: 5, bar: null } }] };
+  const n = { cols: COLS, rows: ROWS, widgets: [{ id: 'big', type: 'tiles', x: 0, y: 0, w: 9, h: 12, settings: { group: null, columns: 5 } }] };
   const d = addCopy(n, 'tiles', undefined, groups, 'g1');
   assert.deepEqual(rect(d), [9, 0, 3, 3]);
   assert.equal(d.settings.columns, 3);
@@ -186,10 +212,11 @@ test('resetLayout keeps the first copy of each type and reports the rest', () =>
   const t = byType(l);
   assert.deepEqual(rect(t.clock), [0, 0, 3, 4]);
   assert.deepEqual(rect(t.tasks), [0, 4, 3, 4]);
-  assert.deepEqual(rect(t.tiles), [3, 0, 6, 12]);
+  assert.deepEqual(rect(t.search), [3, 0, 6, 1]);
+  assert.deepEqual(rect(t.tiles), [3, 1, 6, 11]);
   assert.equal(t.clock.settings.face, 'serif');
   assert.equal(t.notes, undefined);
-  assert.equal(l.widgets.length, 5);
+  assert.equal(l.widgets.length, 6);
 });
 
 test('resetLayout keeps the clock column on the side it was', () => {

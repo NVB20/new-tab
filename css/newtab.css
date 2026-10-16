@@ -208,11 +208,12 @@ body.has-wallpaper .topbar .icon { filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.5
 .widget-root { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .widget-root > .widget { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
 body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
+/* The search bar keeps its height and sits in the middle of its frame. */
 .frame-search .widget-root { justify-content: center; }
+.widget-root > .widget-search { flex: none; overflow: visible; }
 
-/* A tiles block: an optional heading (the pinned group), then the tiles and the docked search bar
-   sharing one grid (#grid is display: contents), so the bar can take a row of its own between
-   the tiles. --cols is the block's own column count. */
+/* A tiles block: an optional heading (the pinned group), then the tiles (#grid is display: contents
+   inside .grid-wrap). --cols is the block's own column count. */
 .widget-tiles { display: flex; flex-direction: column; }
 .tiles-head { flex: none; }
 .widget-tiles .grid-wrap { flex: 1; min-height: 0; overflow: hidden auto; scrollbar-width: thin; }
@@ -246,9 +247,6 @@ body.center-v .grid-wrap { align-content: safe center; }
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(12px); }
-.searchbar[data-at="between"] { margin: 10px 0; }
-.searchbar[data-at="bottom"] { order: 1; margin: 16px 0 0; }
-.searchbar.moving { opacity: 0.5; }
 .sb-mode {
   flex: none;
   display: inline-flex;
@@ -277,37 +275,6 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 /* The shortcut shows until the bar has the cursor; then the Tab hint takes its place. */
 .sb-key { flex: none; opacity: 0.75; white-space: nowrap; }
 .searchbar:focus-within .sb-key { display: none; }
-.sb-grip {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--muted);
-  cursor: grab;
-  touch-action: none;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.12s;
-}
-.searchbar:hover .sb-grip, .sb-grip:focus-visible, .searchbar.moving .sb-grip { opacity: 1; }
-.sb-grip:hover { background: var(--hover); color: var(--text); }
-.sb-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.searchbar.moving .sb-grip { cursor: grabbing; }
-/* Where the bar will land while it's being dragged. */
-.sb-drop {
-  position: fixed;
-  z-index: 50;
-  height: 3px;
-  margin-top: -1.5px;
-  border-radius: 2px;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-  pointer-events: none;
-}
 
 /* ---------- Widgets ---------- */
 

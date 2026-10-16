@@ -1,9 +1,16 @@
 # Layout mode: one canvas for widgets, bars and tiles
 
 Date: 2026-10-16
-Status: approved
+Status: approved, built
 
 Builds on `2026-10-16-search-engines-and-bar-position-design.md` (merged as 796d96c).
+
+**Revision, same day (asked for after the first build):** the search bar is a widget of its own
+and nothing else: the docked bar inside a tiles block, its grip, `settings.bar` and the row helpers
+in `ask.js` are gone, and the Search bar type's `max` is 1. The conversion puts the bar in a row of
+its own above the tiles block (below it when the old `search.row` was `-1`), and a layout saved by
+the first build with a bar still docked in a block gets the same treatment on load. Where the text
+below describes a docked bar or several bars, this paragraph wins.
 
 ## Goal
 

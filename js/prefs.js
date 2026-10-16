@@ -178,7 +178,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
   function searchBar() {
     return [
       title('Engines'),
-      el('p', { class: 'pref-hint pref-intro', text: 'The engines every search bar offers. Ctrl+Space jumps to the bar; Tab or its icon picks an engine. A bar sits among a tiles block’s rows (drag its ⠿ to move it) or anywhere on its own: see Layout.' }),
+      el('p', { class: 'pref-hint pref-intro', text: 'The engines the search bar offers. Ctrl+Space jumps to the bar; Tab or its icon picks an engine. The bar is a widget of its own: move it, resize it or remove it in Layout mode.' }),
       toggle('Google', 'search.google'),
       toggle('Claude', 'search.claude', 'Sends what you type to claude.ai and runs it'),
       toggle('ChatGPT', 'search.chatgpt', 'Sends what you type to chatgpt.com and runs it'),
@@ -235,7 +235,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
     const t = prefs().tiles;
     return [
       title('Layout'),
-      el('p', { class: 'pref-hint pref-intro', text: 'Each tiles block’s columns, group and search bar are under Layout; its size is set in Layout mode.' }),
+      el('p', { class: 'pref-hint pref-intro', text: 'Each tiles block’s columns and group are under Layout; its size and place are set in Layout mode.' }),
       slider('Spacing', 'spacing', 0, 40, { unit: 'px' }),
       toggle('Center vertically', 'centerVertically'),
       toggle('Compact layout', 'compact', 'Shorter tiles'),
@@ -297,19 +297,9 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         },
         el('option', { value: '', text: 'Follow the tabs', selected: s.group === null }),
         groups.map(g => el('option', { value: g.id, text: g.title, selected: g.id === s.group })));
-        const current = s.bar == null ? 'off' : String(s.bar);
-        const barOptions = [['off', 'Off'], ['0', 'Above the tiles'], ...(s.bar > 0 ? [[String(s.bar), `After row ${s.bar}`]] : []), ['-1', 'Below the tiles']];
-        const barSelect = el('select', {
-          class: 'pref-input', 'aria-label': 'Search bar', dataset: { key: `${copy.id}.bar` },
-          onchange: () => {
-            set('bar', barSelect.value === 'off' ? null : Number(barSelect.value));
-            redraw();
-          },
-        }, barOptions.map(([value, text]) => el('option', { value, text, selected: value === current })));
         return [
           row('Group', groupSelect, 'The group this block shows'),
           sliderFor('Columns', `${copy.id}.columns`, s.columns, 2, 10, v => set('columns', v)),
-          row('Search bar', barSelect, 'Among this block’s rows; drag its ⠿ to put it between two rows'),
         ];
       }
       case 'github':
@@ -322,7 +312,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
       case 'markets':
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
       case 'search':
-        return [row('Engines', el('button', { type: 'button', class: 'btn', text: 'Search bar section', onclick: () => show('search') }), 'Shared by every search bar')];
+        return [row('Engines', el('button', { type: 'button', class: 'btn', text: 'Search bar section', onclick: () => show('search') }), 'Google, Claude, ChatGPT, Gemini')];
       default:
         return [row('No settings', el('span'))];
     }
