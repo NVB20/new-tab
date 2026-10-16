@@ -25,7 +25,9 @@ const ACTIVE_FRAME_MS = 1000 / 40;
 const IDLE_FRAME_MS = 1000 / 10;
 const RIPPLE = { speed: 240, maxRadius: 480, thickness: 48 }; // px/s, px, px
 // Clicks on these start no ripple.
-const NO_RIPPLE = 'a, button, input, textarea, select, label, summary, dialog, .menu, .sidebar, .widgets';
+// No ripple from clicks on controls, inside widgets (the tiles block's empty space still ripples),
+// or anywhere on the canvas while the layout is being edited.
+const NO_RIPPLE = 'a, button, input, textarea, select, label, summary, dialog, .menu, .sidebar, .widget-frame:not(.frame-tiles), .layout-editing .canvas';
 
 // Resting letters are the theme's text colour at very low opacity, so they melt into the
 // background; hover light makes them brighter and slightly cooler; the click ripple is blue

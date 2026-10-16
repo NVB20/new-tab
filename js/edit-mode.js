@@ -1,0 +1,289 @@
+// Layout mode: drag, resize, add, duplicate and remove the widget copies on the canvas. Every
+// change goes through the store with layout.js's helpers, and nothing is written while the
+// pointer is down. Loaded on first use.
+
+import { el, icon, confirmDialog, alertDialog } from './ui.js';
+import {
+  TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout,
+} from './layout.js';
+import { gridArea } from './canvas.js';
+
+const MIN_WIDTH = 900;   // px; under this the page stacks and there is nothing to lay out
+const DIRS = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
+
+export function setupEditMode(store, canvas, ctx) {
+  const root = canvas.root;
+  const button = document.getElementById('btn-layout');
+  let active = false;
+  let snapshot = null;   // the layout on entering, for Cancel
+  const layout = () => store.get().prefs.layout;
+
+  // The cell outlines, and the outline of where a drag or resize will land.
+  const overlay = el('div', { class: 'canvas-cells', 'aria-hidden': 'true' },
+    Array.from({ length: COLS * ROWS }, () => el('div', { class: 'canvas-cell' })));
+  const ghost = el('div', { class: 'canvas-ghost', 'aria-hidden': 'true', hidden: true });
+  const chips = el('div', { class: 'tray-chips' });
+  const tray = el('div', { class: 'layout-tray', role: 'toolbar', 'aria-label': 'Layout mode' },
+    el('span', { class: 'tray-label', text: 'Add' }),
+    chips,
+    el('div', { class: 'tray-right' },
+      el('button', { type: 'button', class: 'btn', text: 'Reset layout', title: 'Back to the default places', onclick: reset }),
+      el('button', { type: 'button', class: 'btn', text: 'Cancel', title: 'Undo everything since you entered Layout mode', onclick: () => exit({ restore: true }) }),
+      el('button', { type: 'button', class: 'btn btn-primary', text: 'Done', title: 'Keep this layout (Esc)', onclick: () => exit() })));
+
+  // ---- frames: a label, a toolbar and eight handles while editing ----
+
+  function decorate(frame) {
+    if (frame.querySelector(':scope > .frame-tools')) return;
+    const id = frame.dataset.id;
+    frame.tabIndex = 0;
+    frame.append(
+      el('div', { class: 'frame-label' }),
+      el('div', { class: 'frame-tools' },
+        el('button', { type: 'button', class: 'icon-btn', title: 'Settings', 'aria-label': 'Settings', onclick: () => ctx.openPrefs('layout', id) }, icon('settings', 15)),
+        el('button', { type: 'button', class: 'icon-btn frame-dup', 'aria-label': 'Duplicate', onclick: () => duplicate(id) }, icon('copy', 15)),
+        el('button', { type: 'button', class: 'icon-btn frame-remove', title: 'Remove (Delete)', 'aria-label': 'Remove', onclick: () => remove(id) }, icon('x', 15))),
+      ...DIRS.map(dir => el('div', { class: `frame-handle ${dir}`, dataset: { dir }, 'aria-hidden': 'true' })));
+    refreshFrame(frame);
+  }
+
+  function strip(frame) {
+    frame.tabIndex = -1;
+    frame.removeAttribute('tabindex');
+    for (const n of frame.querySelectorAll(':scope > .frame-label, :scope > .frame-tools, :scope > .frame-handle')) n.remove();
+  }
+
+  const limitTitle = t => (t.max === 1 ? `Only one ${t.label}` : `Up to ${t.max} ${t.label} widgets`);
+
+  function refreshFrame(frame) {
+    const state = store.get();
+    const copy = copyById(state, frame.dataset.id);
+    if (!copy) return;
+    const title = copyTitle(copy, state.groups);
+    const label = frame.querySelector(':scope > .frame-label');
+    if (label) label.textContent = title;
+    const t = TYPES[copy.type];
+    const dup = frame.querySelector('.frame-dup');
+    if (dup) {
+      const full = countOf(state.prefs.layout, copy.type) >= t.max;
+      dup.disabled = full;
+      dup.title = full ? limitTitle(t) : 'Duplicate (D)';
+    }
+    frame.setAttribute('aria-label', `${title}, ${copy.w} by ${copy.h} cells at column ${copy.x + 1}, row ${copy.y + 1}`);
+  }
+
+  function refresh() {
+    for (const frame of canvas.frames().values()) refreshFrame(frame);
+    renderTray();
+  }
+
+  // ---- the tray: one chip per type ----
+
+  function renderTray() {
+    const l = layout();
+    chips.replaceChildren(...Object.entries(TYPES).map(([type, t]) => {
+      const n = countOf(l, type);
+      const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
+      const chip = el('button', { type: 'button', class: 'tray-chip', dataset: { type }, onclick: () => add(type) },
+        icon('plus', 13), el('span', { text: t.label }), el('b', { text: t.max === 1 ? (n ? 'on' : 'off') : `${n}/${t.max}` }));
+      chip.disabled = n >= t.max || !room;
+      chip.title = n >= t.max ? limitTitle(t) : !room ? 'No room: shrink or remove a widget first' : `Add ${t.label}`;
+      return chip;
+    }));
+    document.body.style.setProperty('--tray-h', `${tray.offsetHeight || 64}px`);
+  }
+
+  // ---- changes ----
+
+  const focusFrame = id => canvas.frames().get(id)?.focus({ preventScroll: true });
+  const noRoom = () => alertDialog('No room for another widget. Shrink or remove one first.', 'No room');
+
+  function add(type) {
+    let copy = null;
+    store.update(s => { copy = addCopy(s.prefs.layout, type, undefined, s.groups); });
+    if (copy) focusFrame(copy.id);
+    else noRoom();
+  }
+
+  function duplicate(id) {
+    const own = copyById(store.get(), id);
+    if (!own || countOf(layout(), own.type) >= TYPES[own.type].max) return;
+    let copy = null;
+    store.update(s => { copy = duplicateCopy(s.prefs.layout, id, s.groups); });
+    if (copy) focusFrame(copy.id);
+    else noRoom();
+  }
+
+  function remove(id) {
+    store.update(s => { removeCopy(s.prefs.layout, id); });
+    canvas.frames().values().next().value?.focus({ preventScroll: true });
+  }
+
+  async function reset() {
+    const s = store.get();
+    const names = resetLayout(structuredClone(s.prefs.layout)).map(c => copyTitle(c, s.groups)).join(', ');
+    const ok = await confirmDialog(
+      names ? `Put every widget back in its default place? ${names} will be removed.` : 'Put every widget back in its default place?',
+      { title: 'Reset layout', confirmLabel: 'Reset' },
+    );
+    if (ok) store.update(st => { resetLayout(st.prefs.layout); });
+  }
+
+  // ---- drag and resize ----
+  // The frame follows the pointer (a move) or shows its new size (a resize) while the ghost shows
+  // the cells it will snap to, red when they are taken or off the canvas. Letting go there puts
+  // the frame back.
+
+  root.addEventListener('pointerdown', e => {
+    if (!active || e.button !== 0) return;
+    const frame = e.target.closest('.widget-frame');
+    if (!frame || e.target.closest('.frame-tools')) return;
+    const copy = copyById(store.get(), frame.dataset.id);
+    if (!copy) return;
+    e.preventDefault();
+    frame.focus({ preventScroll: true });
+    const dir = e.target.closest('.frame-handle')?.dataset.dir ?? 'move';
+    const min = TYPES[copy.type].min;
+    const cs = getComputedStyle(root);
+    const r = root.getBoundingClientRect();
+    const pitchX = (r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + parseFloat(cs.columnGap)) / COLS;
+    const pitchY = (r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + parseFloat(cs.rowGap)) / ROWS;
+    const start = { px: e.clientX, py: e.clientY, x: copy.x, y: copy.y, w: copy.w, h: copy.h };
+    let target = { x: copy.x, y: copy.y, w: copy.w, h: copy.h };
+    let valid = true;
+    frame.setPointerCapture(e.pointerId);
+    frame.classList.add('lifted');
+    ghost.hidden = false;
+    ghost.classList.remove('bad');
+    ghost.style.gridArea = gridArea(target);
+
+    const move = ev => {
+      const dx = ev.clientX - start.px;
+      const dy = ev.clientY - start.py;
+      const dc = Math.round(dx / pitchX);
+      const dr = Math.round(dy / pitchY);
+      if (dir === 'move') {
+        target = { x: start.x + dc, y: start.y + dr, w: start.w, h: start.h };
+        frame.style.transform = `translate(${dx}px, ${dy}px)`;
+      } else {
+        let { x, y, w, h } = start;
+        if (dir.includes('e')) w = Math.min(Math.max(start.w + dc, min[0]), COLS - start.x);
+        if (dir.includes('s')) h = Math.min(Math.max(start.h + dr, min[1]), ROWS - start.y);
+        if (dir.includes('w')) {
+          x = Math.min(Math.max(start.x + dc, 0), start.x + start.w - min[0]);
+          w = start.x + start.w - x;
+        }
+        if (dir.includes('n')) {
+          y = Math.min(Math.max(start.y + dr, 0), start.y + start.h - min[1]);
+          h = start.y + start.h - y;
+        }
+        target = { x, y, w, h };
+        frame.style.gridArea = gridArea(target);
+      }
+      valid = fits(layout(), target, copy.id);
+      ghost.style.gridArea = gridArea(target);
+      ghost.classList.toggle('bad', !valid);
+    };
+    const up = () => {
+      frame.removeEventListener('pointermove', move);
+      frame.classList.remove('lifted');
+      frame.style.transform = '';
+      ghost.hidden = true;
+      const changed = ['x', 'y', 'w', 'h'].some(k => target[k] !== start[k]);
+      let moved = false;
+      if (valid && changed) store.update(s => { moved = moveCopy(s.prefs.layout, copy.id, target); });
+      if (!moved) frame.style.gridArea = gridArea(copyById(store.get(), copy.id) ?? start);
+      focusFrame(copy.id);
+    };
+    frame.addEventListener('pointermove', move);
+    frame.addEventListener('lostpointercapture', up, { once: true });
+  });
+
+  // ---- keyboard: arrows move, Shift+arrows resize, D duplicates, Delete removes ----
+
+  root.addEventListener('keydown', e => {
+    if (!active) return;
+    const frame = e.target.closest?.('.widget-frame');
+    if (!frame || e.target !== frame) return;
+    const copy = copyById(store.get(), frame.dataset.id);
+    if (!copy) return;
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (d) {
+      e.preventDefault();
+      const target = e.shiftKey
+        ? { x: copy.x, y: copy.y, w: copy.w + d[0], h: copy.h + d[1] }
+        : { x: copy.x + d[0], y: copy.y + d[1], w: copy.w, h: copy.h };
+      store.update(s => { moveCopy(s.prefs.layout, copy.id, target); });
+      focusFrame(copy.id);
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      remove(copy.id);
+    } else if (e.key.toLowerCase() === 'd' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      duplicate(copy.id);
+    }
+  });
+
+  // ---- entering and leaving ----
+
+  function enter() {
+    if (active) return;
+    if (innerWidth < MIN_WIDTH) {
+      alertDialog('Layout mode needs a window at least 900px wide. The page stacks its widgets in one column below that.', 'Layout mode');
+      return;
+    }
+    active = true;
+    snapshot = structuredClone(layout());
+    document.body.classList.add('layout-editing');
+    button?.setAttribute('aria-pressed', 'true');
+    root.append(overlay, ghost);
+    document.body.append(tray);
+    for (const frame of canvas.frames().values()) decorate(frame);
+    refresh();
+    canvas.frames().values().next().value?.focus({ preventScroll: true });
+  }
+
+  function exit({ restore = false } = {}) {
+    if (!active) return;
+    active = false;
+    if (restore) {
+      const back = snapshot;
+      store.update(s => { s.prefs.layout = structuredClone(back); });
+    }
+    snapshot = null;
+    document.body.classList.remove('layout-editing');
+    document.body.style.removeProperty('--tray-h');
+    button?.setAttribute('aria-pressed', 'false');
+    for (const frame of canvas.frames().values()) strip(frame);
+    overlay.remove();
+    ghost.remove();
+    tray.remove();
+    button?.focus({ preventScroll: true });
+  }
+
+  canvas.onFrame(frame => { if (active) decorate(frame); });
+  store.subscribe(() => {
+    if (!active) return;
+    refresh();
+    root.append(overlay, ghost);   // after the frames the canvas may have re-added
+  }, ['prefs', 'groups']);
+  addEventListener('keydown', e => {
+    if (!active || e.key !== 'Escape') return;
+    if (document.querySelector('dialog[open]') || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    exit();
+  });
+  addEventListener('resize', () => {
+    if (!active) return;
+    if (innerWidth < MIN_WIDTH) exit();
+    else renderTray();
+  });
+
+  return {
+    enter,
+    exit,
+    toggle: () => (active ? exit() : enter()),
+    get active() {
+      return active;
+    },
+  };
+}

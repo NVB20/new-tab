@@ -41,7 +41,9 @@ export function mountCanvas(root, store, ctx) {
       m.frame.style.gridArea = gridArea(copy);
       m.frame.style.order = String(order.indexOf(copy.id));
     }
-    for (const id of order) root.append(mounted.get(id).frame);
+    // Only when the order changed: moving a frame in the DOM would blur anything focused in it.
+    const current = [...root.querySelectorAll(':scope > .widget-frame')].map(f => f.dataset.id);
+    if (current.join() !== order.join()) for (const id of order) root.append(mounted.get(id).frame);
   }
 
   store.subscribe(sync, ['prefs']);

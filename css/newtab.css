@@ -1081,3 +1081,110 @@ kbd {
   .prefs-content { padding: 16px 20px 24px; }
   .pref-row { flex-wrap: wrap; }
 }
+
+/* ---------- Layout mode ---------- */
+
+/* The tray takes the bottom of the window; the canvas keeps its 12 rows above it. */
+body.layout-editing .canvas { height: calc(100vh - 56px - var(--tray-h, 64px)); }
+.canvas-cells {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  padding: 8px 24px 24px;
+  pointer-events: none;
+}
+.canvas-cell { border: 1px dashed color-mix(in srgb, var(--text) 12%, transparent); border-radius: 8px; }
+.canvas-ghost { z-index: 5; border: 2px solid var(--accent); border-radius: 14px; background: var(--accent-soft); pointer-events: none; }
+.canvas-ghost.bad { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
+
+body.layout-editing .widget-frame {
+  outline: 1.5px dashed color-mix(in srgb, var(--text) 38%, transparent);
+  outline-offset: 2px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  cursor: grab;
+  transition: outline-color 0.15s, box-shadow 0.15s;
+}
+body.layout-editing .widget-frame:focus-visible { outline: 2px solid var(--accent); }
+body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
+.widget-frame.lifted { z-index: 6; cursor: grabbing; box-shadow: var(--shadow); outline-color: var(--accent); background: var(--surface); }
+.widget-frame.lifted .widget-root { opacity: 0.9; }
+
+.frame-label {
+  position: absolute;
+  bottom: 6px;
+  left: 9px;
+  z-index: 2;
+  max-width: calc(100% - 24px);
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.frame-tools { position: absolute; top: 4px; right: 4px; z-index: 3; display: flex; gap: 1px; padding: 2px; border-radius: 8px; background: var(--surface-2); }
+.frame-tools .icon-btn { width: 24px; height: 24px; border-radius: 6px; }
+.frame-tools .icon-btn:disabled { opacity: 0.35; cursor: default; }
+.frame-tools .icon-btn:disabled:hover { background: none; color: var(--muted); }
+.frame-tools .frame-remove:hover { color: var(--danger); }
+
+.frame-handle { position: absolute; z-index: 3; touch-action: none; }
+.frame-handle.n, .frame-handle.s { left: 14px; right: 14px; height: 8px; cursor: ns-resize; }
+.frame-handle.e, .frame-handle.w { top: 14px; bottom: 14px; width: 8px; cursor: ew-resize; }
+.frame-handle.n { top: -4px; }
+.frame-handle.s { bottom: -4px; }
+.frame-handle.e { right: -4px; }
+.frame-handle.w { left: -4px; }
+.frame-handle.nw, .frame-handle.ne, .frame-handle.sw, .frame-handle.se { width: 12px; height: 12px; border: 2px solid var(--accent); border-radius: 3px; background: var(--bg); }
+.frame-handle.nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.frame-handle.se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.frame-handle.ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.frame-handle.sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+
+.layout-tray {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.tray-label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tray-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tray-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.tray-chip b { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tray-chip:hover { border-color: var(--muted); }
+.tray-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tray-chip:disabled { opacity: 0.4; cursor: default; }
+.tray-chip:disabled:hover { border-color: var(--border); }
+.tray-right { margin-left: auto; display: flex; gap: 6px; }
+#btn-layout[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  body.layout-editing .widget-frame { transition: none; }
+}
