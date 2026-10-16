@@ -44,6 +44,15 @@ Removed: the "Show widgets" master switch (each widget has its own) and the shor
 - Double-click the header to put it back in the middle. The position is remembered in
   `localStorage` (`newtab:prefs-offset`) and re-fitted to the window on open and on resize.
 
+## One-line clock faces (asked for during this work)
+
+Stencil, Rounded and Serif also come on one line: faces `stencil-line`, `rounded-line`,
+`serif-line` (`{ font }` in `CLOCK_FACES`, styled by the same `face-<font>` class without
+`stacked`, sized to fit the column). The ✎ strip becomes four columns: stacked faces on the top row,
+their one-line twins under them, Dot under Classic. Preferences → Clock: Style picks the font
+(Classic · Stencil · Rounded · Serif · Dot); for the three fonts with both layouts an
+"Hours over minutes" switch picks stacked or one line, and changing font keeps that choice.
+
 ## Features being built in parallel
 
 The panel draws these from the data, so it is right before and after each one lands on main:

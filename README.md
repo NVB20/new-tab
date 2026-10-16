@@ -48,7 +48,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
 | **GitHub** | Your contribution heatmap, latest commits and open pull requests, including private repos with a token. |
-| **Clock** | Five One UI–style faces, from a slim classic clock to big stacked stencil digits. |
+| **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with a week of finished-task history, and a notes pad. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
@@ -160,10 +160,13 @@ should, the widget says why (for example, missing *Contents* access or org appro
   is kept for good (counted on the day you tick it; unticking takes it back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set in Preferences → Widgets. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
-  Samsung One UI lock screen), Rounded, Serif or Dot. The faces' fonts are bundled in `fonts/`
-  (SIL Open Font License), so they work offline.
-- **Background:** Preferences → Appearance: ASCII or Plain, animation on or off, or upload a
-  wallpaper (a wallpaper replaces the ASCII field while it's set).
+  Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
+  line (the second row of the picker, or **Hours over minutes** off in Preferences). The faces'
+  fonts are bundled in `fonts/` (SIL Open Font License), so they work offline.
+- **Background:** Preferences → Page: ASCII, Plain or Image (upload a picture or paste a link).
+  Switching back to ASCII or Plain keeps your picture, so Image brings it back.
+- **Preferences:** drag the panel by its header to see the page behind it change as you adjust;
+  double-click the header to put it back in the middle.
 - **Backup:** Preferences → Backup → **Download backup** saves everything (including the wallpaper)
   to one file you can import again on another computer.
 

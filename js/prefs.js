@@ -1,26 +1,34 @@
-// Preferences modal. Every control writes straight to the store, so the page updates live.
+// Preferences panel. Every control writes straight to the store, so the page updates live, and
+// the panel can be dragged aside by its header to watch the change happen behind it.
 
-import { el, icon, field, confirmDialog, alertDialog } from './ui.js';
-import { normalizeUrl } from './util.js';
-import { fromSpeedDial2 } from './importer.js';
+import { el, icon, confirmDialog, alertDialog } from './ui.js';
+import { normalizeUrl, clamp, backgroundImage } from './util.js';
+import { CLOCK_FACES } from './widgets.js';
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const TILE_PRESETS = [
-  { label: 'White tiles', color: '#ffffff', textColor: '#202124' },
-  { label: 'Dark tiles', color: '#30302e', textColor: '#faf9f5' },
+  { label: 'White', color: '#ffffff', textColor: '#202124' },
+  { label: 'Dark', color: '#30302e', textColor: '#faf9f5' },
 ];
 const MAX_WALLPAPER_SIDE = 2560;
 const BACKUP_FORMAT = 'new-tab-backup';
+const OFFSET_KEY = 'newtab:prefs-offset';
+const KEEP_VISIBLE = 120;   // px of the panel that stay inside the window while dragging
 
 export function setupPrefs(store) {
-  const getPref = path => path.split('.').reduce((o, k) => o[k], store.get().prefs);
+  const prefs = () => store.get().prefs;
+  const getPref = path => path.split('.').reduce((o, k) => o?.[k], prefs());
   const setPref = (path, value) => store.update(s => {
     const keys = path.split('.');
     const last = keys.pop();
     keys.reduce((o, k) => o[k], s.prefs)[last] = value;
   });
+  const redraw = () => show(current);
+  // Image was picked but nothing is set yet (or it was just removed): keep its boxes up.
+  let wantImage = false;
 
   // ---- control builders ----
+  // Switches and choices redraw the section, so the options that depend on them appear or go.
 
   const title = text => el('h3', { class: 'pref-section-title', text });
 
@@ -28,13 +36,36 @@ export function setupPrefs(store) {
     el('div', { class: 'pref-text' }, el('div', { text: label }), hint && el('div', { class: 'pref-hint', text: hint })),
     control);
 
-  function toggle(label, path, hint) {
+  // Options that only matter while the switch or choice above them is on, indented under it.
+  const sub = (on, ...rows) => on && el('div', { class: 'pref-sub' }, rows);
+
+  function switchFor(label, key, checked, set) {
     const input = el('input', {
-      type: 'checkbox', class: 'switch', role: 'switch', checked: getPref(path), 'aria-label': label,
-      onchange: () => setPref(path, input.checked),
+      type: 'checkbox', class: 'switch', role: 'switch', checked, 'aria-label': label,
+      dataset: { key },
+      onchange: () => {
+        set(input.checked);
+        redraw();
+      },
     });
-    return row(label, input, hint);
+    return input;
   }
+
+  const switchInput = (label, path) => switchFor(label, path, getPref(path), on => setPref(path, on));
+
+  const toggle = (label, path, hint) => row(label, switchInput(label, path), hint);
+
+  const choice = (label, value, options, pick) => el('div', { class: 'seg', role: 'group', 'aria-label': label, dataset: { key: label } },
+    options.map(o => el('button', {
+      type: 'button',
+      'aria-pressed': String(value === o.value),
+      onclick: () => {
+        pick(o.value);
+        redraw();
+      },
+    }, o.icon && icon(o.icon, 16), el('span', { text: o.label }))));
+
+  const segmented = (label, path, options, hint) => row(label, choice(label, getPref(path), options, v => setPref(path, v)), hint);
 
   function slider(label, path, min, max, { step = 1, unit = '' } = {}) {
     const out = el('output', { class: 'range-value', text: getPref(path) + unit });
@@ -48,69 +79,73 @@ export function setupPrefs(store) {
     return el('div', { class: 'pref-row pref-slider' }, el('div', { class: 'pref-label' }, el('span', { text: label }), out), input);
   }
 
-  function segmented(label, path, options, hint) {
-    const buttons = options.map(o => el('button', {
-      type: 'button',
-      'aria-pressed': String(getPref(path) === o.value),
-      onclick: () => {
-        setPref(path, o.value);
-        buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(options[i].value === o.value)));
-      },
-    }, o.icon && icon(o.icon, 16), el('span', { text: o.label })));
-    return row(label, el('div', { class: 'seg', role: 'group', 'aria-label': label }, buttons), hint);
+  function colorInput(label, path) {
+    const input = el('input', { type: 'color', value: getPref(path), title: label, 'aria-label': label, oninput: () => setPref(path, input.value) });
+    return input;
   }
 
-  function color(label, path) {
-    const input = el('input', { type: 'color', value: getPref(path), 'aria-label': label, oninput: () => setPref(path, input.value) });
-    return row(label, input);
-  }
-
-  function textInput(label, path, placeholder, { type = 'text', maxLength = 60, hint } = {}) {
+  function textField(label, path, placeholder, { type = 'text', maxLength = 60 } = {}) {
     const input = el('input', {
       type, class: 'pref-input', value: getPref(path), placeholder, dir: 'auto', maxLength, 'aria-label': label,
       autocomplete: 'off', spellcheck: false,
       oninput: () => setPref(path, input.value),
     });
-    return row(label, input, hint);
+    return input;
   }
+
+  const textInput = (label, path, placeholder, { hint, ...opts } = {}) => row(label, textField(label, path, placeholder, opts), hint);
 
   // ---- sections ----
 
-  function general() {
+  function page() {
+    const p = prefs();
+    const image = backgroundImage(p.background, store.wallpaper);
+    const shown = image || wantImage ? 'image' : p.background.pattern;
+    const swatches = ACCENTS.map(c => el('button', {
+      type: 'button', class: 'swatch', title: c, 'aria-label': `Accent ${c}`,
+      'aria-pressed': String(p.accent === c),
+      style: `background:${c}`,
+      onclick: () => {
+        setPref('accent', c);
+        redraw();
+      },
+    }));
+    const custom = el('input', { type: 'color', value: p.accent, title: 'Any colour', 'aria-label': 'Custom accent colour', oninput: () => setPref('accent', custom.value) });
+
     return [
-      title('Layout'),
+      title('Colours'),
       segmented('Theme', 'theme', [
         { value: 'auto', label: 'Auto', icon: 'auto' },
         { value: 'light', label: 'Light', icon: 'sun' },
         { value: 'dark', label: 'Dark', icon: 'moon' },
       ]),
-      slider('Number of columns', 'columns', 2, 10),
-      slider('Spacing', 'spacing', 0, 40, { unit: 'px' }),
-      slider('Width', 'width', 480, 1600, { step: 10, unit: 'px' }),
-      toggle('Center vertically', 'centerVertically'),
-      toggle('Show + button', 'showAddButton'),
-      toggle('Compact layout', 'compact', 'Shorter tiles'),
-      toggle('Open tiles in a new tab', 'openInNewTab', 'Ctrl+click or middle-click always opens a new tab'),
+      row('Accent', el('div', { class: 'swatches' }, swatches, custom)),
+      title('Background'),
+      row('Style', choice('Background', shown, [
+        { value: 'ascii', label: 'ASCII' },
+        { value: 'none', label: 'Plain' },
+        { value: 'image', label: 'Image' },
+      ], pickBackground)),
+      sub(shown === 'ascii', toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations')),
+      sub(shown === 'image', imageRows(image)),
+      // The search bar's prefs arrive with the search feature; until then there is nothing to set.
+      p.search && title('Search bar'),
+      p.search && toggle('Search bar', 'search.enabled', 'Above the tiles. With Google and Claude both on, a switch picks one'),
+      p.search && sub(p.search.enabled,
+        toggle('Google', 'search.google'),
+        toggle('Claude', 'search.claude', 'Sends what you type to claude.ai and runs it')),
+      title('Top bar'),
       toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
-      el('p', { class: 'pref-footnote', text: 'Ctrl+K or / opens Jump. Right-click a tile or group for more options; drag tiles to reorder or onto a group to move them.' }),
     ];
   }
 
-  function appearance() {
-    const swatches = ACCENTS.map(c => el('button', {
-      type: 'button', class: 'swatch', title: c, 'aria-label': `Accent ${c}`,
-      'aria-pressed': String(getPref('accent') === c),
-      style: `background:${c}`,
-      onclick: () => { setPref('accent', c); show('appearance'); },
-    }));
-    const custom = el('input', { type: 'color', value: getPref('accent'), 'aria-label': 'Custom accent colour', oninput: () => setPref('accent', custom.value) });
-
-    const bg = store.get().prefs.background;
-    const source = bg.useUpload && store.wallpaper
-      ? 'Uploaded image (replaces the style above)'
-      : bg.url ? 'Image from a link (replaces the style above)' : 'None';
+  function imageRows(image) {
+    const bg = prefs().background;
     const fileInput = el('input', { type: 'file', accept: 'image/*', hidden: true, onchange: () => uploadWallpaper(fileInput.files[0]) });
-    const urlInput = el('input', { type: 'text', class: 'pref-input wide', value: bg.url, placeholder: 'https://… image link', spellcheck: false, autocomplete: 'off' });
+    const urlInput = el('input', {
+      type: 'text', class: 'pref-input wide', value: bg.url, placeholder: 'https://… image link',
+      spellcheck: false, autocomplete: 'off', 'aria-label': 'Image link',
+    });
     const urlHint = el('div', { class: 'field-hint' });
     const applyUrl = () => {
       const raw = urlInput.value.trim();
@@ -120,26 +155,19 @@ export function setupPrefs(store) {
         urlHint.textContent = 'That doesn’t look like a link.';
         return;
       }
-      store.update(s => {
-        s.prefs.background.url = href;
-        s.prefs.background.useUpload = false;
-      });
-      show('appearance');
+      store.update(s => Object.assign(s.prefs.background, { url: href, useUpload: false, showImage: true }));
+      redraw();
     };
     urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyUrl(); });
 
     return [
-      title('Accent'),
-      row('Accent colour', el('div', { class: 'swatches' }, swatches, custom)),
-      title('Background'),
-      segmented('Style', 'background.pattern', [{ value: 'ascii', label: 'ASCII' }, { value: 'none', label: 'Plain' }]),
-      toggle('Animate and react to the mouse', 'background.motion', 'Stays still if Windows is set to reduce animations'),
-      row('Wallpaper', el('div', { class: 'btn-row' },
-        el('button', { type: 'button', class: 'btn', onclick: () => fileInput.click() }, icon('upload', 16), 'Upload image'),
-        el('button', { type: 'button', class: 'btn', onclick: clearWallpaper }, 'Remove'),
-        fileInput), source),
+      row('Image', el('div', { class: 'btn-row' },
+        el('button', { type: 'button', class: 'btn', onclick: () => fileInput.click() }, icon('upload', 16), 'Upload'),
+        el('button', { type: 'button', class: 'btn', disabled: !image, onclick: clearWallpaper }, 'Remove'),
+        fileInput),
+      image ? (bg.useUpload ? 'Your uploaded image' : 'Image from a link') : 'Upload one, or paste a link below'),
       el('div', { class: 'pref-row pref-stack' },
-        el('div', { text: 'Or use an image link' }),
+        el('div', { text: 'Image link' }),
         el('div', { class: 'btn-row' }, urlInput, el('button', { type: 'button', class: 'btn', onclick: applyUrl }, 'Apply')),
         urlHint),
       slider('Blur', 'background.blur', 0, 20, { unit: 'px' }),
@@ -147,52 +175,89 @@ export function setupPrefs(store) {
     ];
   }
 
+  // ASCII and Plain hide the image but keep it, so choosing Image again brings it back.
+  function pickBackground(value) {
+    wantImage = value === 'image';
+    store.update(s => {
+      s.prefs.background.showImage = wantImage;
+      if (!wantImage) s.prefs.background.pattern = value;
+    });
+  }
+
   function tiles() {
+    const t = prefs().tiles;
     return [
-      title('Tiles'),
+      title('Layout'),
+      slider('Columns', 'columns', 2, 10),
+      slider('Width', 'width', 480, 1600, { step: 10, unit: 'px' }),
+      slider('Spacing', 'spacing', 0, 40, { unit: 'px' }),
+      toggle('Center vertically', 'centerVertically'),
+      toggle('Compact layout', 'compact', 'Shorter tiles'),
+      title('Look'),
       segmented('Style', 'tiles.style', [{ value: 'flat', label: 'Flat' }, { value: 'card', label: 'Cards' }]),
+      sub(t.style === 'card',
+        slider('Corner radius', 'tiles.radius', 0, 24, { unit: 'px' }),
+        row('Colours', el('div', { class: 'btn-row' },
+          TILE_PRESETS.map(p => el('button', {
+            type: 'button', class: 'btn',
+            onclick: () => {
+              store.update(s => Object.assign(s.prefs.tiles, { color: p.color, textColor: p.textColor }));
+              redraw();
+            },
+          }, p.label)),
+          colorInput('Card colour', 'tiles.color'),
+          colorInput('Title colour', 'tiles.textColor')), 'A preset, or pick the card and title colours')),
       segmented('Icons', 'tiles.icons', [{ value: 'logo', label: 'Logos' }, { value: 'site', label: 'Site icons' }],
-        'Site icons are the flat icons Chrome keeps for each site (installed extension only)'),
+        'Site icons come from Chrome (installed extension only)'),
       toggle('Show titles', 'tiles.showTitle'),
-      title('Cards'),
-      slider('Corner radius', 'tiles.radius', 0, 24, { unit: 'px' }),
-      color('Card colour', 'tiles.color'),
-      color('Title colour', 'tiles.textColor'),
-      row('Presets', el('div', { class: 'btn-row' }, TILE_PRESETS.map(p => el('button', {
-        type: 'button', class: 'btn',
-        onclick: () => {
-          store.update(s => Object.assign(s.prefs.tiles, { style: 'card', color: p.color, textColor: p.textColor }));
-          show('tiles');
-        },
-      }, p.label))), 'Only used with the Cards style'),
+      title('Behaviour'),
+      toggle('Open tiles in a new tab', 'openInNewTab', 'Ctrl+click or middle-click always opens a new tab'),
+      toggle('Show + button', 'showAddButton', 'The last tile in the grid, for adding a new one'),
     ];
   }
 
   function widgets() {
+    const w = prefs().widgets;
+    const [near, far] = w.position === 'right' ? ['Right', 'Left'] : ['Left', 'Right'];
     return [
-      title('Widgets'),
-      toggle('Show widgets', 'widgets.enabled'),
-      segmented('Position', 'widgets.position', [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }]),
-      title('Clock'),
-      toggle('Clock', 'widgets.clock.enabled'),
-      textInput('Your name', 'widgets.clock.name', 'Niv'),
-      toggle('24-hour clock', 'widgets.clock.hour24'),
-      toggle('Greeting', 'widgets.clock.greeting'),
-      title('Lists'),
+      segmented('Clock side', 'widgets.position', [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }],
+        'Markets and GitHub take the other side'),
+      title(`${near} column`),
+      toggle('Clock', 'widgets.clock.enabled', 'Or use ✎ on the clock to pick a style'),
+      sub(w.clock.enabled,
+        clockStyle(w.clock.face),
+        toggle('24-hour clock', 'widgets.clock.hour24'),
+        row('Greeting', el('div', { class: 'btn-row' },
+          w.clock.greeting && textField('Your name', 'widgets.clock.name', 'Your name'),
+          switchInput('Greeting', 'widgets.clock.greeting')), 'Good morning, and your name')),
       toggle('Tasks', 'widgets.tasks.enabled'),
       toggle('Notes', 'widgets.notes.enabled'),
-      title('Markets'),
-      toggle('Markets', 'widgets.markets.enabled', 'Shown in the column opposite the clock'),
-      textInput('Coins', 'widgets.markets.coins', 'BTC, SOL, XRP, ETH', { hint: 'Bybit spot tickers, priced in USDT' }),
-      toggle('USD/ILS rate', 'widgets.markets.fx', 'Daily ECB reference rate'),
-      title('GitHub'),
-      toggle('GitHub', 'widgets.github.enabled', 'Your latest commits in any repo, and open pull requests'),
-      textInput('Username', 'widgets.github.user', 'NVB20'),
-      textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
-        type: 'password',
-        maxLength: 300,
-        hint: 'A read-only token adds commits and PRs in private repos (e.g. eitan-capital). Kept only in this browser and left out of backups.',
-      }),
+      // Arrives with the search feature, like the search bar's prefs.
+      w.claude && toggle('Claude', 'widgets.claude.enabled', 'A box that sends a message to a new chat on claude.ai'),
+      title(`${far} column`),
+      toggle('Markets', 'widgets.markets.enabled', 'Use ✎ on the widget to choose coins and currency pairs'),
+      toggle('GitHub', 'widgets.github.enabled', 'Your latest commits, open pull requests and a year of activity'),
+      sub(w.github.enabled,
+        textInput('Username', 'widgets.github.user', 'NVB20'),
+        textInput('Access token', 'widgets.github.token', 'github_pat_…', {
+          type: 'password',
+          maxLength: 300,
+          hint: 'Optional and read-only; adds private repos (e.g. eitan-capital). Kept only in this browser, never in backups.',
+        })),
+    ];
+  }
+
+  // Style picks the font. Stencil, Rounded and Serif come stacked or on one line (their `-line`
+  // face), so a switch picks which, and changing font keeps that choice.
+  function clockStyle(faceId) {
+    const face = CLOCK_FACES.find(f => f.id === faceId) ?? CLOCK_FACES[0];
+    const font = face.font ?? face.id;
+    const lineOf = f => CLOCK_FACES.find(x => x.font === f)?.id;
+    const fonts = CLOCK_FACES.filter(f => !f.font).map(f => ({ value: f.id, label: f.label }));
+    return [
+      row('Style', choice('Clock style', font, fonts, f => setPref('widgets.clock.face', face.font && lineOf(f) ? lineOf(f) : f))),
+      lineOf(font) && row('Hours over minutes', switchFor('Hours over minutes', 'clock-stacked', !face.font,
+        on => setPref('widgets.clock.face', on ? font : lineOf(font)))),
     ];
   }
 
@@ -218,8 +283,8 @@ export function setupPrefs(store) {
     try {
       const dataUrl = await shrinkImage(file);
       await store.setWallpaper(dataUrl);
-      store.update(s => { s.prefs.background.useUpload = true; });
-      show('appearance');
+      store.update(s => Object.assign(s.prefs.background, { useUpload: true, showImage: true }));
+      redraw();
     } catch (err) {
       alertDialog(`Couldn’t use that image: ${err.message}`);
     }
@@ -227,11 +292,9 @@ export function setupPrefs(store) {
 
   async function clearWallpaper() {
     await store.setWallpaper('');
-    store.update(s => {
-      s.prefs.background.useUpload = false;
-      s.prefs.background.url = '';
-    });
-    show('appearance');
+    store.update(s => Object.assign(s.prefs.background, { useUpload: false, url: '' }));
+    wantImage = true;
+    redraw();
   }
 
   function exportBackup() {
@@ -261,10 +324,12 @@ export function setupPrefs(store) {
       if (!await confirmDialog(`Replace everything here with this backup (${n} tiles)?`, { title: 'Restore backup', confirmLabel: 'Restore' })) return;
       store.replace(json.state);
       await store.setWallpaper(typeof json.wallpaper === 'string' ? json.wallpaper : '');
-      show('backup');
+      redraw();
       return;
     }
 
+    // Only needed for this rare path, so it isn't loaded with the page.
+    const { fromSpeedDial2 } = await import('./importer.js');
     let imported;
     try {
       imported = fromSpeedDial2(json);
@@ -276,54 +341,118 @@ export function setupPrefs(store) {
     if (!await confirmDialog(message, { title: 'Import from Speed Dial 2', confirmLabel: 'Import' })) return;
     const { tasks, taskHistory, taskStats, notes } = store.get();
     store.replace({ ...imported, tasks, taskHistory, taskStats, notes });
-    show('backup');
+    redraw();
   }
 
   async function resetAll() {
     if (!await confirmDialog('This deletes all tiles, groups, settings, tasks, notes and the wallpaper. Download a backup first if you might want them back.', { title: 'Reset everything?', confirmLabel: 'Reset', danger: true })) return;
     store.replace(null);
     await store.setWallpaper('');
-    show('general');
+    show('page');
   }
 
-  // ---- modal ----
+  // ---- panel ----
 
   const sections = [
-    { id: 'general', label: 'General', icon: 'sliders', build: general },
-    { id: 'appearance', label: 'Appearance', icon: 'palette', build: appearance },
+    { id: 'page', label: 'Page', icon: 'palette', build: page },
     { id: 'tiles', label: 'Tiles', icon: 'grid', build: tiles },
     { id: 'widgets', label: 'Widgets', icon: 'layout', build: widgets },
     { id: 'backup', label: 'Backup', icon: 'database', build: backup },
   ];
-  let current = 'general';
+  let current = 'page';
 
   const nav = el('nav', { class: 'prefs-nav', 'aria-label': 'Preference sections' });
   const content = el('div', { class: 'prefs-content' });
-  const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' },
-    el('div', { class: 'prefs-head' },
-      el('h2', { text: 'Preferences' }),
-      el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x'))),
-    el('div', { class: 'prefs-body' }, nav, content));
-  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+  const head = el('div', { class: 'prefs-head' },
+    el('div', { class: 'prefs-grab', title: 'Drag to move · double-click to centre' }, icon('grip', 16), el('h2', { text: 'Preferences' })),
+    el('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')));
+  const dialog = el('dialog', { class: 'dlg prefs-dlg', 'aria-label': 'Preferences' }, head, el('div', { class: 'prefs-body' }, nav, content));
+  // Close on a click outside, but not when a drag that began inside (a slider, the header) ends there.
+  let pressedOutside = false;
+  dialog.addEventListener('pointerdown', e => { pressedOutside = e.target === dialog; });
+  dialog.addEventListener('click', e => { if (e.target === dialog && pressedOutside) dialog.close(); });
   document.body.append(dialog);
 
   function show(id) {
+    const same = id === current;
     current = id;
+    // Redrawing replaces the controls, so focus goes back to the one that was just used.
+    const active = document.activeElement;
+    const navFocused = nav.contains(active);
+    const key = content.contains(active) ? active.closest('[data-key]')?.dataset.key : null;
+
     nav.replaceChildren(...sections.map(s => el('button', {
       type: 'button',
       'aria-current': String(s.id === id),
       onclick: () => show(s.id),
     }, icon(s.icon, 17), el('span', { text: s.label }))));
     const scroll = content.scrollTop;
-    content.replaceChildren(...sections.find(s => s.id === id).build());
-    content.scrollTop = scroll;
+    content.replaceChildren(...sections.find(s => s.id === id).build().filter(Boolean));
+    content.scrollTop = same ? scroll : 0;
+
+    if (navFocused) nav.querySelector('[aria-current="true"]').focus();
+    const target = key && [...content.querySelectorAll('[data-key]')].find(n => n.dataset.key === key);
+    if (target) (target.classList.contains('seg') ? target.querySelector('[aria-pressed="true"]') : target).focus({ preventScroll: true });
   }
+
+  // ---- moving the panel ----
+  // The offset from the centred position is kept for next time and re-fitted to the window.
+
+  let offset = { x: 0, y: 0 };
+  try {
+    const saved = JSON.parse(localStorage.getItem(OFFSET_KEY));
+    if (Number.isFinite(saved?.x) && Number.isFinite(saved?.y)) offset = { x: saved.x, y: saved.y };
+  } catch {
+    // nothing saved: start in the middle
+  }
+
+  function place(x, y) {
+    const r = dialog.getBoundingClientRect();
+    const left = r.left - offset.x;   // where the panel sits when centred
+    const top = r.top - offset.y;
+    offset = {
+      x: Math.round(clamp(x, KEEP_VISIBLE - r.width - left, innerWidth - KEEP_VISIBLE - left)),
+      y: Math.round(clamp(y, -top, innerHeight - head.offsetHeight - top)),
+    };
+    dialog.style.translate = `${offset.x}px ${offset.y}px`;
+  }
+
+  function saveOffset() {
+    try {
+      localStorage.setItem(OFFSET_KEY, JSON.stringify(offset));
+    } catch {
+      // only a convenience
+    }
+  }
+
+  head.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    e.preventDefault();
+    const start = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    const move = ev => place(ev.clientX - start.x, ev.clientY - start.y);
+    head.setPointerCapture(e.pointerId);
+    head.classList.add('dragging');
+    head.addEventListener('pointermove', move);
+    head.addEventListener('lostpointercapture', () => {
+      head.removeEventListener('pointermove', move);
+      head.classList.remove('dragging');
+      saveOffset();
+    }, { once: true });
+  });
+  head.addEventListener('dblclick', e => {
+    if (e.target.closest('button')) return;
+    place(0, 0);
+    saveOffset();
+  });
+  addEventListener('resize', () => { if (dialog.open) place(offset.x, offset.y); });
 
   return {
     open(id = current) {
+      wantImage = false;
       show(id);
       dialog.showModal();
       content.scrollTop = 0;
+      place(offset.x, offset.y);
     },
   };
 }

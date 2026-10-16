@@ -23,7 +23,8 @@ export const DEFAULT_PREFS = {
   widgets: {
     enabled: true,   // always true: an old false is turned into every widget switched off on load
     position: 'left',
-    // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks).
+    // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks),
+    // or 'stencil-line' | 'rounded-line' | 'serif-line' for those fonts on one line.
     clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic' },
     tasks: { enabled: true },
     notes: { enabled: true },

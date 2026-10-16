@@ -10,15 +10,21 @@ function partOfDay(hour) {
   return 'night';
 }
 
-// One UI style lock-screen faces. Stacked faces put the hours above the minutes.
+// One UI style lock-screen faces. Stacked faces put the hours above the minutes; the faces with
+// a `font` show that face's font on one line. In this order the ✎ strip's four columns line up
+// each stacked face with its one-line twin.
 export const CLOCK_FACES = [
   { id: 'classic', label: 'Classic' },
   { id: 'stencil', label: 'Stencil', stacked: true },
   { id: 'rounded', label: 'Rounded', stacked: true },
   { id: 'serif', label: 'Serif', stacked: true },
   { id: 'dot', label: 'Dot' },
+  { id: 'stencil-line', label: 'Stencil', font: 'stencil' },
+  { id: 'rounded-line', label: 'Rounded', font: 'rounded' },
+  { id: 'serif-line', label: 'Serif', font: 'serif' },
 ];
 const faceOf = id => CLOCK_FACES.find(f => f.id === id) ?? CLOCK_FACES[0];
+const faceClass = f => `face-${f.font ?? f.id}${f.stacked ? ' stacked' : ''}`;
 
 const heading = (iconName, text) => el('h2', { class: 'widget-head' }, icon(iconName, 18), el('span', { text }));
 
@@ -111,7 +117,7 @@ export function mountWidgets(root, store) {
 
     const c = store.get().prefs.widgets.clock;
     const current = faceOf(c.face);
-    face.className = `clock-face face-${current.id}${current.stacked ? ' stacked' : ''}`;
+    face.className = `clock-face ${faceClass(current)}`;
     // Classic keeps "Friday, Oct 16"; the One UI faces use the short "Fri 16 Oct".
     date.textContent = current.id === 'classic'
       ? now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
@@ -122,7 +128,7 @@ export function mountWidgets(root, store) {
     if (!faces.hidden) {
       faces.replaceChildren(...CLOCK_FACES.map(f => el('button', {
         type: 'button',
-        class: `clock-face-btn face-${f.id}${f.stacked ? ' stacked' : ''}`,
+        class: `clock-face-btn ${faceClass(f)}`,
         'aria-pressed': String(f.id === current.id),
         onclick: () => store.update(s => { s.prefs.widgets.clock.face = f.id; }),
       }, el('span', { class: 'clock-time', 'aria-hidden': 'true' }, clockDigits(f, now, c.hour24)), el('span', { class: 'clock-face-label', text: f.label }))));
