@@ -27,6 +27,14 @@ export (`.json`). Groups, tiles and layout settings come over; tasks and notes h
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar** — the panel icon in the header: Chrome bookmarks, the last week of history and
   recently closed tabs.
+- **Markets** — BTC, SOL, XRP and ETH (Bybit spot, USDT) with a 24h sparkline, plus the USD/ILS
+  daily ECB rate. Change the coins in Preferences → Widgets; click a row to open its chart.
+- **GitHub** — type your username into the widget. It lists your recently pushed repos and open PRs.
+  Without a token only public repos show. To include private ones (e.g. eitan-capital), create a
+  fine-grained token on GitHub (Settings → Developer settings → Personal access tokens →
+  Fine-grained), give it read-only *Metadata* and *Pull requests* access to the repos or orgs you
+  want (an org may need to approve it), and paste it into Preferences → Widgets → Access token. The
+  token stays in this browser and is never written into backup files.
 - **Background** — Preferences → Appearance: ASCII or Plain, animation on/off, or upload a
   wallpaper (a wallpaper replaces the ASCII field while it's set).
 - **Backup** — Preferences → Backup → **Download backup** saves everything (including the

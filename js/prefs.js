@@ -65,12 +65,13 @@ export function setupPrefs(store) {
     return row(label, input);
   }
 
-  function textInput(label, path, placeholder) {
+  function textInput(label, path, placeholder, { type = 'text', maxLength = 60, hint } = {}) {
     const input = el('input', {
-      type: 'text', class: 'pref-input', value: getPref(path), placeholder, dir: 'auto', maxLength: 60, 'aria-label': label,
+      type, class: 'pref-input', value: getPref(path), placeholder, dir: 'auto', maxLength, 'aria-label': label,
+      autocomplete: 'off', spellcheck: false,
       oninput: () => setPref(path, input.value),
     });
-    return row(label, input);
+    return row(label, input, hint);
   }
 
   // ---- sections ----
@@ -180,6 +181,19 @@ export function setupPrefs(store) {
       title('Lists'),
       toggle('Tasks', 'widgets.tasks.enabled'),
       toggle('Notes', 'widgets.notes.enabled'),
+      title('Markets'),
+      toggle('Markets', 'widgets.markets.enabled', 'Shown in the column opposite the clock'),
+      textInput('Coins', 'widgets.markets.coins', 'BTC, SOL, XRP, ETH', { hint: 'Bybit spot tickers, priced in USDT' }),
+      toggle('USD/ILS rate', 'widgets.markets.fx', 'Daily ECB reference rate'),
+      title('GitHub'),
+      toggle('GitHub', 'widgets.github.enabled', 'Recently pushed repos and open pull requests'),
+      textInput('Username', 'widgets.github.user', 'NVB20'),
+      textInput('Organisations', 'widgets.github.orgs', 'eitan-capital, Investing-Academy', { maxLength: 200, hint: 'Their public repos are included' }),
+      textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
+        type: 'password',
+        maxLength: 300,
+        hint: 'A read-only fine-grained token adds your private repos and PRs. Kept only in this browser and left out of backups.',
+      }),
     ];
   }
 
@@ -222,7 +236,9 @@ export function setupPrefs(store) {
   }
 
   function exportBackup() {
-    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state: store.get(), wallpaper: store.wallpaper };
+    const state = structuredClone(store.get());
+    state.prefs.widgets.github.token = '';   // a backup file shouldn't carry a credential
+    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `new-tab-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a);

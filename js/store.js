@@ -24,6 +24,10 @@ export const DEFAULT_PREFS = {
     clock: { enabled: true, hour24: true, name: '', greeting: true },
     tasks: { enabled: true },
     notes: { enabled: true },
+    // Shown in the column opposite the clock. coins are Bybit spot tickers quoted in USDT.
+    markets: { enabled: true, coins: 'BTC, SOL, XRP, ETH', fx: true },
+    // token is optional (read-only) and only adds private repos and PRs; never exported in backups.
+    github: { enabled: true, user: '', orgs: '', token: '' },
   },
   sidebar: { enabled: true },
 };
