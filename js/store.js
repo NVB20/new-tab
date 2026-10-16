@@ -18,13 +18,16 @@ export const DEFAULT_PREFS = {
   // style 'flat' shows icon and title straight on the background; 'card' uses color/textColor.
   // icons 'logo' uses each tile's own icon image; 'site' prefers Chrome's favicon for the site.
   tiles: { style: 'flat', icons: 'logo', radius: 10, showTitle: true, color: '#ffffff', textColor: '#202124' },
-  // pattern 'ascii' is the animated letter field; a wallpaper, when set, replaces it.
-  background: { pattern: 'ascii', motion: true, url: '', useUpload: false, blur: 0, dim: 0 },
+  // pattern 'ascii' is the animated letter field. An image (the upload when useUpload, else url)
+  // covers it while showImage is on; picking a pattern turns showImage off and keeps the image.
+  background: { pattern: 'ascii', motion: true, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
   widgets: {
-    enabled: true,
+    enabled: true,   // always true: an old false is turned into every widget switched off on load
     position: 'left',
-    // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks).
-    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic' },
+    // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks),
+    // or 'stencil-line' | 'rounded-line' | 'serif-line' for those fonts on one line.
+    // colon: one-line faces show "15:41", or "1541" without it.
+    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic', colon: true },
     tasks: { enabled: true },
     notes: { enabled: true },
     // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')
@@ -135,6 +138,11 @@ export function normalizeState(raw) {
   s.prefs = deepMerge(DEFAULT_PREFS, raw.prefs);
   s.prefs.widgets.markets = normalizeMarkets(raw.prefs?.widgets?.markets);
   if (!GITHUB_SHOW.includes(s.prefs.widgets.github.show)) s.prefs.widgets.github.show = DEFAULT_PREFS.widgets.github.show;
+  // Older versions had one switch that hid every widget; it becomes each widget switched off.
+  if (!s.prefs.widgets.enabled) {
+    for (const w of Object.values(s.prefs.widgets)) if (isObj(w)) w.enabled = false;
+    s.prefs.widgets.enabled = true;
+  }
   return s;
 }
 

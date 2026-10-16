@@ -66,6 +66,7 @@ test('older saved prefs get the ASCII background and flat tiles by default', () 
   assert.equal(s.prefs.tiles.icons, 'logo');
   assert.deepEqual(s.prefs.widgets.markets.items, ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS']);
   assert.equal(s.prefs.widgets.clock.face, 'classic');
+  assert.equal(s.prefs.widgets.clock.colon, true);
   assert.equal(s.prefs.widgets.github.user, '');
   assert.equal(s.prefs.tiles.color, '#ffffff');
 });
@@ -85,6 +86,24 @@ test('GitHub shows commits and issues unless the saved choice is a valid one', (
   assert.equal(show({ show: 'issues' }), 'issues');
   assert.equal(show({ show: 'commits' }), 'commits');
   assert.equal(show({ show: 'everything' }), 'both');
+});
+
+test('the old switch that hid every widget becomes each widget switched off', () => {
+  const w = normalizeState({ prefs: { widgets: { enabled: false, tasks: { enabled: true }, markets: { enabled: true } } } }).prefs.widgets;
+  assert.equal(w.enabled, true);
+  for (const name of ['clock', 'tasks', 'notes', 'markets', 'github']) assert.equal(w[name].enabled, false, name);
+});
+
+test('each widget keeps its own switch when the old master switch was on', () => {
+  const w = normalizeState({ prefs: { widgets: { enabled: true, notes: { enabled: false } } } }).prefs.widgets;
+  assert.equal(w.notes.enabled, false);
+  assert.equal(w.clock.enabled, true);
+});
+
+test('saved backgrounds from before showImage keep showing their image', () => {
+  const bg = normalizeState({ prefs: { background: { url: 'https://x/a.jpg' } } }).prefs.background;
+  assert.equal(bg.showImage, true);
+  assert.equal(bg.url, 'https://x/a.jpg');
 });
 
 test('normalizeState keeps task timestamps, history and daily counts, dropping junk', () => {

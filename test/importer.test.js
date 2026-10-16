@@ -92,7 +92,7 @@ test('preferences are mapped onto our prefs', () => {
   assert.equal(prefs.tiles.showTitle, true);
   assert.equal(prefs.widgets.enabled, true);
   assert.equal(prefs.widgets.position, 'left');
-  assert.deepEqual(prefs.widgets.clock, { enabled: true, hour24: true, name: 'Niv', greeting: true, face: 'classic' });
+  assert.deepEqual(prefs.widgets.clock, { enabled: true, hour24: true, name: 'Niv', greeting: true, face: 'classic', colon: true });
   assert.equal(prefs.widgets.tasks.enabled, true);
   assert.equal(prefs.widgets.notes.enabled, false);
   assert.equal(prefs.accent, DEFAULT_PREFS.accent);

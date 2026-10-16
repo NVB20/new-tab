@@ -1,6 +1,7 @@
 // Widget column: clock with greeting, tasks and notes.
 
 import { el, icon } from './ui.js';
+import { playClockIntro } from './clock-intro.js';
 import { mountTasks } from './task-widget.js';
 
 function partOfDay(hour) {
@@ -10,21 +11,27 @@ function partOfDay(hour) {
   return 'night';
 }
 
-// One UI style lock-screen faces. Stacked faces put the hours above the minutes.
+// One UI style lock-screen faces. Stacked faces put the hours above the minutes; the faces with
+// a `font` show that face's font on one line. In this order the ✎ strip's four columns line up
+// each stacked face with its one-line twin.
 export const CLOCK_FACES = [
   { id: 'classic', label: 'Classic' },
   { id: 'stencil', label: 'Stencil', stacked: true },
   { id: 'rounded', label: 'Rounded', stacked: true },
   { id: 'serif', label: 'Serif', stacked: true },
   { id: 'dot', label: 'Dot' },
+  { id: 'stencil-line', label: 'Stencil', font: 'stencil' },
+  { id: 'rounded-line', label: 'Rounded', font: 'rounded' },
+  { id: 'serif-line', label: 'Serif', font: 'serif' },
 ];
 const faceOf = id => CLOCK_FACES.find(f => f.id === id) ?? CLOCK_FACES[0];
+const faceClass = f => `face-${f.font ?? f.id}${f.stacked ? ' stacked' : ''}`;
 
 const heading = (iconName, text) => el('h2', { class: 'widget-head' }, icon(iconName, 18), el('span', { text }));
 
-// The time's children for a face: "9:05" in one line, or "09" over "05" (stacked faces always
-// show two-digit hours).
-function clockDigits(face, now, hour24) {
+// The time's children for a face: "9:05" (or "905" without the colon) in one line, or "09" over
+// "05" (stacked faces always show two-digit hours).
+function clockDigits(face, now, { hour24, colon }) {
   const h = now.getHours();
   const hour = hour24 ? h : h % 12 || 12;
   const hh = hour24 || face.stacked ? String(hour).padStart(2, '0') : String(hour);
@@ -32,7 +39,7 @@ function clockDigits(face, now, hour24) {
   const ampm = !hour24 && el('span', { class: 'clock-ampm', text: h < 12 ? 'AM' : 'PM' });
   return face.stacked
     ? [el('span', { class: 'clock-h', text: hh }), el('span', { class: 'clock-m' }, mm, ampm)]
-    : [`${hh}:${mm}`, ampm].filter(Boolean);
+    : [`${hh}${colon ? ':' : ''}${mm}`, ampm].filter(Boolean);
 }
 
 export function mountWidgets(root, store) {
@@ -85,21 +92,21 @@ export function mountWidgets(root, store) {
 
     const c = store.get().prefs.widgets.clock;
     const current = faceOf(c.face);
-    face.className = `clock-face face-${current.id}${current.stacked ? ' stacked' : ''}`;
+    face.className = `clock-face ${faceClass(current)}`;
     // Classic keeps "Friday, Oct 16"; the One UI faces use the short "Fri 16 Oct".
     date.textContent = current.id === 'classic'
       ? now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
       : now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-    time.replaceChildren(...clockDigits(current, now, c.hour24));
+    time.replaceChildren(...clockDigits(current, now, c));
     greeting.hidden = !c.greeting;
     greeting.textContent = `Good ${partOfDay(now.getHours())}${c.name.trim() ? ', ' + c.name.trim() : ''}`;
     if (!faces.hidden) {
       faces.replaceChildren(...CLOCK_FACES.map(f => el('button', {
         type: 'button',
-        class: `clock-face-btn face-${f.id}${f.stacked ? ' stacked' : ''}`,
+        class: `clock-face-btn ${faceClass(f)}`,
         'aria-pressed': String(f.id === current.id),
         onclick: () => store.update(s => { s.prefs.widgets.clock.face = f.id; }),
-      }, el('span', { class: 'clock-time', 'aria-hidden': 'true' }, clockDigits(f, now, c.hour24)), el('span', { class: 'clock-face-label', text: f.label }))));
+      }, el('span', { class: 'clock-time', 'aria-hidden': 'true' }, clockDigits(f, now, c)), el('span', { class: 'clock-face-label', text: f.label }))));
     }
   }
 
@@ -116,5 +123,7 @@ export function mountWidgets(root, store) {
 
   store.subscribe(render, ['notes', 'prefs']);
   render(store.get());
+  // A new tab builds its time out of a single point, then redraws it as plain text.
+  playClockIntro(time, [date, greeting]).then(() => renderClock(true));
   setInterval(renderClock, 1000);
 }

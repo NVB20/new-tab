@@ -341,6 +341,10 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 .face-serif .clock-date { font-family: "DM Serif Display", Georgia, serif; font-size: 18px; font-weight: 400; font-style: italic; }
 .face-dot .clock-date { font-family: "Doto", ui-monospace, monospace; font-size: 16px; font-weight: 800; }
 .stacked .clock-ampm { font-size: 18px; }
+/* The same fonts on one line, sized so "15:32" fits the column. */
+.face-stencil:not(.stacked) { --clock-size: 100px; }
+.face-rounded:not(.stacked) { --clock-size: 80px; }
+.face-serif:not(.stacked) { --clock-size: 96px; }
 
 /* ✎ in a widget: shown on hover, and while its editor is open. */
 .widget-edit { width: 26px; height: 26px; border-radius: 7px; opacity: 0; transition: opacity 0.15s, background 0.12s, color 0.12s; }
@@ -350,7 +354,7 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 .widget-head-status + .widget-edit { margin-left: 4px; }   /* GitHub: status, then ✎ */
 .clock-edit { position: absolute; top: 0; right: 0; }
 
-.clock-faces { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+.clock-faces { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
 .clock-face-btn {
   display: flex;
   flex-direction: column;
@@ -716,14 +720,24 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 
 .prefs-dlg { width: min(880px, calc(100vw - 32px)); height: min(640px, calc(100vh - 48px)); }
 .prefs-dlg[open] { display: flex; flex-direction: column; }
+/* Nothing dims or blurs the page: it shows exactly how the settings look. */
+.prefs-dlg::backdrop { background: none; backdrop-filter: none; }
 
+/* The header is the handle for dragging the panel aside. */
 .prefs-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 16px 16px 28px;
+  gap: 12px;
+  padding: 16px 16px 16px 20px;
   border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
 }
+.prefs-head.dragging { cursor: grabbing; }
+.prefs-grab { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.prefs-grab .icon { color: var(--muted); }
 .prefs-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
 
 .prefs-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px 1fr; }
@@ -775,8 +789,17 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .pref-label { display: flex; justify-content: space-between; }
 .pref-text { min-width: 0; }
 .pref-hint { margin-top: 2px; font-size: 12.5px; color: var(--muted); }
-.pref-footnote { margin: 18px 0 0; font-size: 12.5px; color: var(--muted); }
 .pref-input { width: 220px; }
+
+/* Options that only apply while the switch or choice above is on, tied to it by a rail. */
+.pref-sub {
+  padding: 0 0 8px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(var(--border), var(--border)) 3px 0 / 2px calc(100% - 14px) no-repeat;
+}
+.pref-row:has(+ .pref-sub) { border-bottom: 0; }
+.pref-sub:has(+ .pref-section-title), .pref-sub:last-child { border-bottom: 0; }
+.pref-sub .pref-row { padding: 8px 0; border-bottom: 0; }
 .pref-input.wide { flex: 1; width: auto; }
 .range-value { color: var(--muted); font-variant-numeric: tabular-nums; }
 
@@ -836,6 +859,7 @@ input[type="color"] {
   border: 0;
   background: none;
   color: var(--muted);
+  white-space: nowrap;
 }
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button:hover { color: var(--text); }

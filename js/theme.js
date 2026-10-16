@@ -1,5 +1,7 @@
 // Applies prefs to CSS custom properties, body classes and the wallpaper layer.
 
+import { backgroundImage } from './util.js';
+
 const cssUrl = url => `url("${url.replace(/["\\\n\r]/g, encodeURIComponent)}")`;
 
 export function mountTheme(store) {
@@ -22,6 +24,7 @@ export function mountTheme(store) {
       }
     }
 
+    const image = backgroundImage(p.background, store.wallpaper);
     const vars = {
       '--accent': p.accent,
       '--cols': p.columns,
@@ -30,13 +33,13 @@ export function mountTheme(store) {
       '--tile-radius': p.tiles.radius + 'px',
       '--tile-bg': p.tiles.color,
       '--tile-text': p.tiles.textColor,
-      '--bg-blur': p.background.blur + 'px',
-      '--bg-dim': p.background.dim / 100,
+      // Blur and dim are for photos; they would only muddy the plain and ASCII backgrounds.
+      '--bg-blur': (image ? p.background.blur : 0) + 'px',
+      '--bg-dim': image ? p.background.dim / 100 : 0,
     };
     for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, String(value));
 
     // An uploaded wallpaper is a data URL of up to a few MB: only set it when it changes.
-    const image = p.background.useUpload ? store.wallpaper : p.background.url;
     if (image !== shownImage) {
       shownImage = image;
       bg.style.backgroundImage = image ? cssUrl(image) : '';
@@ -50,7 +53,7 @@ export function mountTheme(store) {
     cl.toggle('tiles-card', p.tiles.style === 'card');
     cl.toggle('site-icons', p.tiles.icons === 'site');
     cl.toggle('widgets-right', p.widgets.position === 'right');
-    cl.toggle('widgets-off', !p.widgets.enabled);
+    cl.toggle('widgets-off', !Object.values(p.widgets).some(w => w?.enabled === true));
     cl.toggle('no-sidebar', !p.sidebar.enabled);
   }
 
