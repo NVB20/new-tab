@@ -67,6 +67,7 @@ const ICONS = {
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   trend: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
   trophy: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5a2.5 2.5 0 0 0 2.7 4M17 6h2.5a2.5 2.5 0 0 1-2.7 4M12 14v3M8.5 20h7M9.5 17h5"/>',
+  racecar: '<circle cx="6.5" cy="15.5" r="2.75"/><circle cx="17" cy="15.5" r="2.75"/><path d="M1.5 8h4M3 8v5h4.5l3-3.5H12l1 2h4l5 3.75M22.5 17.5h-2.5M9.25 16.5h5"/>',
   candles: '<path d="M7 3v4M7 15v6M17 3v7M17 17v4"/><rect x="5" y="7" width="4" height="8" rx="1"/><rect x="15" y="10" width="4" height="7" rx="1"/>',
   branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 4-4 5-8 6"/>',
   pr: '<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8M18 16V9a3 3 0 0 0-3-3h-4"/><path d="m13 4-2 2 2 2"/>',

@@ -125,7 +125,7 @@ export function mountSports(root, store, copy) {
   const podiumOf = e => (podium?.season === e.season && podium.round === e.round ? podium.podium.join(' · ') : 'Results soon');
 
   function matchup(e) {
-    if (e.sport === 'f1') return el('span', { class: 'sp-match' }, el('span', { class: 'sp-title', text: e.title }));
+    if (e.sport === 'f1') return el('span', { class: 'sp-match' }, icon('racecar', 18), el('span', { class: 'sp-title', text: e.title }));
     const mine = where => e.side === where || e.side === 'both';
     return el('span', { class: 'sp-match' },
       logo(e.away), abbr(e.away, mine('away')),

@@ -80,7 +80,7 @@ Fields used from an ESPN event: `id`, `date`, `timeValid` (false = time not set 
   `league.abbreviation`.
 - **Matchup:** away logo, `LAC @ KC`, home logo (ESPN's order). The followed team's abbreviation
   is bold. F1 rows read `US GP · Qualifying` (the race name without "Grand Prix" and sponsors,
-  plus the session).
+  plus the session) after a muted race-car icon in the logos' place.
 - **Time:** local start time, 24-hour unless the page's Clock is set to 12-hour. A moon icon
   marks starts from 00:00 to 06:59 local. `timeValid: false` shows `TBD`; such a game is never
   live by the clock alone, so while ESPN still says `pre` it keeps showing `TBD`.
@@ -124,7 +124,7 @@ or `Final` when none is known.
 
 ### Narrow widget
 
-Under 3 cells wide: no logos, no TV column.
+Under 3 cells wide: no logos or race car, no TV column.
 
 ## The ✎ editor
 

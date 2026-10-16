@@ -435,6 +435,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .sp-at { color: var(--muted); }
 .sp-score { font-weight: 600; }
 .sp-logo { flex: none; width: 16px; height: 16px; object-fit: contain; }
+.sp-match > .icon { margin: -1px 0; color: var(--muted); }
 .sp-when { display: flex; align-items: center; justify-content: flex-end; gap: 6px; white-space: nowrap; }
 .sp-when > .icon { color: var(--muted); }
 .sp-tv { font-size: 11.5px; color: var(--muted); }
@@ -447,7 +448,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .sp-res.L { color: var(--down); background: color-mix(in srgb, var(--down) 16%, transparent); }
 .sp-res.D { color: var(--muted); background: var(--hover); }
 /* Under 3 cells wide: no logos, no channels. */
-.widget-sports.narrow .sp-logo, .widget-sports.narrow .sp-tv { display: none; }
+.widget-sports.narrow .sp-logo, .widget-sports.narrow .sp-match > .icon, .widget-sports.narrow .sp-tv { display: none; }
 .widget-sports.narrow .sp-row { grid-template-columns: 38px minmax(0, 1fr) auto; }
 
 /* Sports editor: team buttons that stay pressed while followed. */

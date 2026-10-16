@@ -259,7 +259,7 @@ you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's 
   and F1, and pick the F1 sessions you want (Practice, Sprint, Qualifying, Race). Changes apply as
   you go; **✓** closes the editor. A new widget follows Inter Miami, Argentina and F1.
 - **A row:** the league or competition (NBA, NFL, MLS, Leagues Cup, World Cup, F1, …), the
-  teams with yours in bold, the start time and the TV channel. A moon marks games that start
+  teams with yours in bold (F1: a race car, the race and the session), the start time and the TV channel. A moon marks games that start
   between midnight and 7 in the morning. Times follow the Clock's 12/24-hour setting.
 - **Live:** a red dot, the score and the clock (Q3 5:21, 67'). Scores refresh every 30 seconds
   while the tab is in view. F1 sessions read LIVE while they're scheduled to run.
