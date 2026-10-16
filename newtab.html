@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="css/newtab.css">
+  <script src="js/boot.js"></script>
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <div id="bg" class="bg" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <nav id="groups" class="groups" aria-label="Groups"></nav>
+    <div class="actions">
+      <button id="btn-jump" class="icon-btn" type="button" title="Jump (Ctrl+K)" aria-label="Jump"></button>
+      <button id="btn-sidebar" class="icon-btn" type="button" title="Sidebar" aria-label="Sidebar"></button>
+      <button id="btn-prefs" class="icon-btn" type="button" title="Preferences" aria-label="Preferences"></button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside id="widgets" class="widgets" aria-label="Widgets"></aside>
+    <section class="grid-wrap" aria-label="Tiles">
+      <div id="grid" class="grid"></div>
+    </section>
+  </main>
+
+  <aside id="sidebar" class="sidebar" aria-label="Sidebar" inert></aside>
+</body>
+</html>

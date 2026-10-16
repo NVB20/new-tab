@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "New Tab",
+  "version": "1.0.0",
+  "description": "Personal speed-dial new tab page with groups, widgets, Jump launcher and sidebar.",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "bookmarks",
+    "history",
+    "sessions",
+    "tabs",
+    "favicon",
+    "search"
+  ]
+}
