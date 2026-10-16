@@ -340,6 +340,36 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80
 .mk-spark polyline { fill: none; stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; opacity: 0.9; }
 .mk-price { text-align: right; }
 .mk-chg { text-align: right; font-size: 12.5px; }
+/* Segment headings, lined up with the rows' text; a name box takes a heading's place. */
+.mk-segment {
+  position: relative;
+  margin: 6px -8px 0;
+  padding: 4px 8px 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mk-list > .mk-segment:first-child { margin-top: 0; }
+.mk-segment-edit { width: 100%; padding: 0; border: 0; border-bottom: 1px solid var(--accent); background: none; color: var(--text); font: inherit; letter-spacing: inherit; text-transform: inherit; outline: none; }
+/* Dragging: the moving row (or heading and its rows) fades; a line marks where it will land. */
+.mk-list .dragging { opacity: 0.4; }
+.mk-list .drop-before::before,
+.mk-list .drop-after::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.mk-list .drop-before::before { top: 0; }
+.mk-list .drop-after::after { bottom: 0; }
 .up { color: var(--up); }
 .down { color: var(--down); }
 .flat { color: var(--muted); }

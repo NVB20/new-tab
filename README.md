@@ -51,7 +51,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist. |
+| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
@@ -86,6 +86,31 @@ Keep the extension in the same folder. Chrome ties your saved data to the folder
 copy loaded from somewhere else starts empty. If you need to move it, download a backup first and
 import it afterwards.
 
+### Safari (Mac only)
+
+Safari runs the extension on a Mac with one code change and a few features missing. There's no
+Safari for Windows, and an iPhone needs an Xcode build.
+
+1. In `js/main.js`, use `setTimeout` where `requestIdleCallback` isn't available. Safari doesn't
+   have `requestIdleCallback`, and without the fallback Jump, Preferences and the sidebar don't
+   load.
+2. In Safari, open **Settings → Advanced** and tick **Show features for web developers**.
+3. Open **Settings → Developer**, click **Add Temporary Extension…** and pick the folder that
+   contains `manifest.json`.
+4. In **Settings → General**, choose the extension under **New tabs open with**.
+5. Allow the extension on the sites Safari asks about: github.com for the heatmap, and claude.ai,
+   chatgpt.com and gemini.google.com for sending messages from the search bar.
+
+Safari removes a temporary extension when you quit it or after 24 hours, so download a backup now
+and then (Preferences → **Backup**) in case it comes back empty. To keep it installed, package it
+as a Mac app with Xcode (`xcrun safari-web-extension-packager /path/to/new-tab`) and run the app.
+Without an Apple Developer account, tick **Allow unsigned extensions** in Settings → Developer each
+time you open Safari.
+
+Safari has no extension APIs for bookmarks, history or recently closed tabs, so Jump and the
+sidebar don't show them. Tiles show their own logo or a letter instead of the site's icon, and
+searches go to google.com rather than the browser's search engine.
+
 ## Folders
 
 - **Make one:** drag a tile onto the middle of another tile. Both go into a new folder and its name
@@ -118,6 +143,12 @@ copies can each follow their own list (say, coins in one and currencies in anoth
   are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
 - **Click a row** to open the coin's chart on Bybit (the index on CNBC, or the pair on Google
   Finance); the candles icon at the end opens it on TradingView.
+- **Drag a row** up or down to reorder the list; a line shows where it will land.
+- **Segments:** right-click a row and choose **New segment above** to put a heading over it (say,
+  *US* over SPY), type its name and press Enter (Esc cancels). The rows below a heading, up to the
+  next one, belong to it, and dragging a heading moves its rows with it. Right-click a heading to
+  rename or remove it (its rows stay, under the heading above), or right-click anywhere else in the
+  widget for a new segment at the bottom. Rows that belong to no segment stay at the top.
 
 Prices refresh every 30 seconds while the tab is open and visible, and all open new tabs share one
 copy, so having many tabs open doesn't multiply the requests.

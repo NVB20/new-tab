@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCommits, latestCommits, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
-  parseContributions, heatmapLayout,
+  isPair, isSegment, segmentItem, moveMarketItem, headingDropIndex, parseContributions, heatmapLayout,
 } from '../js/feeds.js';
 
 test('parseTicker reads Bybit last price and 24h change', () => {
@@ -75,6 +75,52 @@ test('parseCnbcSession keeps the closes of the latest regular session', () => {
 test('cleanMarketItems keeps valid coins and pairs once, in order', () => {
   assert.deepEqual(cleanMarketItems(['btc', 'EUR/ILS', 'BTC', '$x', 'usd/ils', 'EURO/ILS', 7, 'SOL']), ['BTC', 'EUR/ILS', 'USD/ILS', 'SOL']);
   assert.deepEqual(cleanMarketItems('BTC'), null);
+});
+
+test('cleanMarketItems keeps segment headings as typed, repeats allowed, empty ones dropped', () => {
+  assert.deepEqual(
+    cleanMarketItems(['#Crypto', 'btc', ' #  US   stocks ', 'SPY', '#', '# ', '#Crypto', 'BTC', '#' + 'x'.repeat(30)]),
+    ['#Crypto', 'BTC', '#US stocks', 'SPY', '#Crypto', '#' + 'x'.repeat(24)]);
+});
+
+test('isPair is only for currency pairs, not a heading with a slash in it', () => {
+  assert.equal(isPair('EUR/ILS'), true);
+  assert.equal(isPair('#US/EU'), false);
+  assert.deepEqual(fxCurrencies(['#US/EU', 'USD/ILS']), ['ILS', 'USD']);
+});
+
+test('segmentItem turns a typed name into a heading entry', () => {
+  assert.equal(segmentItem('  Crypto  coins '), '#Crypto coins');
+  assert.equal(segmentItem('   '), null);
+  assert.equal(segmentItem('a'.repeat(30)), '#' + 'a'.repeat(24));
+  assert.equal(isSegment('#Crypto'), true);
+  assert.equal(isSegment('BTC'), false);
+});
+
+test('moveMarketItem moves a row alone and a heading with its rows', () => {
+  const items = ['BTC', '#Crypto', 'ETH', 'SOL', '#US', 'SPY', 'QQQ'];
+  // A row, down into another segment and up to the top.
+  assert.deepEqual(moveMarketItem(items, 2, 6), ['BTC', '#Crypto', 'SOL', '#US', 'SPY', 'ETH', 'QQQ']);
+  assert.deepEqual(moveMarketItem(items, 5, 0), ['SPY', 'BTC', '#Crypto', 'ETH', 'SOL', '#US', 'QQQ']);
+  // A heading takes its rows: US above Crypto, Crypto to the end.
+  assert.deepEqual(moveMarketItem(items, 4, 1), ['BTC', '#US', 'SPY', 'QQQ', '#Crypto', 'ETH', 'SOL']);
+  assert.deepEqual(moveMarketItem(items, 1, 7), ['BTC', '#US', 'SPY', 'QQQ', '#Crypto', 'ETH', 'SOL']);
+  // Dropping where it already is, or inside its own block, changes nothing.
+  assert.deepEqual(moveMarketItem(items, 2, 3), items);
+  assert.deepEqual(moveMarketItem(items, 1, 3), items);
+  assert.deepEqual(moveMarketItem(items, 1, 4), items);
+});
+
+test('headingDropIndex snaps a heading drop to a segment boundary', () => {
+  const items = ['BTC', '#Crypto', 'ETH', 'SOL', '#US', 'SPY', '#FX'];
+  // Over a heading's top half: above that segment; anywhere else: below the segment's last row.
+  assert.equal(headingDropIndex(items, 4, true), 4);
+  assert.equal(headingDropIndex(items, 4, false), 6);
+  assert.equal(headingDropIndex(items, 2, true), 4);
+  assert.equal(headingDropIndex(items, 6, false), 7);
+  // Rows that belong to no segment stay at the top: a drop on them lands above the first heading.
+  assert.equal(headingDropIndex(items, 0, true), 1);
+  assert.equal(headingDropIndex(['#US', 'SPY'], 1, true), 2);
 });
 
 test('parseCommits reads commit search results, newest first, first line of the message', () => {

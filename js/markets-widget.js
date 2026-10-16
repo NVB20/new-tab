@@ -1,11 +1,13 @@
 // Markets widget: live crypto prices from Bybit, US index quotes from CNBC and ECB exchange rates
-// with sparklines, for the coins, indexes and currency pairs chosen in its ✎ editor. Each copy on
-// the page has its own list; the prices are fetched once and shared through the request cache.
+// with sparklines, for the coins, indexes and currency pairs chosen in its ✎ editor, under segment
+// headings added from its right-click menu, in the order they're dragged into. Each copy on the
+// page has its own list; the prices are fetched once and shared through the request cache.
 
-import { el, icon, svgEl, widgetHead, widgetSub, widgetEmpty } from './ui.js';
+import { el, icon, svgEl, widgetHead, widgetSub, widgetEmpty, showMenu } from './ui.js';
 import { feed, fetchJson, peek } from './net.js';
 import {
   parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, isPair,
+  isSegment, segmentItem, blockEnd, moveMarketItem, headingDropIndex, SEGMENT_MAX,
   formatPrice, formatRate, formatChange, sparkPoints, parseCoins,
 } from './feeds.js';
 import { copyById, TYPES } from './layout.js';
@@ -32,7 +34,8 @@ const STOCKS = {
 const PAIRS = ['USD/ILS', 'EUR/ILS', 'GBP/ILS', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF'];
 
 const isStock = id => Object.hasOwn(STOCKS, id);
-const isCoin = id => !isPair(id) && !isStock(id);
+const isCoin = id => !isSegment(id) && !isPair(id) && !isStock(id);
+const segmentName = item => item.slice(1);
 const isoDay = ms => new Date(ms).toISOString().slice(0, 10);
 const trendOf = change => (change > 0 ? 'up' : change < 0 ? 'down' : 'flat');
 
@@ -57,14 +60,15 @@ export function mountMarkets(root, store, copy) {
   root.append(section);
 
   // The symbol's link stretches over the whole row; chart is an optional link in the last column.
+  // The links don't drag on their own, so a drag anywhere on the row moves the row.
   function marketRow({ label, href, title, value, change, closes, chart }) {
     const trend = trendOf(change);
     return el('div', { class: 'mk-row' },
-      el('a', { class: 'mk-sym', title, text: label, ...linkProps(href) }),
+      el('a', { class: 'mk-sym', title, text: label, draggable: false, ...linkProps(href) }),
       closes.length > 1 ? sparkline(closes, trend) : el('span'),
       el('span', { class: 'mk-price', text: value }),
       el('span', { class: `mk-chg ${trend}`, text: change == null ? '' : formatChange(change) }),
-      chart ? el('a', { class: 'mk-tv', title: chart.title, 'aria-label': chart.title, ...linkProps(chart.href) }, icon('candles', 15)) : el('span'));
+      chart ? el('a', { class: 'mk-tv', title: chart.title, 'aria-label': chart.title, draggable: false, ...linkProps(chart.href) }, icon('candles', 15)) : el('span'));
   }
 
   const coinRow = ({ id, ticker, closes }) => marketRow({
@@ -96,13 +100,36 @@ export function mountMarkets(root, store, copy) {
     closes: fx?.series ?? [],
   });
 
+  // One entry of the list, a heading or a row, which knows its place in the items for dragging.
+  function entryNode(r, index) {
+    const node = isSegment(r.id) ? el('div', { class: 'mk-segment', dir: 'auto', text: segmentName(r.id) })
+      : isPair(r.id) ? pairRow(r) : isStock(r.id) ? stockRow(r) : coinRow(r);
+    node.dataset.index = index;
+    node.draggable = true;
+    return node;
+  }
+
+  let shownRows = [];   // the latest rows, drawn unless a drag or a segment's name box is open
+  let naming = null;    // { at, rename }: the name box sits at index at, over the heading if rename
+  let dragFrom = null;  // index of the entry being dragged
+
   function renderMarkets(rows) {
-    if (!rows.length) {
+    shownRows = rows;
+    if (!naming && dragFrom == null) draw();
+  }
+
+  function draw() {
+    if (!shownRows.length && !naming) {
       marketList.replaceChildren(widgetEmpty('Nothing chosen. ',
         el('button', { type: 'button', class: 'link-btn', text: 'Choose products', onclick: () => setEditing(true) })));
       return;
     }
-    marketList.replaceChildren(...rows.map(r => (isPair(r.id) ? pairRow(r) : isStock(r.id) ? stockRow(r) : coinRow(r))));
+    const nodes = shownRows.map(entryNode);
+    if (naming) {
+      const box = nameBox(naming.rename ? segmentName(shownRows[naming.at].id) : '');
+      nodes.splice(naming.at, naming.rename ? 1 : 0, el('div', { class: 'mk-segment' }, box));
+    }
+    marketList.replaceChildren(...nodes);
   }
 
   const marketKeys = coin => ({ ticker: `ticker:${coin}USDT`, kline: `kline:${coin}USDT` });
@@ -113,10 +140,10 @@ export function mountMarkets(root, store, copy) {
   const quotesKey = stocks => `cnbc:quotes:${stocks.join(',')}`;
   const sessionKey = stock => `cnbc:session:${stock}`;
 
-  // Rows in the chosen order; coin(id) gives a coin's { ticker, closes }, stock(id) an index's
-  // { quote, closes }.
-  const marketRows = (list, coin, stock, fxTable) => list.map(id => (isPair(id)
-    ? { id, fx: fxTable ? parseFxPair(fxTable, id) : null }
+  // Rows in the chosen order, headings among them; coin(id) gives a coin's { ticker, closes },
+  // stock(id) an index's { quote, closes }.
+  const marketRows = (list, coin, stock, fxTable) => list.map(id => (isSegment(id) ? { id }
+    : isPair(id) ? { id, fx: fxTable ? parseFxPair(fxTable, id) : null }
     : { id, ...(isStock(id) ? stock(id) : coin(id)) }));
 
   function renderCachedMarkets() {
@@ -214,14 +241,16 @@ export function mountMarkets(root, store, copy) {
     }
   }
 
-  function setItem(id, on) {
+  // change gets a copy of this copy's items and returns the new list.
+  function editItems(change) {
     store.update(s => {
       const own = copyById(s, copy.id);
-      if (!own) return;
-      const list = own.settings.items.filter(i => i !== id);
-      if (on) list.push(id);
-      own.settings.items = list;
+      if (own) own.settings.items = change([...own.settings.items]);
     });
+  }
+
+  function setItem(id, on) {
+    editItems(list => [...list.filter(i => i !== id), ...(on ? [id] : [])]);
   }
 
   function checkbox(id) {
@@ -258,6 +287,141 @@ export function mountMarkets(root, store, copy) {
 
   setEditing(false);
 
+  // ---- segments: headings added, renamed and removed from the right-click menu ----
+
+  function nameBox(value) {
+    const box = el('input', {
+      type: 'text', class: 'mk-segment-edit', value, maxLength: SEGMENT_MAX, dir: 'auto', spellcheck: false,
+      autocomplete: 'off', placeholder: 'Segment name', 'aria-label': 'Segment name',
+      onkeydown: e => {
+        if (e.key !== 'Enter' && e.key !== 'Escape') return;
+        e.preventDefault();
+        finishNaming(e.key === 'Enter' ? box.value : null);
+      },
+      onblur: () => finishNaming(box.value),
+    });
+    return box;
+  }
+
+  function startNaming(at, rename) {
+    naming = { at, rename };
+    draw();
+    const box = marketList.querySelector('.mk-segment-edit');
+    box.focus();
+    box.select();
+  }
+
+  // name is null when cancelled; a blank name changes nothing.
+  function finishNaming(name) {
+    if (!naming) return;   // Enter already saved; this is the blur that follows
+    const { at, rename } = naming;
+    naming = null;
+    draw();
+    const item = name == null ? null : segmentItem(name);
+    if (!item) return;
+    editItems(list => {
+      if (!rename) list.splice(at, 0, item);
+      else if (isSegment(list[at] ?? '')) list[at] = item;
+      return list;
+    });
+  }
+
+  section.addEventListener('contextmenu', e => {
+    if (editing || naming) return;
+    e.preventDefault();
+    const node = e.target.closest('.mk-list [data-index]');
+    const at = node ? Number(node.dataset.index) : -1;
+    const item = shownRows[at]?.id;
+    const addAtEnd = { label: 'New segment', icon: 'plus', action: () => startNaming(shownRows.length, false) };
+    const choose = { label: 'Choose products…', icon: 'edit', action: () => setEditing(true) };
+    showMenu(e.clientX, e.clientY, !item ? [addAtEnd, choose]
+      : isSegment(item) ? [
+        { label: 'Rename', icon: 'edit', action: () => startNaming(at, true) },
+        // Its rows stay, under the heading above.
+        { label: 'Remove segment', icon: 'trash', action: () => editItems(list => list.filter((i, n) => n !== at || i !== item)) },
+        { separator: true },
+        addAtEnd,
+      ] : [
+        { label: 'New segment above', icon: 'plus', action: () => startNaming(at, false) },
+        { label: `Remove ${item}`, icon: 'x', action: () => setItem(item, false) },
+        { separator: true },
+        choose,
+      ]);
+  });
+
+  // ---- drag to reorder: a row lands above or below the row under the pointer; a heading takes
+  // its rows along and lands between segments ----
+
+  const MARKET_MIME = 'application/x-newtab-market';
+  let dragIds = [];   // the items as they were drawn when the drag began
+  let marked = null;
+
+  const clearMark = () => {
+    marked?.classList.remove('drop-before', 'drop-after');
+    marked = null;
+  };
+
+  // The index in dragIds that the dragged block would land before, or null for no move.
+  function dropIndex(e) {
+    const node = e.target.closest?.('[data-index]');
+    let to = dragIds.length;   // the empty space below the last entry
+    if (node) {
+      const over = Number(node.dataset.index);
+      const r = node.getBoundingClientRect();
+      const upper = e.clientY < r.top + r.height / 2;
+      to = isSegment(dragIds[dragFrom]) ? headingDropIndex(dragIds, over, upper) : over + (upper ? 0 : 1);
+    }
+    return to >= dragFrom && to <= blockEnd(dragIds, dragFrom) ? null : to;
+  }
+
+  function endDrag() {
+    if (dragFrom == null) return;
+    dragFrom = null;
+    clearMark();
+    draw();   // with any prices that came in during the drag
+  }
+
+  marketList.addEventListener('dragstart', e => {
+    const node = e.target.closest?.('[data-index]');
+    if (!node || naming) return;
+    dragFrom = Number(node.dataset.index);
+    dragIds = shownRows.map(r => r.id);
+    e.dataTransfer.setData(MARKET_MIME, node.dataset.index);
+    e.dataTransfer.effectAllowed = 'move';
+    const end = blockEnd(dragIds, dragFrom);
+    for (const n of marketList.querySelectorAll('[data-index]')) {
+      const i = Number(n.dataset.index);
+      if (i >= dragFrom && i < end) n.classList.add('dragging');
+    }
+  });
+
+  marketList.addEventListener('dragover', e => {
+    if (dragFrom == null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    clearMark();
+    const to = dropIndex(e);
+    if (to == null) return;
+    const nodes = marketList.querySelectorAll('[data-index]');
+    marked = nodes[to] ?? nodes[nodes.length - 1];
+    marked.classList.add(nodes[to] ? 'drop-before' : 'drop-after');
+  });
+
+  marketList.addEventListener('dragleave', e => {
+    if (!marketList.contains(e.relatedTarget)) clearMark();
+  });
+
+  marketList.addEventListener('drop', e => {
+    if (dragFrom == null) return;
+    e.preventDefault();
+    const [from, to, ids] = [dragFrom, dropIndex(e), dragIds];
+    endDrag();
+    // Moved only if the list is still the one that was drawn (another tab may have changed it).
+    if (to != null) editItems(list => (JSON.stringify(list) === JSON.stringify(ids) ? moveMarketItem(ids, from, to) : list));
+  });
+
+  marketList.addEventListener('dragend', endDrag);
+
   // ---- wiring ----
 
   let conf = null;
@@ -272,6 +436,7 @@ export function mountMarkets(root, store, copy) {
     if (next === conf) return;
     const first = conf === null;
     conf = next;
+    seq++;   // a load started for the old list (say, before a drag) draws nothing
     renderCachedMarkets();
     clearTimeout(timer);
     timer = setTimeout(loadMarkets, first ? 0 : RECONFIGURE_MS);
