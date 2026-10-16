@@ -169,6 +169,17 @@ export function mountSideWidgets(root, store) {
           title: `${c.repo} @ ${c.sha}${c.private ? ' (private)' : ''}\n${c.message}`,
         }))
         : [empty('No commits found.')]));
+      const t = data.tokenInfo;
+      if (t) {
+        parts.push(el('p', {
+          class: 'widget-note',
+          text: !t.privateRepos
+            ? 'Token works but sees no private repos. Check its resource owner and repository access.'
+            : t.unreadable
+              ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only.`
+              : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}.`,
+        }));
+      }
     }
     githubBody.replaceChildren(...parts);
   }
@@ -188,7 +199,7 @@ export function mountSideWidgets(root, store) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
     const my = ++githubSeq;
-    const result = await feed(`github-latest:${user}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
+    const result = await feed(`github-v3:${user}:${token ? 'token' : 'public'}`, GITHUB_TTL, async () => {
       // Commit search finds the user's commits in every repo and organisation (default branches);
       // GitHub's events feed returns nothing for this account. 100 results reach enough repos to
       // pick the latest commit of each.
@@ -198,16 +209,22 @@ export function mountSideWidgets(root, store) {
         fetchJson(`${GITHUB}/search/commits?q=${commitQuery}&sort=author-date&order=desc&per_page=100`, headers).then(parseCommits),
         fetchJson(`${GITHUB}/search/issues?q=${prQuery}&sort=updated&per_page=4`, headers).then(parsePulls),
         token
-          ? fetchJson(`${GITHUB}/user/repos?sort=pushed&per_page=15`, headers).then(list => (Array.isArray(list) ? list : []))
+          ? fetchJson(`${GITHUB}/user/repos?visibility=private&sort=pushed&per_page=30`, headers).then(list => (Array.isArray(list) ? list : []))
           : [],
       ]);
       // Private repos the token can see are asked directly, since search may leave them out.
-      const privateCommits = await Promise.all(tokenRepos.filter(r => r.private).map(r => fetchJson(
+      // 409 means an empty repo; other failures (usually missing Contents access) are counted.
+      let unreadable = 0;
+      const privateCommits = await Promise.all(tokenRepos.map(r => fetchJson(
         `${GITHUB}/repos/${r.full_name}/commits?author=${encodeURIComponent(user)}&per_page=1`, headers,
       )
         .then(list => parseCommits({ items: (Array.isArray(list) ? list : []).map(i => ({ ...i, repository: { full_name: r.full_name, private: true } })) }))
-        .catch(() => [])));   // e.g. an empty repo
-      return { commits: latestPerRepo([...searched, ...privateCommits.flat()], 6), pulls };
+        .catch(err => {
+          if (err.status !== 409) unreadable++;
+          return [];
+        })));
+      const tokenInfo = token ? { privateRepos: tokenRepos.length, unreadable, withCommits: privateCommits.filter(c => c.length).length } : null;
+      return { commits: latestPerRepo([...searched, ...privateCommits.flat()], 6), pulls, tokenInfo };
     });
     if (my === githubSeq) renderGithub(result, user);
   }
