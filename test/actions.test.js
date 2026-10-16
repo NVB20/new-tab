@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   addTile, updateTile, deleteTile, moveTileToGroup, reorderTile,
   addGroup, renameGroup, deleteGroup, reorderGroups,
+  createFolder, addToFolder, removeFromFolder, dissolveFolder, folderChildren, topLevel,
 } from '../js/actions.js';
 
 function state() {
@@ -110,4 +111,83 @@ test('reorderGroups moves a group before another or to the end', () => {
   assert.deepEqual(s.groups.map(g => g.title), ['Work', 'Home', 'dev']);
   reorderGroups(s, work, null);
   assert.deepEqual(s.groups.map(g => g.title), ['Home', 'dev', 'Work']);
+});
+
+// ---- folders ----
+
+const ids = list => list.map(t => t.id);
+
+test('createFolder puts the target and the dropped tile in a new folder at the target position', () => {
+  const s = state();
+  const f = createFolder(s, 'b', 'c', 'Work');
+  assert.equal(f.kind, 'folder');
+  assert.equal(f.title, 'Work');
+  assert.deepEqual(ids(topLevel(s, 'home')), ['a', f.id]);
+  assert.deepEqual(ids(folderChildren(s, f.id)), ['b', 'c']);
+});
+
+test('createFolder refuses folders inside folders and a tile on itself', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'b');
+  assert.equal(createFolder(s, f.id, 'c'), null);
+  assert.equal(createFolder(s, 'c', f.id), null);
+  assert.equal(createFolder(s, 'c', 'c'), null);
+});
+
+test('a tile dropped from another group joins the folder and its group', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'x');
+  assert.equal(s.tiles.find(t => t.id === 'x').groupId, 'home');
+  assert.deepEqual(ids(folderChildren(s, f.id)), ['a', 'x']);
+});
+
+test('addToFolder appends to an existing folder', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'b');
+  addToFolder(s, 'c', f.id);
+  assert.deepEqual(ids(folderChildren(s, f.id)), ['a', 'b', 'c']);
+  assert.deepEqual(ids(topLevel(s, 'home')), [f.id]);
+});
+
+test('removeFromFolder puts the tile right after the folder and reports how many are left', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'b');
+  addToFolder(s, 'c', f.id);
+  assert.equal(removeFromFolder(s, 'b'), 2);
+  assert.deepEqual(ids(topLevel(s, 'home')), [f.id, 'b']);
+  assert.deepEqual(ids(folderChildren(s, f.id)), ['a', 'c']);
+});
+
+test('dissolveFolder puts its tiles back where the folder was', () => {
+  const s = state();
+  const f = createFolder(s, 'b', 'c');
+  dissolveFolder(s, f.id);
+  assert.deepEqual(ids(topLevel(s, 'home')), ['a', 'b', 'c']);
+  assert.equal(s.tiles.some(t => t.kind === 'folder'), false);
+  assert.equal(s.tiles.some(t => t.folderId), false);
+});
+
+test('deleting the last tile of a folder removes the empty folder', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'b');
+  deleteTile(s, 'a');
+  deleteTile(s, 'b');
+  assert.equal(s.tiles.some(t => t.id === f.id), false);
+});
+
+test('deleting a folder keeps its tiles', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'b');
+  deleteTile(s, f.id);
+  assert.deepEqual(ids(topLevel(s, 'home')), ['a', 'b', 'c']);
+});
+
+test('moving a folder to another group takes its tiles along; moving a child takes it out', () => {
+  const s = state();
+  const f = createFolder(s, 'a', 'b');
+  moveTileToGroup(s, f.id, 'dev');
+  assert.deepEqual(folderChildren(s, f.id).map(t => t.groupId), ['dev', 'dev']);
+  moveTileToGroup(s, 'a', 'home');
+  assert.equal(s.tiles.find(t => t.id === 'a').folderId, undefined);
+  assert.deepEqual(ids(folderChildren(s, f.id)), ['b']);
 });

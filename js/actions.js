@@ -14,16 +14,96 @@ export function updateTile(s, id, patch) {
   if (tile) Object.assign(tile, patch);
 }
 
+// Deleting a folder keeps its tiles; deleting a folder's last tile removes the empty folder.
 export function deleteTile(s, id) {
+  const tile = s.tiles.find(t => t.id === id);
+  if (!tile) return;
+  if (isFolder(tile)) {
+    dissolveFolder(s, id);
+    return;
+  }
   s.tiles = s.tiles.filter(t => t.id !== id);
+  if (tile.folderId) dropIfEmpty(s, tile.folderId);
 }
 
+// A folder moves with its tiles; a tile inside a folder leaves the folder.
 export function moveTileToGroup(s, id, groupId) {
   const i = s.tiles.findIndex(t => t.id === id);
   if (i < 0 || s.tiles[i].groupId === groupId || !s.groups.some(g => g.id === groupId)) return;
-  const [tile] = s.tiles.splice(i, 1);
-  tile.groupId = groupId;
-  s.tiles.push(tile);
+  const tile = s.tiles[i];
+  if (tile.folderId) removeFromFolder(s, id);
+  const moving = isFolder(tile) ? [tile, ...folderChildren(s, tile.id)] : [tile];
+  s.tiles = s.tiles.filter(t => !moving.includes(t));
+  moving.forEach(t => { t.groupId = groupId; });
+  s.tiles.push(...moving);
+}
+
+// ---- folders ----
+// A folder is a tile with kind 'folder' (no url); its tiles carry folderId and keep their own
+// order in the array. Folders hold plain tiles only, never other folders.
+
+export const isFolder = t => t?.kind === 'folder';
+
+export function folderChildren(s, folderId) {
+  return s.tiles.filter(t => t.folderId === folderId);
+}
+
+// Tiles shown on the group's grid: plain tiles and folders, not the tiles inside folders.
+export function topLevel(s, groupId) {
+  return s.tiles.filter(t => t.groupId === groupId && !t.folderId);
+}
+
+function dropIfEmpty(s, folderId) {
+  if (!folderChildren(s, folderId).length) s.tiles = s.tiles.filter(t => t.id !== folderId);
+}
+
+// Dropping `draggedId` onto `targetId` makes a folder where the target was, holding both.
+export function createFolder(s, targetId, draggedId, title = 'Folder') {
+  const target = s.tiles.find(t => t.id === targetId);
+  const dragged = s.tiles.find(t => t.id === draggedId);
+  if (!target || !dragged || target === dragged || isFolder(target) || isFolder(dragged) || target.folderId) return null;
+  if (dragged.folderId) removeFromFolder(s, draggedId);
+  const folder = { id: uid(), groupId: target.groupId, kind: 'folder', title, url: '', icon: '' };
+  target.folderId = folder.id;
+  dragged.folderId = folder.id;
+  dragged.groupId = target.groupId;
+  const rest = s.tiles.filter(t => t !== dragged);
+  rest.splice(rest.indexOf(target), 1, folder, target, dragged);
+  s.tiles = rest;
+  return folder;
+}
+
+export function addToFolder(s, tileId, folderId) {
+  const tile = s.tiles.find(t => t.id === tileId);
+  const folder = s.tiles.find(t => t.id === folderId);
+  if (!tile || !isFolder(folder) || isFolder(tile) || tile.folderId === folderId) return;
+  if (tile.folderId) removeFromFolder(s, tileId);
+  tile.folderId = folderId;
+  tile.groupId = folder.groupId;
+  s.tiles = [...s.tiles.filter(t => t !== tile), tile];
+}
+
+// Takes a tile out of its folder and puts it right after the folder. Returns the tiles left.
+export function removeFromFolder(s, tileId) {
+  const tile = s.tiles.find(t => t.id === tileId);
+  if (!tile?.folderId) return 0;
+  const folderId = tile.folderId;
+  delete tile.folderId;
+  const rest = s.tiles.filter(t => t !== tile);
+  const at = rest.findIndex(t => t.id === folderId);
+  rest.splice(at < 0 ? rest.length : at + 1, 0, tile);
+  s.tiles = rest;
+  return folderChildren(s, folderId).length;
+}
+
+// Removes a folder and puts its tiles, in order, where the folder was.
+export function dissolveFolder(s, folderId) {
+  const children = folderChildren(s, folderId);
+  children.forEach(t => { delete t.folderId; });
+  const rest = s.tiles.filter(t => !children.includes(t));
+  const at = rest.findIndex(t => t.id === folderId);
+  if (at >= 0) rest.splice(at, 1, ...children);
+  s.tiles = rest;
 }
 
 // Places tile `id` right before tile `beforeId`; null puts it last in its group.

@@ -78,15 +78,23 @@ export function normalizeState(raw) {
   if (groups.length) s.groups = groups;
   const ids = new Set(s.groups.map(g => g.id));
 
-  s.tiles = (Array.isArray(raw.tiles) ? raw.tiles : [])
-    .filter(t => isObj(t) && typeof t.url === 'string' && t.url)
+  const tiles = (Array.isArray(raw.tiles) ? raw.tiles : [])
+    .filter(t => isObj(t) && (t.kind === 'folder' || (typeof t.url === 'string' && t.url)))
     .map(t => ({
       id: str(t.id) || uid(),
       groupId: ids.has(t.groupId) ? t.groupId : s.groups[0].id,
       title: str(t.title),
-      url: t.url,
+      url: t.kind === 'folder' ? '' : t.url,
       icon: str(t.icon),
+      ...(t.kind === 'folder' ? { kind: 'folder' } : {}),
+      ...(typeof t.folderId === 'string' ? { folderId: t.folderId } : {}),
     }));
+  // A tile may only point at an existing folder in its own group; empty folders are dropped.
+  const folders = new Map(tiles.filter(t => t.kind === 'folder').map(t => [t.id, t]));
+  for (const t of tiles) {
+    if (t.folderId && (t.kind === 'folder' || folders.get(t.folderId)?.groupId !== t.groupId)) delete t.folderId;
+  }
+  s.tiles = tiles.filter(t => t.kind !== 'folder' || tiles.some(c => c.folderId === t.id));
 
   s.activeGroupId = ids.has(raw.activeGroupId) ? raw.activeGroupId : s.groups[0].id;
   s.tasks = (Array.isArray(raw.tasks) ? raw.tasks : [])

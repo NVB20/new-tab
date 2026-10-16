@@ -86,6 +86,19 @@ test('normalizeState keeps task timestamps, history and daily counts, dropping j
   assert.deepEqual(normalizeState(null).taskHistory, []);
 });
 
+test('normalizeState keeps folders and their tiles, and repairs broken folder links', () => {
+  const s = normalizeState({
+    groups: [{ id: 'g1', title: 'Home' }],
+    tiles: [
+      { id: 'f', groupId: 'g1', kind: 'folder', title: 'Work' },
+      { id: 'a', groupId: 'g1', title: 'A', url: 'https://a.com', folderId: 'f' },
+      { id: 'b', groupId: 'g1', title: 'B', url: 'https://b.com', folderId: 'gone' },
+      { id: 'empty', groupId: 'g1', kind: 'folder', title: 'Empty' },
+    ],
+  });
+  assert.deepEqual(s.tiles.map(t => [t.id, t.kind ?? '', t.folderId ?? '']), [['f', 'folder', ''], ['a', '', 'f'], ['b', '', '']]);
+});
+
 test('store notifies only subscribers whose keys changed', async () => {
   const store = createStore(memoryAdapter());
   await store.load();
