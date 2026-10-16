@@ -1,7 +1,7 @@
 // Thin wrappers over the Chrome extension APIs. Outside an extension (plain browser tab)
 // every call degrades to an empty result or a normal web navigation.
 
-import { HANDOFF_KEY, addHandoff, claudeUrl } from './ask.js';
+import { HANDOFF_KEY, CHAT_PAGES, addHandoff, chatUrl } from './ask.js';
 
 const c = globalThis.chrome;
 
@@ -94,24 +94,25 @@ export async function restoreSession(sessionId) {
   await closeCurrentTab();
 }
 
-// Opens a new chat on claude.ai and runs `text` in it: the message waits in extension storage and
-// content/claude.js types it in and sends it. Only an id goes in the address.
-export async function askClaude(text, { newTab = false } = {}) {
+// Opens a new chat with `engine` ('claude' | 'chatgpt' | 'gemini') and runs `text` in it: the
+// message waits in extension storage and content/chat.js types it in and sends it. Only an id goes
+// in the address.
+export async function askChat(engine, text, { newTab = false } = {}) {
   if (hasChrome && c.storage) {
     const id = crypto.randomUUID();
     const now = Date.now();
     const list = (await c.storage.local.get(HANDOFF_KEY))[HANDOFF_KEY];
-    await c.storage.local.set({ [HANDOFF_KEY]: addHandoff(list, { id, text, at: now }, now) });
-    await openUrl(claudeUrl(id), { newTab });
+    await c.storage.local.set({ [HANDOFF_KEY]: addHandoff(list, { id, engine, text, at: now }, now) });
+    await openUrl(chatUrl(engine, id), { newTab });
     return;
   }
-  // Outside the extension nothing runs on claude.ai, so the message goes to the clipboard.
+  // Outside the extension nothing runs on the chat site, so the message goes to the clipboard.
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // no clipboard access; claude.ai still opens
+    // no clipboard access; the chat still opens
   }
-  await openUrl('https://claude.ai/new', { newTab });
+  await openUrl(CHAT_PAGES[engine], { newTab });
 }
 
 export async function webSearch(text, { newTab = false } = {}) {

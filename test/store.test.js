@@ -281,9 +281,14 @@ test('store falls back to defaults when saved state is corrupt', async () => {
   assert.equal(store.get().groups.length, 1);
 });
 
-test('a saved state from before the search bar gets the bar with both modes, and no Claude widget', () => {
+test('a saved state from before the search bar gets the bar with Google and Claude on top, and no Claude widget', () => {
   const s = normalizeState({ prefs: { widgets: { tasks: { enabled: false } } } });
-  assert.deepEqual(s.prefs.search, { enabled: true, google: true, claude: true, mode: 'google' });
+  assert.deepEqual(s.prefs.search, { enabled: true, google: true, claude: true, chatgpt: false, gemini: false, mode: 'google', row: 0 });
   assert.equal(s.prefs.widgets.claude.enabled, false);
   assert.equal(s.prefs.widgets.tasks.enabled, false);
+});
+
+test('a saved bar from before ChatGPT and Gemini keeps its settings and gets the new ones off', () => {
+  const s = normalizeState({ prefs: { search: { enabled: true, google: false, claude: true, mode: 'claude' } } });
+  assert.deepEqual(s.prefs.search, { enabled: true, google: false, claude: true, chatgpt: false, gemini: false, mode: 'claude', row: 0 });
 });

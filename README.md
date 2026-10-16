@@ -52,7 +52,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **GitHub** | Your contribution heatmap, open pull requests, and your open issues, latest commits or both, including private repos with a token. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
-| **Search bar and Claude** | Search Google, or type a message that runs in a new Claude chat on claude.ai. Also as a Claude box in the widget column. |
+| **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; drag it between rows of tiles. Also a Claude box for the widget column. |
 | **Jump** | Ctrl+K searches tiles, open tabs, bookmarks, history and recently closed tabs. |
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, or your own wallpaper. |
@@ -204,27 +204,32 @@ written into backup files.
 | "Token sees N private repos but can't read commits in …" | Give it *Contents: Read-only*. |
 | Private issues or pull requests don't show | Give it *Issues* or *Pull requests: Read-only*. A fine-grained token only sees repos of its own owner. |
 
-## Search bar and Claude
+## Search bar and AI chats
 
-The bar above the tiles searches Google or asks Claude. The icon on its left shows which, **G** or
-**✳**. Click it, or press **Tab** in the bar, to switch; the bar remembers the one you used last.
+The bar searches Google or sends your message to **Claude**, **ChatGPT** or **Gemini**. Choose
+which of the four it offers in Preferences → Page → **Search bar** (Google and Claude are on to
+start with). The icon on the left shows the engine in use; click it to pick another, or press
+**Tab** in the bar to go to the next one. The bar remembers the one you used last.
 
+- **Ctrl+Space** puts the cursor in the bar from anywhere on the page.
 - **Google:** Enter opens the Google results.
-- **Claude:** Enter opens a new chat on claude.ai and sends your message, so the answer starts
-  straight away. You need to be signed in to claude.ai in this browser.
+- **Claude, ChatGPT, Gemini:** Enter opens a new chat and sends your message, so the answer starts
+  straight away. You need to be signed in to that site in this browser.
 - Enter opens in this tab, or in a new tab when *Open tiles in a new tab* is on. Ctrl+Enter always
   opens a new tab.
-- In Preferences → Page → **Search bar** you can turn the bar off, or keep just one of Google
-  and Claude (then there's nothing to switch).
+- **Move it:** drag the ⠿ grip at the right end of the bar. A line shows where it will land: above
+  the tiles, between any two rows, or below them. Esc cancels. With the grip focused, ↑ and ↓ move
+  it one row. The spot is the same in every group; a group with fewer rows shows the bar under its
+  tiles.
 
-The **Claude** widget (Preferences → Widgets, off by default) does the same from a box under Notes,
-with room for longer messages: Enter sends, Shift+Enter starts a new line.
+The **Claude** widget (Preferences → Widgets, off by default) sends to Claude from a box under
+Notes, with room for longer messages: Enter sends, Shift+Enter starts a new line.
 
 How the message gets there: it waits in the extension's own storage, and a small script the
-extension runs on claude.ai types it into the message box and presses send. Only a random id goes
-in the address, so your message isn't in your history, and the script leaves alone any claude.ai
-page the new tab didn't open. That script is why Chrome lists the extension as able to read and
-change your data on claude.ai.
+extension runs on claude.ai, chatgpt.com and gemini.google.com types it into the message box and
+presses send. Only a random id goes in the address, so your message isn't in your history, and the
+script leaves alone any page the new tab didn't open. That script is why Chrome lists the extension
+as able to read and change your data on those three sites.
 
 ## Everything else
 
@@ -275,20 +280,20 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
-| Search bar | `google.com` or `claude.ai`, opened like any link | only when you press Enter |
+| Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 
 Turn a widget off in Preferences (Widgets, or GitHub for the GitHub widget) and it stops fetching.
 
 ## Known limits
 
-- On a fresh new tab Chrome keeps the cursor in the address bar, so Ctrl+K and / work once you've
-  clicked the page. The search icon always works.
+- On a fresh new tab Chrome keeps the cursor in the address bar, so Ctrl+K, / and Ctrl+Space work
+  once you've clicked the page. The search icon and clicking the bar always work.
 - A tile logo from a site that doesn't allow saving it (no CORS headers) still loads from its link.
   If one stops showing, right-click → Edit and clear the icon field (uses the site's own icon) or
   paste another image link.
-- Claude: if you're signed out of claude.ai, nothing is sent; sign in and send it again. If Claude
-  changes its page and the send button can't be found, your message is left in the box and you
-  press Enter yourself.
+- Claude, ChatGPT, Gemini: if you're signed out of the site, nothing is sent; sign in and send it
+  again. If a site changes its page and the send button can't be found, your message is left in
+  the box and you press Enter yourself.
 - No sync between computers; use a backup file to move your setup.
 
 ## Development

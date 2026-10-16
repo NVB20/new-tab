@@ -202,18 +202,28 @@ body.has-wallpaper .topbar .icon { filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.5
 }
 body.widgets-off .layout { grid-template-columns: minmax(0, 1fr) minmax(0, var(--width)) minmax(0, 1fr); }
 
-.grid-wrap { grid-column: 2; grid-row: 1; }
+/* The tiles (#grid is display: contents) and the search bar share this grid, so the bar can take a
+   row of its own between the tiles. */
+.grid-wrap {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  align-content: start;
+  gap: var(--gap);
+}
 body.center-v .grid-wrap { align-self: center; }
 
 /* ---------- Search bar ---------- */
 
 .searchbar {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;
   height: 46px;
-  margin: 0 0 24px;
-  padding: 0 14px 0 6px;
+  margin: 0 0 16px;
+  padding: 0 6px 0 6px;
   border: 1px solid var(--border);
   border-radius: 23px;
   background: var(--surface);
@@ -224,27 +234,68 @@ body.center-v .grid-wrap { align-self: center; }
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(12px); }
+.searchbar[data-at="between"] { margin: 10px 0; }
+.searchbar[data-at="bottom"] { order: 1; margin: 16px 0 0; }
+.searchbar.moving { opacity: 0.5; }
 .sb-mode {
   flex: none;
-  display: grid;
-  place-items: center;
-  width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 34px;
   height: 34px;
-  padding: 0;
+  padding: 0 8px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 17px;
   background: none;
   color: var(--text);
   transition: background 0.12s;
 }
+.sb-mode .icon + .icon { color: var(--muted); }
 .sb-mode:not(:disabled):hover { background: var(--hover); }
 .sb-mode:disabled { cursor: default; }
 .sb-mode:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .searchbar[data-mode="claude"] .sb-mode { color: var(--accent); }
+.searchbar[data-mode="gemini"] .sb-mode { color: #5b8def; }
 .sb-input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; outline: none; font-size: 15px; color: var(--text); }
 .sb-input::placeholder { color: var(--muted); }
-.sb-hint { opacity: 0; transition: opacity 0.15s; }
-.searchbar:focus-within .sb-hint { opacity: 1; }
+.sb-hint { display: none; }
+.searchbar:focus-within .sb-hint { display: inline; }
+/* The shortcut shows until the bar has the cursor; then the Tab hint takes its place. */
+.sb-key { flex: none; opacity: 0.75; white-space: nowrap; }
+.searchbar:focus-within .sb-key { display: none; }
+.sb-grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.12s;
+}
+.searchbar:hover .sb-grip, .sb-grip:focus-visible, .searchbar.moving .sb-grip { opacity: 1; }
+.sb-grip:hover { background: var(--hover); color: var(--text); }
+.sb-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.searchbar.moving .sb-grip { cursor: grabbing; }
+/* Where the bar will land while it's being dragged. */
+.sb-drop {
+  position: fixed;
+  z-index: 50;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  pointer-events: none;
+}
 
 /* ---------- Widgets ---------- */
 
@@ -487,11 +538,8 @@ body.widgets-right .side-widgets { grid-column: 1; justify-self: start; }
 
 /* ---------- Tiles ---------- */
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  gap: var(--gap);
-}
+/* Laid out by .grid-wrap, which it shares with the search bar. */
+.grid { display: contents; }
 
 /* Flat by default: icon and title straight on the background. */
 .tile {

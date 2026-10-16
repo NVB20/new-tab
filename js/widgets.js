@@ -1,7 +1,7 @@
 // Widget column: clock with greeting, tasks, notes and a box that sends to Claude.
 
 import { el, icon } from './ui.js';
-import { askClaude } from './chrome-api.js';
+import { askChat } from './chrome-api.js';
 import { playClockIntro } from './clock-intro.js';
 import { mountTasks } from './task-widget.js';
 
@@ -110,7 +110,7 @@ export function mountWidgets(root, store) {
     const text = claudeInput.value.trim();
     if (!text) return;
     claudeInput.value = '';
-    askClaude(text, { newTab: ctrl || store.get().prefs.openInNewTab });
+    askChat('claude', text, { newTab: ctrl || store.get().prefs.openInNewTab });
   }
 
   root.append(clock, tasks, notes, claude);

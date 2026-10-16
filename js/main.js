@@ -13,7 +13,7 @@ await store.load();
 
 mountTheme(store);
 mountGroups(document.getElementById('groups'), store);
-mountSearchBar(document.getElementById('search'), store);
+mountSearchBar(document.getElementById('search'), document.getElementById('grid'), store);
 mountGrid(document.getElementById('grid'), store);
 startIconCache(store);
 mountWidgets(document.getElementById('widgets'), store);

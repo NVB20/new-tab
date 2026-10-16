@@ -21,8 +21,9 @@ export const DEFAULT_PREFS = {
   // pattern 'ascii' is the animated letter field. An image (the upload when useUpload, else url)
   // covers it while showImage is on; picking a pattern turns showImage off and keeps the image.
   background: { pattern: 'ascii', motion: true, url: '', useUpload: false, showImage: true, blur: 0, dim: 0 },
-  // Bar above the tiles. mode ('google' | 'claude') is where Enter goes while both are on.
-  search: { enabled: true, google: true, claude: true, mode: 'google' },
+  // Bar among the tiles. Each engine has a switch; mode is the one Enter goes to. row is how many
+  // rows of tiles are above the bar (-1 keeps it under all of them).
+  search: { enabled: true, google: true, claude: true, chatgpt: false, gemini: false, mode: 'google', row: 0 },
   widgets: {
     enabled: true,   // always true: an old false is turned into every widget switched off on load
     position: 'left',

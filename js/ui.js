@@ -71,7 +71,11 @@ const ICONS = {
   circle: '<circle cx="12" cy="12" r="5"/>',
   google: '<path d="M17.7 6.3A8 8 0 1 0 20 12h-7.5"/>',
   claude: '<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>',
+  chatgpt: '<path d="M12 3.5 19.4 7.75v8.5L12 20.5l-7.4-4.25v-8.5z"/><circle cx="12" cy="12" r="3"/>',
+  gemini: '<path d="M12 3c.7 4.6 4.4 8.3 9 9-4.6.7-8.3 4.4-9 9-.7-4.6-4.4-8.3-9-9 4.6-.7 8.3-4.4 9-9z"/>',
   'arrow-up': '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  caret: '<path d="m8 10 4 4 4-4"/>',
+  grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
 };
 
 const iconCache = new Map();
