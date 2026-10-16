@@ -28,8 +28,8 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: everything is in Preferences → Widgets → GitHub (the ✎ on the widget opens
-     it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
+   - GitHub widget: everything is in the GitHub section of Preferences (the ✎ on the widget
+     opens it): my username, and Show: Commits, Issues or Both. For private repos, walk me through
      making a token as described under "Tokens for private repos" in the README: usually a
      fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
@@ -114,9 +114,10 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-All of the widget's settings are in one place: **Preferences → Widgets → GitHub**. That's your
-username, what to show and an optional access token. Hover the widget and click **✎** to go
-straight there; a widget without a username has a **Set up GitHub** button that does the same.
+All of the widget's settings are in one place, the **GitHub** section of Preferences: the widget's
+switch, your username, what to show and an optional access token, with a short how-to for getting
+one. Hover the widget and click **✎** to go straight there; a widget without a username has a
+**Set up GitHub** button that does the same.
 
 The widget shows:
 
@@ -189,7 +190,7 @@ repos, also allows changes. Treat it like a password.
 
 #### Add the token
 
-Paste it into Preferences → Widgets → GitHub → **Access token**, then press **Refresh** on the
+Paste it into Preferences → GitHub → **Access token**, then press **Refresh** on the
 widget (otherwise it checks again within the hour). The token stays in this browser and is never
 written into backup files.
 
@@ -250,7 +251,7 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 
-Turn a widget off in Preferences → Widgets and it stops fetching.
+Turn a widget off in Preferences (Widgets, or GitHub for the GitHub widget) and it stops fetching.
 
 ## Known limits
 

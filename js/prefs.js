@@ -244,21 +244,46 @@ export function setupPrefs(store) {
       w.claude && toggle('Claude', 'widgets.claude.enabled', 'A box that sends a message to a new chat on claude.ai'),
       title(`${far} column`),
       toggle('Markets', 'widgets.markets.enabled', 'Use ✎ on the widget to choose coins and currency pairs'),
+      row('GitHub', el('button', { type: 'button', class: 'btn', onclick: () => show('github') }, 'Settings'),
+        `${w.github.enabled ? 'On' : 'Off'} · set up in its own section`),
+    ];
+  }
+
+  function github() {
+    const on = prefs().widgets.github.enabled;
+    return [
+      // The widget's ✎ and Set up button open this group; an empty Username box gets the cursor.
       group('github',
-        toggle('GitHub', 'widgets.github.enabled', 'A year of activity, open pull requests, and your issues and commits'),
-        sub(w.github.enabled,
+        title('GitHub'),
+        toggle('GitHub widget', 'widgets.github.enabled', 'A year of activity, open pull requests, and your issues and commits'),
+        sub(on,
           textInput('Username', 'widgets.github.user', 'NVB20'),
           segmented('Show', 'widgets.github.show', [
             { value: 'commits', label: 'Commits' },
             { value: 'issues', label: 'Issues' },
             { value: 'both', label: 'Both' },
-          ], 'Listed under your open pull requests'),
-          textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
-            type: 'password',
-            maxLength: 300,
-            hint: 'Adds private repos (e.g. eitan-capital). A fine-grained token with Contents, Issues and Pull requests set to read-only. Kept only in this browser and left out of backups.',
-          }))),
+          ], 'Listed under your open pull requests'))),
+      on && title('Private repos'),
+      on && textInput('Access token (optional)', 'widgets.github.token', 'github_pat_…', {
+        type: 'password',
+        maxLength: 300,
+        hint: 'Only needed for private repos. Kept only in this browser and left out of backups.',
+      }),
+      on && tokenHelp(),
     ];
+  }
+
+  function tokenHelp() {
+    const link = (href, text) => el('a', { href, target: '_blank', rel: 'noopener', text });
+    return el('div', { class: 'pref-help' },
+      el('div', { class: 'pref-help-title', text: 'How to get a token' }),
+      el('ol', {},
+        el('li', {}, 'Open ', link('https://github.com/settings/personal-access-tokens/new', 'a new fine-grained token'), ' on GitHub.'),
+        el('li', { text: 'Pick the owner (you or an organisation) and the repos it may see.' }),
+        el('li', { text: 'Under Permissions, add Contents, Issues and Pull requests, each Read-only.' }),
+        el('li', { text: 'Generate it, copy it and paste it above.' })),
+      el('div', {}, 'Private repos under more than one owner? ',
+        link('https://github.com/NVB20/new-tab#tokens-for-private-repos', 'See the README'), '.'));
   }
 
   // Style picks the font. Stencil, Rounded and Serif come stacked or on one line (their `-line`
@@ -374,6 +399,7 @@ export function setupPrefs(store) {
     { id: 'page', label: 'Page', icon: 'palette', build: page },
     { id: 'tiles', label: 'Tiles', icon: 'grid', build: tiles },
     { id: 'widgets', label: 'Widgets', icon: 'layout', build: widgets },
+    { id: 'github', label: 'GitHub', icon: 'branch', build: github },
     { id: 'backup', label: 'Backup', icon: 'database', build: backup },
   ];
   let current = 'page';
