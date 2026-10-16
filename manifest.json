@@ -15,5 +15,8 @@
     "tabs",
     "favicon",
     "search"
+  ],
+  "host_permissions": [
+    "https://github.com/*"
   ]
 }

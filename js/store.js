@@ -2,6 +2,7 @@
 // Touches no browser globals at import time (unit-tested in Node).
 
 import { uid } from './util.js';
+import { parseCoins, cleanMarketItems } from './feeds.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
@@ -21,11 +22,13 @@ export const DEFAULT_PREFS = {
   widgets: {
     enabled: true,
     position: 'left',
-    clock: { enabled: true, hour24: true, name: '', greeting: true },
+    // face: 'classic' | 'stencil' | 'rounded' | 'serif' | 'dot' (One UI style lock-screen clocks).
+    clock: { enabled: true, hour24: true, name: '', greeting: true, face: 'classic' },
     tasks: { enabled: true },
     notes: { enabled: true },
-    // Shown in the column opposite the clock. coins are Bybit spot tickers quoted in USDT.
-    markets: { enabled: true, coins: 'BTC, SOL, XRP, ETH', fx: true },
+    // Shown in the column opposite the clock. items are Bybit spot coins quoted in USDT ('BTC')
+    // and ECB currency pairs ('EUR/ILS'), in display order.
+    markets: { enabled: true, items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] },
     // token is optional (read-only) and only adds private repos' commits and PRs; never exported in backups.
     github: { enabled: true, user: '', token: '' },
   },
@@ -107,7 +110,18 @@ export function normalizeState(raw) {
     .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isInteger(n) && n > 0));
   s.notes = str(raw.notes);
   s.prefs = deepMerge(DEFAULT_PREFS, raw.prefs);
+  s.prefs.widgets.markets = normalizeMarkets(raw.prefs?.widgets?.markets);
   return s;
+}
+
+// Older versions kept a coins text and a USD/ILS switch; those become the item list.
+function normalizeMarkets(raw) {
+  const m = isObj(raw) ? raw : {};
+  const legacy = typeof m.coins === 'string' ? [...parseCoins(m.coins), ...(m.fx === false ? [] : ['USD/ILS'])] : null;
+  return {
+    enabled: typeof m.enabled === 'boolean' ? m.enabled : DEFAULT_PREFS.widgets.markets.enabled,
+    items: cleanMarketItems(m.items) ?? legacy ?? [...DEFAULT_PREFS.widgets.markets.items],
+  };
 }
 
 export function pickAdapter() {

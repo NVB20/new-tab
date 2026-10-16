@@ -3,7 +3,7 @@
 
 const PREFIX = 'newtab:cache:';
 
-export async function fetchJson(url, headers = {}, timeoutMs = 10000) {
+async function request(url, headers, timeoutMs) {
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) {
     const err = new Error(`HTTP ${res.status}`);
@@ -11,7 +11,15 @@ export async function fetchJson(url, headers = {}, timeoutMs = 10000) {
     err.rateLimited = res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0';
     throw err;
   }
-  return res.json();
+  return res;
+}
+
+export async function fetchJson(url, headers = {}, timeoutMs = 10000) {
+  return (await request(url, headers, timeoutMs)).json();
+}
+
+export async function fetchText(url, headers = {}, timeoutMs = 10000) {
+  return (await request(url, headers, timeoutMs)).text();
 }
 
 // Last stored value for a key, however old ({ at, data } or null).

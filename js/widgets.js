@@ -10,13 +10,55 @@ function partOfDay(hour) {
   return 'night';
 }
 
+// One UI style lock-screen faces. Stacked faces put the hours above the minutes.
+export const CLOCK_FACES = [
+  { id: 'classic', label: 'Classic' },
+  { id: 'stencil', label: 'Stencil', stacked: true },
+  { id: 'rounded', label: 'Rounded', stacked: true },
+  { id: 'serif', label: 'Serif', stacked: true },
+  { id: 'dot', label: 'Dot' },
+];
+const faceOf = id => CLOCK_FACES.find(f => f.id === id) ?? CLOCK_FACES[0];
+
 const heading = (iconName, text) => el('h2', { class: 'widget-head' }, icon(iconName, 18), el('span', { text }));
+
+// The time's children for a face: "9:05" in one line, or "09" over "05" (stacked faces always
+// show two-digit hours).
+function clockDigits(face, now, hour24) {
+  const h = now.getHours();
+  const hour = hour24 ? h : h % 12 || 12;
+  const hh = hour24 || face.stacked ? String(hour).padStart(2, '0') : String(hour);
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ampm = !hour24 && el('span', { class: 'clock-ampm', text: h < 12 ? 'AM' : 'PM' });
+  return face.stacked
+    ? [el('span', { class: 'clock-h', text: hh }), el('span', { class: 'clock-m' }, mm, ampm)]
+    : [`${hh}:${mm}`, ampm].filter(Boolean);
+}
 
 export function mountWidgets(root, store) {
   const date = el('div', { class: 'clock-date' });
   const time = el('div', { class: 'clock-time' });
   const greeting = el('div', { class: 'clock-greeting', dir: 'auto' });
-  const clock = el('section', { class: 'widget widget-clock' }, date, time, greeting);
+  const face = el('div', { class: 'clock-face' }, date, time, greeting);
+  // ✎ opens a strip of previews, one per face; picking one applies it straight away.
+  const faces = el('div', { class: 'clock-faces', role: 'group', 'aria-label': 'Clock style', hidden: true });
+  const editButton = el('button', {
+    type: 'button',
+    class: 'icon-btn widget-edit clock-edit',
+    onclick: () => setEditing(faces.hidden),
+  });
+  const clock = el('section', { class: 'widget widget-clock' }, face, editButton, faces);
+
+  function setEditing(on) {
+    faces.hidden = !on;
+    clock.classList.toggle('editing', on);
+    editButton.replaceChildren(icon(on ? 'check' : 'edit', 15));
+    editButton.title = on ? 'Done' : 'Clock style';
+    editButton.setAttribute('aria-label', editButton.title);
+    editButton.setAttribute('aria-pressed', String(on));
+    if (on) renderClock(true);
+  }
+  setEditing(false);
 
   const taskInput = el('input', {
     class: 'task-input',
@@ -68,16 +110,23 @@ export function mountWidgets(root, store) {
     shownMinute = minute;
 
     const c = store.get().prefs.widgets.clock;
-    const h = now.getHours();
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    date.textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-    if (c.hour24) {
-      time.replaceChildren(`${String(h).padStart(2, '0')}:${mm}`);
-    } else {
-      time.replaceChildren(`${h % 12 || 12}:${mm}`, el('span', { class: 'clock-ampm', text: h < 12 ? 'AM' : 'PM' }));
-    }
+    const current = faceOf(c.face);
+    face.className = `clock-face face-${current.id}${current.stacked ? ' stacked' : ''}`;
+    // Classic keeps "Friday, Oct 16"; the One UI faces use the short "Fri 16 Oct".
+    date.textContent = current.id === 'classic'
+      ? now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+      : now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    time.replaceChildren(...clockDigits(current, now, c.hour24));
     greeting.hidden = !c.greeting;
-    greeting.textContent = `Good ${partOfDay(h)}${c.name.trim() ? ', ' + c.name.trim() : ''}`;
+    greeting.textContent = `Good ${partOfDay(now.getHours())}${c.name.trim() ? ', ' + c.name.trim() : ''}`;
+    if (!faces.hidden) {
+      faces.replaceChildren(...CLOCK_FACES.map(f => el('button', {
+        type: 'button',
+        class: `clock-face-btn face-${f.id}${f.stacked ? ' stacked' : ''}`,
+        'aria-pressed': String(f.id === current.id),
+        onclick: () => store.update(s => { s.prefs.widgets.clock.face = f.id; }),
+      }, el('span', { class: 'clock-time', 'aria-hidden': 'true' }, clockDigits(f, now, c.hour24)), el('span', { class: 'clock-face-label', text: f.label }))));
+    }
   }
 
   function renderTasks(list) {

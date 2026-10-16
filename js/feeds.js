@@ -18,16 +18,27 @@ export function parseKline(json) {
   return list.map(row => Number(row?.[4])).filter(Number.isFinite).reverse();
 }
 
-// Frankfurter time series → latest rate, its change from the previous day, and the series.
-export function parseFxSeries(json, currency) {
+// Frankfurter time series (one base, several currencies) → a pair's latest rate, its change from
+// the previous day and the series. 'USD/ILS' is ILS per USD, so it's rate[ILS] / rate[USD].
+export function parseFxPair(json, pair) {
+  const [from, to] = pair.split('/');
+  const base = json?.base ?? 'EUR';
+  const rateOf = (day, cur) => (cur === base ? 1 : day[cur]);
   const days = Object.entries(json?.rates ?? {})
-    .filter(([, r]) => typeof r?.[currency] === 'number')
+    .filter(([, day]) => typeof rateOf(day ?? {}, from) === 'number' && typeof rateOf(day ?? {}, to) === 'number')
     .sort(([a], [b]) => (a < b ? -1 : 1));
   if (!days.length) return null;
-  const series = days.map(([, r]) => r[currency]);
+  const series = days.map(([, day]) => rateOf(day, to) / rateOf(day, from));
   const rate = series.at(-1);
   const prev = series.at(-2);
   return { rate, change: prev ? rate / prev - 1 : 0, date: days.at(-1)[0], series };
+}
+
+// Currencies (besides EUR, the ECB's base) needed for the chosen pairs, for one request.
+export function fxCurrencies(items) {
+  const set = new Set(items.filter(isPair).flatMap(p => p.split('/')));
+  set.delete('EUR');
+  return [...set].sort();
 }
 
 // GitHub commit search results → commit rows, newest first, with the message's first line.
@@ -45,12 +56,12 @@ export function parseCommits(json) {
     .sort((a, b) => b.at - a.at);
 }
 
-// The newest commit of each repo, repos ordered by that commit (newest first).
-export function latestPerRepo(commits, limit) {
+// The newest commits across all repos; the same commit found twice is kept once.
+export function latestCommits(commits, limit) {
   const seen = new Set();
   return [...commits]
     .sort((a, b) => b.at - a.at)
-    .filter(c => !seen.has(c.repo) && seen.add(c.repo))
+    .filter(c => !seen.has(c.repo + c.sha) && seen.add(c.repo + c.sha))
     .slice(0, limit);
 }
 
@@ -105,8 +116,67 @@ export function timeAgo(ms, now = Date.now()) {
   return `${Math.floor(s / (7 * 86400))}w`;
 }
 
+const COIN = /^[A-Z0-9]{2,10}$/;
+const PAIR = /^[A-Z]{3}\/[A-Z]{3}$/;
+export const isPair = id => id.includes('/');
+
 // "btc, SOL xrp" → ['BTC', 'SOL', 'XRP'] (tickers only, no duplicates).
 export function parseCoins(text) {
-  const coins = String(text ?? '').toUpperCase().split(/[\s,;]+/).filter(c => /^[A-Z0-9]{2,10}$/.test(c));
+  const coins = String(text ?? '').toUpperCase().split(/[\s,;]+/).filter(c => COIN.test(c));
   return [...new Set(coins)];
+}
+
+// Markets items: coin tickers ('BTC') and currency pairs ('EUR/ILS'), valid ones once, in order.
+// Anything but a list gives null.
+export function cleanMarketItems(list) {
+  if (!Array.isArray(list)) return null;
+  const items = list
+    .filter(i => typeof i === 'string')
+    .map(i => i.trim().toUpperCase())
+    .filter(i => COIN.test(i) || PAIR.test(i));
+  return [...new Set(items)];
+}
+
+// GitHub's contribution calendar (github.com/users/<user>/contributions) → each day's activity
+// level (0–4) and count, oldest first, plus the yearly total. The count is in the tooltip that
+// points at the day's cell id. null when the page has no calendar.
+export function parseContributions(html) {
+  const text = String(html ?? '');
+  const attr = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+  const counts = new Map();
+  for (const [, tag, label] of text.matchAll(/<tool-tip\b([^>]*)>([^<]*)<\/tool-tip>/g)) {
+    const n = label.trim().match(/^([\d,]+) contributions?\b/);
+    counts.set(attr(tag, 'for'), n ? Number(n[1].replace(/,/g, '')) : 0);
+  }
+  const days = [];
+  for (const [tag] of text.matchAll(/<td\b[^>]*\bdata-date="[^"]*"[^>]*>/g)) {
+    const date = attr(tag, 'data-date');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    days.push({ date, level: Math.min(4, Math.max(0, Number(attr(tag, 'data-level')) || 0)), count: counts.get(attr(tag, 'id')) ?? 0 });
+  }
+  if (!days.length) return null;
+  days.sort((a, b) => (a.date < b.date ? -1 : 1));
+  const total = text.match(/([\d,]+)\s+contributions?\s+in the last year/);
+  return { total: total ? Number(total[1].replace(/,/g, '')) : days.reduce((n, d) => n + d.count, 0), days };
+}
+
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Grid positions for a contribution heatmap: one column per week, Sunday in row 0. A month is
+// named above the column whose top day is one of its first seven days.
+export function heatmapLayout(days) {
+  if (!days.length) return { cols: 0, cells: [], months: [] };
+  const dayNo = date => Date.parse(date + 'T00:00:00Z') / 86400e3;
+  const start = dayNo(days[0].date) - new Date(days[0].date + 'T00:00:00Z').getUTCDay();
+  const cells = days.map(d => {
+    const i = dayNo(d.date) - start;
+    return { ...d, col: Math.floor(i / 7), row: i % 7 };
+  });
+  const months = [];
+  for (const c of cells) {
+    const isTop = c.row === 0 || c === cells[0];
+    const [, month, dom] = c.date.split('-').map(Number);
+    if (isTop && dom <= 7) months.push({ col: c.col, label: MONTHS[month - 1] });
+  }
+  return { cols: cells.at(-1).col + 1, cells, months };
 }
