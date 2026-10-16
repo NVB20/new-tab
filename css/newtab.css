@@ -283,6 +283,16 @@ body:not(.tiles-card) .tile-img {
   border-radius: 22%;
   transform: translateX(-50%);
 }
+/* Wide logos get a wide box (no rounding: their background is transparent). Speed Dial 2's
+   640×265 banners are cropped to the middle, where the symbol is, so it isn't shrunk to fit
+   the whole banner width. */
+body:not(.tiles-card) .tile-img.wide {
+  top: 8%;
+  height: 78%;
+  aspect-ratio: 1.75;
+  border-radius: 0;
+}
+body:not(.tiles-card) .tile-img.wide.banner { object-fit: cover; }
 /* Site favicons are small, flat shapes: show them at a crisp fixed size, unclipped. */
 body.site-icons:not(.tiles-card) .tile-img {
   top: 50%;

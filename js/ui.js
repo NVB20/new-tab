@@ -84,9 +84,18 @@ export function tileIcon(url, iconUrl, title, { mini = false, preferSite = mini 
     if (i < candidates.length) img.src = candidates[i];
     else img.replaceWith(letter());
   });
+  // Wide images get a wide box in the flat layout instead of shrinking into a square one.
+  // Speed Dial 2's own logos are 640×265 banners with the symbol in the middle, so those are
+  // also cropped to their centre.
+  img.addEventListener('load', () => {
+    img.classList.toggle('wide', img.naturalWidth / img.naturalHeight > 1.3);
+    img.classList.toggle('banner', SD2_BANNER.test(img.currentSrc));
+  });
   img.src = candidates[0];
   return img;
 }
+
+const SD2_BANNER = /^https:\/\/assets\.speeddial2\.com\/logo\//;
 
 // ---- Context menu ----
 
