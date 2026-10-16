@@ -162,11 +162,19 @@ export function mountTiles(root, store, copy, ctx) {
       nodes.push(el('p', { class: 'grid-empty', text: 'No tiles in this group. Turn on the + button in Preferences to add some.' }));
     }
     grid.replaceChildren(...nodes);
-    fade();
+    fadeSoon();
   }
 
-  // A soft fade along the bottom edge while there are more rows below.
+  // A soft fade along the bottom edge while there are more rows below. After a redraw it's measured
+  // in the next frame, once every widget is on the page, rather than forcing a layout mid-mount.
   const fade = () => wrap.classList.toggle('more-below', wrap.scrollTop + wrap.clientHeight < wrap.scrollHeight - 2);
+  let fadeFrame = 0;
+  const fadeSoon = () => {
+    fadeFrame ||= requestAnimationFrame(() => {
+      fadeFrame = 0;
+      fade();
+    });
+  };
   wrap.addEventListener('scroll', fade, { passive: true });
   const sizes = new ResizeObserver(fade);
   sizes.observe(wrap);
@@ -261,6 +269,7 @@ export function mountTiles(root, store, copy, ctx) {
     destroy() {
       unsubscribe();
       sizes.disconnect();
+      cancelAnimationFrame(fadeFrame);
     },
   };
 }

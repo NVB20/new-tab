@@ -4,6 +4,7 @@ import { mountTheme } from './theme.js';
 import { mountGroups } from './groups.js';
 import { mountCanvas } from './canvas.js';
 import { startIconCache } from './icon-cache.js';
+import { idle } from './util.js';
 
 const store = createStore(pickAdapter());
 await store.load();
@@ -25,7 +26,9 @@ mountTheme(store);
 mountGroups(document.getElementById('groups'), store);
 const canvasRoot = document.getElementById('canvas');
 const canvas = mountCanvas(canvasRoot, store, ctx);
-startIconCache(store);
+// The tiles draw their saved logos from the localStorage copy; reading the full set from
+// chrome.storage (and fetching new ones) waits for a quiet moment.
+idle(() => startIconCache(store));
 
 const buttons = [
   ['btn-jump', 'search', openJump],
@@ -69,5 +72,5 @@ document.body.classList.add('ready');
 requestAnimationFrame(() => setTimeout(async () => {
   const { mountAsciiBackground } = await import('./ascii-bg.js');
   mountAsciiBackground(document.getElementById('ascii'), store);
-  requestIdleCallback(() => [jump, prefs, sidebar].forEach(load => load()));
+  idle(() => [jump, prefs, sidebar].forEach(load => load()));
 }));

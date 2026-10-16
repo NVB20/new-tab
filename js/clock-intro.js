@@ -2,9 +2,9 @@
 // character grows out of that same point and travels to its place. Skipped when the system asks
 // for less motion. Resolves when it's done, so the clock can be redrawn as plain text.
 
-const SEED_MS = 260;    // the point appears and swells before the first digit leaves it
-const GROW_MS = 700;
-const STAGGER_MS = 70;
+const SEED_MS = 140;    // the point appears and swells before the first digit leaves it
+const GROW_MS = 480;
+const STAGGER_MS = 40;
 
 export async function playClockIntro(time, others = []) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || !time.animate) return;
@@ -49,7 +49,7 @@ export async function playClockIntro(time, others = []) {
   ], { duration: seedMs, easing: 'ease-out' }));
   for (const n of others) {
     animations.push(n.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
-      { duration: 450, delay: SEED_MS + units.length * STAGGER_MS, easing: 'ease-out', fill: 'backwards' }));
+      { duration: 320, delay: SEED_MS + units.length * STAGGER_MS, easing: 'ease-out', fill: 'backwards' }));
   }
 
   await Promise.allSettled(animations.map(a => a.finished));

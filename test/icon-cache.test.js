@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { iconsToFetch, pruneIcons } from '../js/icon-cache.js';
+import { iconsToFetch, pruneIcons, needsShrink } from '../js/icon-cache.js';
 
 const tile = (icon, extra = {}) => ({ id: icon, groupId: 'g', title: 't', url: 'https://a.com', icon, ...extra });
 
@@ -29,4 +29,13 @@ test('iconsToFetch skips links that already failed this session', () => {
 test('pruneIcons drops saved logos no tile uses', () => {
   const saved = { 'https://a.example/kept.png': 'data:1', 'https://a.example/gone.png': 'data:2' };
   assert.deepEqual(pruneIcons([tile('https://a.example/kept.png')], saved), { 'https://a.example/kept.png': 'data:1' });
+});
+
+test('needsShrink picks big raster logos only', () => {
+  const big = n => 'A'.repeat(n);
+  assert.equal(needsShrink('data:image/png;base64,' + big(14000)), false);   // a Speed Dial 2 banner
+  assert.equal(needsShrink('data:image/png;base64,' + big(400000)), true);
+  assert.equal(needsShrink('data:image/jpeg;base64,' + big(400000)), true);
+  assert.equal(needsShrink('data:image/svg+xml;base64,' + big(400000)), false);
+  assert.equal(needsShrink('data:image/gif;base64,' + big(400000)), false);
 });
