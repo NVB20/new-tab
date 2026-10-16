@@ -13,7 +13,9 @@ const FIELD_LEVELS = 6;
 const GLOW_LEVELS = 8;
 const BLUE_LEVELS = 8;
 const GLOW_MIN = 0.1;           // below this a lit letter falls back to the resting field
-const FIELD_MS = 160;          // how often the drifting field is recomputed
+const FIELD_MS = 100;          // how often the flowing field is recomputed
+const FLOW_WHILE_ACTIVE = 0.3; // flow speed while the mouse moves or a ripple runs (idle = 1)
+const FLOW_EASE_MS = 700;      // how gently the flow speeds up and slows down
 const HOVER_RADIUS = 90;       // px around the cursor that brightens
 const HOVER_DECAY_MS = 280;    // how fast hover light fades
 const RIPPLE_DECAY_MS = 170;   // ripple light fades quickly behind the wave, so it reads as a ring
@@ -45,7 +47,6 @@ export function mountAsciiBackground(canvas, store) {
   const ctx = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const seed = Math.floor(Math.random() * 1e6);
-  const startTime = performance.now();
 
   let cols = 0, rows = 0, cw = 0, ch = 0, cwPx = 0, chPx = 0;
   let chars, base, glow, fadeMs, blue, drawn;
@@ -57,6 +58,8 @@ export function mountAsciiBackground(canvas, store) {
   let lastMove = 0;
   let lastFrame = 0;
   let lastField = 0;
+  let flowTime = 0;   // seconds of flow so far, advanced faster while idle
+  let flowSpeed = 1;
   let raf = 0;
   const active = new Set();
   const ripples = [];
@@ -111,9 +114,9 @@ export function mountAsciiBackground(canvas, store) {
     if (row >= 0) ctx.drawImage(atlas, glyph * cwPx, row * chPx, cwPx, chPx, x, y, cw, ch);
   }
 
-  // Recomputes the drifting streaks; letters that newly appear get a fresh glyph.
-  function updateField(now) {
-    const t = motion ? (now - startTime) / 1000 : 0;
+  // Recomputes the flowing streaks; letters that newly appear get a fresh glyph.
+  function updateField() {
+    const t = motion ? flowTime : 0;
     for (let i = 0; i < cols * rows; i++) {
       const v = streakField(i % cols, Math.floor(i / cols), t, seed);
       if (base[i] === 0 && v > 0) chars[i] = randomGlyph();
@@ -145,7 +148,7 @@ export function mountAsciiBackground(canvas, store) {
     ripples.length = 0;
     for (let i = 0; i < n; i++) chars[i] = Math.floor(hash2(i % cols, Math.floor(i / cols), seed) * GLYPHS.length);
     buildAtlas(dpr);
-    updateField(performance.now());
+    updateField();
   }
 
   function light(i, strength, decayMs, isBlue = 0) {
@@ -208,9 +211,14 @@ export function mountAsciiBackground(canvas, store) {
     const dt = Math.min(120, now - lastFrame);
     lastFrame = now;
 
+    // The waves flow freely while nothing is happening and calm down during interaction.
+    const targetSpeed = pointer || ripples.length ? FLOW_WHILE_ACTIVE : 1;
+    flowSpeed += (targetSpeed - flowSpeed) * Math.min(1, dt / FLOW_EASE_MS);
+    flowTime += (dt / 1000) * flowSpeed;
+
     if (now - lastField >= FIELD_MS) {
       lastField = now;
-      updateField(now);
+      updateField();
       // Now and then a single visible letter changes.
       const i = Math.floor(Math.random() * cols * rows);
       if (base[i] > 0) {

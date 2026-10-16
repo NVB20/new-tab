@@ -35,10 +35,25 @@ test('streakField is deterministic, bounded and mostly empty', () => {
   assert.ok(values.some(v => v > 0.4), 'streaks have brighter middles');
 });
 
-test('streakField drifts slowly over time', () => {
-  let changed = 0;
-  for (let c = 0; c < 200; c++) if (Math.abs(streakField(c, 5, 0, 3) - streakField(c, 5, 0.5, 3)) > 0.2) changed++;
-  assert.ok(changed < 40, 'half a second changes only a few cells a lot');
+function changedShare(t0, t1, threshold) {
+  let changed = 0, cells = 0;
+  for (let r = 0; r < 20; r++) {
+    for (let c = 0; c < 200; c++) {
+      cells++;
+      if (Math.abs(streakField(c, r, t0, 3) - streakField(c, r, t1, 3)) > threshold) changed++;
+    }
+  }
+  return changed / cells;
+}
+
+test('streakField flows: a second later the streaks have visibly moved', () => {
+  const share = changedShare(0, 1, 0.2);
+  assert.ok(share > 0.08, `only ${(share * 100).toFixed(1)}% of cells changed in a second`);
+});
+
+test('streakField flows smoothly between 0.1s animation steps', () => {
+  const share = changedShare(2, 2.1, 0.3);
+  assert.ok(share < 0.05, `${(share * 100).toFixed(1)}% of cells jumped in 0.1s`);
 });
 
 test('falloff is 1 at the centre, 0 at the radius and decreasing', () => {
