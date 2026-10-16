@@ -1,5 +1,5 @@
-// Clock widget: date, time and greeting in one of the One UI style faces. The face is sized to
-// the widget's frame (container query units, see the CSS), so a bigger clock is a bigger clock.
+// Clock widget: date, time and greeting in one of the One UI style faces. The time fills what the
+// date and greeting leave of the widget's frame, so a bigger clock is a bigger clock.
 
 import { el, icon } from './ui.js';
 import { copyById, TYPES } from './layout.js';
@@ -47,7 +47,9 @@ export function mountClock(root, store, copy) {
   const date = el('div', { class: 'clock-date' });
   const time = el('div', { class: 'clock-time' });
   const greeting = el('div', { class: 'clock-greeting', dir: 'auto' });
-  const face = el('div', { class: 'clock-face' }, date, time, greeting);
+  // A hidden copy of the time, measured at trial sizes to find the one that fills the frame.
+  const probe = el('div', { class: 'clock-time clock-probe', 'aria-hidden': 'true' });
+  const face = el('div', { class: 'clock-face' }, date, time, greeting, probe);
   // ✎ opens a strip of previews, one per face; picking one applies it straight away.
   const faces = el('div', { class: 'clock-faces', role: 'group', 'aria-label': 'Clock style', hidden: true });
   const editButton = el('button', {
@@ -58,6 +60,58 @@ export function mountClock(root, store, copy) {
   const section = el('section', { class: 'widget widget-clock' }, face, editButton, faces);
   root.append(section);
 
+  // The biggest font size at which the time fits width × height (0 if none).
+  function sizeFor(width, height) {
+    if (width <= 0 || height <= 0) return 0;
+    let size = 100;
+    for (let i = 0; i < 2; i++) {   // twice, as AM/PM keeps its own size while the digits scale
+      probe.style.fontSize = `${size}px`;
+      const box = probe.getBoundingClientRect();
+      size *= Math.min(width / box.width, height / box.height);
+    }
+    return size;
+  }
+  const textWidth = node => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return range.getBoundingClientRect().width;
+  };
+
+  // The time's size in a face `height` tall, with the date and greeting under it or beside it:
+  // beside when that makes the time clearly bigger (hours over minutes in a wide frame), or when
+  // the frame is too short for them under the time and beside keeps it nearly as big.
+  function arrange(height) {
+    const width = face.clientWidth;
+    // Beside, the date and greeting keep their own width, up to 40% of the frame. The time is out
+    // of the way while they're measured, so they don't wrap.
+    time.style.fontSize = '0';
+    face.classList.add('beside');
+    const side = Math.min(width * 0.4, Math.max(textWidth(date), textWidth(greeting)));
+    const beside = side ? sizeFor(width - side - parseFloat(getComputedStyle(face).columnGap), height) : 0;
+    face.classList.remove('beside');
+    const under = sizeFor(width, height - (face.offsetHeight - time.offsetHeight));
+    return beside > under * (date.offsetHeight ? 1.15 : 0.9) ? { size: beside, beside: true } : { size: under, beside: false };
+  }
+
+  // Sizes the time to the room left in the frame, both ways. Small screens stack the frames at
+  // their content's height, so there the CSS sizes stand.
+  const small = matchMedia('(max-width: 900px)');
+  function fit() {
+    if (small.matches || !section.clientHeight || !probe.firstChild) {
+      face.classList.remove('beside');
+      time.style.fontSize = '';
+      return;
+    }
+    const pad = getComputedStyle(section);
+    const room = section.clientHeight - parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom);
+    const strip = faces.hidden ? 0 : faces.offsetHeight + parseFloat(getComputedStyle(faces).marginTop);
+    let best = arrange(room - strip);
+    // No room for a readable time above the open ✎ strip: it keeps its size and the frame scrolls.
+    if (strip && best.size < 48) best = arrange(room);
+    face.classList.toggle('beside', best.beside);
+    time.style.fontSize = `${Math.max(24, Math.floor(best.size))}px`;
+  }
+
   function setEditing(on) {
     faces.hidden = !on;
     section.classList.toggle('editing', on);
@@ -66,6 +120,7 @@ export function mountClock(root, store, copy) {
     editButton.setAttribute('aria-label', editButton.title);
     editButton.setAttribute('aria-pressed', String(on));
     if (on) renderClock(true);
+    else fit();
   }
   setEditing(false);
 
@@ -99,6 +154,10 @@ export function mountClock(root, store, copy) {
         onclick: () => pickFace(f.id),
       }, el('span', { class: 'clock-time', 'aria-hidden': 'true' }, clockDigits(f, now, c)), el('span', { class: 'clock-face-label', text: f.label }))));
     }
+    // The time as shown, so it fills the frame: in Stencil and Serif, whose 1s are narrow, it
+    // grows or shrinks a little when the digits change.
+    probe.replaceChildren(...clockDigits(current, now, c));
+    fit();
   }
 
   const unsubscribe = store.subscribe(() => renderClock(true), ['prefs']);
@@ -106,10 +165,16 @@ export function mountClock(root, store, copy) {
   // A new tab builds its time out of a single point, then redraws it as plain text.
   playClockIntro(time, [date, greeting]).then(() => renderClock(true));
   const timer = setInterval(renderClock, 1000);
+  // Refit when the frame is resized and when a face's font arrives (its digits measure differently).
+  const resized = new ResizeObserver(() => fit());
+  resized.observe(section);
+  document.fonts.addEventListener('loadingdone', fit);
   return {
     destroy() {
       clearInterval(timer);
       unsubscribe();
+      resized.disconnect();
+      document.fonts.removeEventListener('loadingdone', fit);
     },
   };
 }

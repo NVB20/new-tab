@@ -74,12 +74,18 @@ allowed.
 
 Per type:
 
-- **Clock.** The frame is a size container; the faces size themselves with container query units
-  instead of a fixed `--clock-size`: `font-size: min(var(--fit-w) * 1cqw, var(--fit-h) * 1cqh)`
-  with per-face factors (starting points: classic 30/45, dot 26/45, one-line stencil 32/45, rounded
-  28/45, serif 30/45; stacked stencil 55/34, rounded 50/34, serif 52/36; tuned in the browser). Under
-  a container height of 160px the date and greeting are hidden. The ✎ face strip still opens under
-  the clock; the frame scrolls if it does not fit.
+- **Clock.** The time fills its frame (2026-10-17; this replaced per-face container-query factors,
+  which left a wide frame mostly empty). Its box is trimmed to the digits (`text-box: trim-both cap
+  alphabetic`, with 0.02em of padding for round digits' overshoot), and `clock-widget.js` measures a
+  hidden copy of the time as shown to set the largest font size that fits the room the date and
+  greeting leave, refitting each minute, on resize, on settings changes and when a font loads. In
+  Stencil and Serif, whose 1s are narrow, the size changes a little with the digits. The date and
+  greeting go beside the time instead (a `.beside` grid, at its foot on the right) when that makes
+  the time 15% bigger, or, in a frame under 160px tall (which otherwise hides them), when it keeps
+  the time at 90% or more. The clock sits in the middle of whatever height is left. The open ✎ face
+  strip shrinks the time to make room while it stays 48px or more; otherwise the time keeps its
+  size and the frame scrolls to the strip. Under 900px wide the frames stack at their content's
+  height and the CSS sizes apply.
 - **Tasks, Notes, Claude.** As today. The notes textarea fills its frame and scrolls inside it (no
   `max-height: 40vh`). Removing Tasks or Notes keeps `state.tasks` and `state.notes`.
 - **Markets.** As today, per copy: the ✎ editor writes the copy's `items`. Rows under 3 cells wide
