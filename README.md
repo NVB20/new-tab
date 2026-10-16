@@ -21,6 +21,11 @@ export (`.json`). Groups, tiles and layout settings come over; tasks and notes h
 
 - **Tiles** — click to open; Ctrl+click or middle-click opens a new tab. Right-click to edit, move
   to another group or delete. Drag to reorder, or drop on a group tab to move it there.
+- **Folders** — drag a tile onto the middle of another tile to put both in a new folder, then type
+  its name. Drop more tiles on a folder to add them. Click a folder to open it; there you can rename
+  it, reorder its tiles, or drag a tile outside the window to take it out. When only one tile is
+  left you're asked whether to remove the folder (the tile takes its place) or keep it.
+  Right-click a folder to rename, move or remove it (its tiles are kept).
 - **Groups** — click to switch, double-click or right-click to rename or delete, **+** next to the
   tabs adds one. Drag tabs to reorder.
 - **Jump** — **Ctrl+K** or **/** (or the search icon). Searches tiles, open tabs, bookmarks, history

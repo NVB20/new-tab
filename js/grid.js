@@ -1,7 +1,12 @@
-// Tile grid for the active group: open, drag to reorder, context menu, add/edit dialog.
+// Tile grid for the active group: open, drag to reorder, drop a tile on another to make a folder,
+// context menu, add/edit dialog.
 
 import { el, icon, tileIcon, showMenu, openDialog, confirmDialog, field, TILE_MIME } from './ui.js';
-import { addTile, updateTile, deleteTile, moveTileToGroup, reorderTile } from './actions.js';
+import {
+  addTile, updateTile, deleteTile, moveTileToGroup, reorderTile,
+  isFolder, folderChildren, topLevel, createFolder, addToFolder, removeFromFolder, dissolveFolder,
+} from './actions.js';
+import { openFolder, settleFolder } from './folders.js';
 import { openUrl } from './chrome-api.js';
 import { normalizeUrl, hostOf } from './util.js';
 
@@ -15,6 +20,17 @@ export function mountGrid(root, store) {
     showMenu(e.clientX, e.clientY, [
       { label: 'Open in new tab', icon: 'external', action: () => openUrl(tile.url, { newTab: true }) },
       { label: 'Edit', icon: 'edit', action: () => openTileDialog(store, tile) },
+      ...(tile.folderId
+        ? [{
+          label: 'Move out of folder', icon: 'folder',
+          action: () => {
+            const folderId = tile.folderId;
+            let left = 0;
+            store.update(s => { left = removeFromFolder(s, tile.id); });
+            settleFolder(store, folderId, left);
+          },
+        }]
+        : []),
       ...(others.length
         ? [{ separator: true }, { heading: 'Move to' },
           ...others.map(g => ({ label: g.title, icon: 'folder', action: () => store.update(s => moveTileToGroup(s, tile.id, g.id)) }))]
@@ -31,7 +47,47 @@ export function mountGrid(root, store) {
     ]);
   }
 
+  function folderMenu(e, folder) {
+    const others = store.get().groups.filter(g => g.id !== folder.groupId);
+    showMenu(e.clientX, e.clientY, [
+      { label: 'Open', icon: 'folder', action: () => open(folder) },
+      { label: 'Rename', icon: 'edit', action: () => open(folder, true) },
+      ...(others.length
+        ? [{ separator: true }, { heading: 'Move to' },
+          ...others.map(g => ({ label: g.title, icon: 'folder', action: () => store.update(s => moveTileToGroup(s, folder.id, g.id)) }))]
+        : []),
+      { separator: true },
+      { label: 'Remove folder (keep tiles)', icon: 'trash', danger: true, action: () => store.update(s => dissolveFolder(s, folder.id)) },
+    ]);
+  }
+
+  const open = (folder, focusName = false) => openFolder(store, folder.id, { tileNode, focusName });
+
+  // A folder shows up to four of its tiles' icons in a rounded box.
+  function folderNode(folder, prefs) {
+    const kids = folderChildren(store.get(), folder.id);
+    return el('div', {
+      class: 'tile tile-folder',
+      role: 'button',
+      tabIndex: 0,
+      draggable: true,
+      dataset: { id: folder.id },
+      title: `${folder.title} (${kids.length} tile${kids.length === 1 ? '' : 's'})`,
+      onclick: () => open(folder),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(folder); } },
+      oncontextmenu: e => {
+        e.preventDefault();
+        folderMenu(e, folder);
+      },
+    },
+      el('div', { class: 'tile-thumb' },
+        el('div', { class: 'folder-thumb' }, kids.slice(0, 4).map(k => el('span', { class: 'folder-cell' },
+          tileIcon(k.url, k.icon, k.title, { mini: true, preferSite: prefs.tiles.icons === 'site' }))))),
+      el('div', { class: 'tile-title', dir: 'auto', text: folder.title }));
+  }
+
   function tileNode(tile, prefs) {
+    if (isFolder(tile)) return folderNode(tile, prefs);
     return el('a', {
       class: 'tile',
       href: tile.url,
@@ -57,7 +113,7 @@ export function mountGrid(root, store) {
 
   function render() {
     const { tiles, activeGroupId, prefs } = store.get();
-    const list = tiles.filter(t => t.groupId === activeGroupId);
+    const list = topLevel({ tiles }, activeGroupId);
     const nodes = list.map(t => tileNode(t, prefs));
     if (prefs.showAddButton) {
       nodes.push(el('button', {
@@ -74,16 +130,18 @@ export function mountGrid(root, store) {
     root.replaceChildren(...nodes);
   }
 
-  const clearMarks = () => root.querySelectorAll('.drop-before, .drop-after')
-    .forEach(n => n.classList.remove('drop-before', 'drop-after'));
+  const clearMarks = () => root.querySelectorAll('.drop-before, .drop-after, .drop-into')
+    .forEach(n => n.classList.remove('drop-before', 'drop-after', 'drop-into'));
 
   root.addEventListener('dragstart', e => {
     const tile = e.target.closest?.('.tile[data-id]');
     if (!tile) return;
     dragId = tile.dataset.id;
     e.dataTransfer.setData(TILE_MIME, dragId);
-    e.dataTransfer.setData('text/uri-list', tile.href);
-    e.dataTransfer.setData('text/plain', tile.href);
+    if (tile.href) {
+      e.dataTransfer.setData('text/uri-list', tile.href);
+      e.dataTransfer.setData('text/plain', tile.href);
+    }
     e.dataTransfer.effectAllowed = 'copyMove';
     tile.classList.add('dragging');
   });
@@ -101,13 +159,34 @@ export function mountGrid(root, store) {
     clearMarks();
     const tile = e.target.closest?.('.tile[data-id]');
     if (!tile || tile.dataset.id === dragId) return;
+    // Edges reorder; the middle drops the tile into the target (making a folder if needed).
+    // Folders can't go inside folders.
     const r = tile.getBoundingClientRect();
-    tile.classList.add(e.clientX < r.left + r.width / 2 ? 'drop-before' : 'drop-after');
+    const x = (e.clientX - r.left) / r.width;
+    const dragged = store.get().tiles.find(t => t.id === dragId);
+    const canNest = !isFolder(dragged);
+    if (canNest && x > 0.28 && x < 0.72) tile.classList.add('drop-into');
+    else tile.classList.add(x < 0.5 ? 'drop-before' : 'drop-after');
   });
 
   root.addEventListener('drop', e => {
     if (!dragId) return;
     e.preventDefault();
+    const into = root.querySelector('.drop-into');
+    if (into) {
+      const id = dragId;
+      const targetId = into.dataset.id;
+      clearMarks();
+      const target = store.get().tiles.find(t => t.id === targetId);
+      if (isFolder(target)) {
+        store.update(s => addToFolder(s, id, targetId));
+        return;
+      }
+      let folder = null;
+      store.update(s => { folder = createFolder(s, targetId, id); });
+      if (folder) open(folder, true);   // name it right away
+      return;
+    }
     const mark = root.querySelector('.drop-before, .drop-after');
     if (!mark) return;
     const beforeId = mark.classList.contains('drop-after')

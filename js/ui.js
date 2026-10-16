@@ -131,7 +131,9 @@ export function showMenu(x, y, items) {
     const i = buttons.indexOf(document.activeElement);
     buttons[(i + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
   });
-  document.body.append(menu);
+  // Inside an open modal (e.g. a folder window) the menu must live in that dialog, or the
+  // dialog's top layer would cover it.
+  ([...document.querySelectorAll('dialog[open]')].at(-1) ?? document.body).append(menu);
   const r = menu.getBoundingClientRect();
   menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
   menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';

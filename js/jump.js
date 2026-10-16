@@ -81,13 +81,15 @@ export function setupJump(store) {
     const q = input.value.trim();
     const s = store.get();
     const groupName = id => s.groups.find(g => g.id === id)?.title ?? '';
-    const tileItems = s.tiles.map(t => ({ title: t.title, url: t.url, icon: t.icon, kind: groupName(t.groupId) }));
+    // Folders have no address; the tiles inside them are listed like any other tile.
+    const tileItems = s.tiles.filter(t => t.kind !== 'folder')
+      .map(t => ({ title: t.title, url: t.url, icon: t.icon, kind: groupName(t.groupId), groupId: t.groupId }));
     const tabItems = tabs.map(t => ({ title: t.title, url: t.url, kind: 'Open tab', tab: t }));
     const closedItems = closed.map(c => ({ title: c.title, url: c.url, kind: 'Closed', sessionId: c.sessionId }));
 
     if (!q) {
       render([
-        { label: 'Tiles', items: tileItems.filter((t, i) => s.tiles[i].groupId === s.activeGroupId).slice(0, 8) },
+        { label: 'Tiles', items: tileItems.filter(t => t.groupId === s.activeGroupId).slice(0, 8) },
         { label: 'Open tabs', items: tabItems.slice(0, LIMITS.tabs) },
         { label: 'Recently closed', items: closedItems.slice(0, LIMITS.closed) },
       ]);

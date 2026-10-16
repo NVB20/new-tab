@@ -440,6 +440,56 @@ body.compact .tile-title { padding-bottom: 6px; font-size: 12px; }
 .tile.drop-before::before { left: 3px; }
 .tile.drop-after::after { right: 3px; }
 
+/* ---------- Folders ---------- */
+
+.tile-folder { cursor: pointer; }
+.folder-thumb {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  height: 66%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  padding: 5px;
+  border-radius: 22%;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  border: 1px solid var(--border);
+}
+body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
+.folder-cell { display: grid; place-items: center; min-width: 0; min-height: 0; }
+.folder-cell .mini-img { width: 100%; height: 100%; border-radius: 22%; }
+/* Speed Dial 2's wide banner logos: show their middle, where the symbol is. */
+.folder-cell .mini-img.banner { object-fit: cover; border-radius: 0; }
+.folder-cell .letter-avatar.mini { width: 100%; height: 100%; font-size: 9px; }
+
+/* Dropping a tile into the middle of another: grow it and ring it to show a folder will form. */
+.tile.drop-into .tile-thumb { transform: scale(1.08); }
+.tile.drop-into { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.folder-dlg { width: min(620px, calc(100vw - 32px)); padding: 18px 20px 14px; transition: box-shadow 0.15s; }
+.folder-dlg.drag-out { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.folder-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; color: var(--muted); }
+.folder-name {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  outline: none;
+}
+.folder-name:hover { border-color: var(--border); }
+.folder-name:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.folder-grid { --cols: 4; }
+.folder-hint { margin: 12px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
 .grid-empty { grid-column: 1 / -1; margin: 40px 0; text-align: center; color: var(--muted); }
 
 /* ---------- Context menu ---------- */
