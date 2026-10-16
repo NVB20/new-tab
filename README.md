@@ -36,7 +36,8 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
      Never ask me to paste the token into this chat.
    - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
-     heading; any Bybit spot coin, priced in USDT, plus pairs such as USD/ILS and EUR/ILS).
+     heading; any Bybit spot coin, priced in USDT, the SPY, QQQ and DJIA indexes, plus pairs such as
+     USD/ILS and EUR/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
    on the extension's card in chrome://extensions.
 ```
@@ -50,9 +51,10 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | Coins from Bybit and currency pairs (USD/ILS, EUR/ILS, …) with sparklines, picked from a checklist. |
+| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
+| **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with due dates, priorities, drag-to-reorder and a week of finished-task history, and a notes pad. |
 | **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
@@ -85,6 +87,32 @@ Keep the extension in the same folder. Chrome ties your saved data to the folder
 copy loaded from somewhere else starts empty. If you need to move it, download a backup first and
 import it afterwards.
 
+### Safari (Mac only)
+
+Safari runs the extension on a Mac with one code change and a few features missing. There's no
+Safari for Windows, and an iPhone needs an Xcode build.
+
+1. In `js/main.js`, use `setTimeout` where `requestIdleCallback` isn't available. Safari doesn't
+   have `requestIdleCallback`, and without the fallback Jump, Preferences and the sidebar don't
+   load.
+2. In Safari, open **Settings → Advanced** and tick **Show features for web developers**.
+3. Open **Settings → Developer**, click **Add Temporary Extension…** and pick the folder that
+   contains `manifest.json`.
+4. In **Settings → General**, choose the extension under **New tabs open with**.
+5. Allow the extension on the sites Safari asks about: github.com for the heatmap, and claude.ai,
+   chatgpt.com and gemini.google.com for sending messages from the search bar.
+
+Safari removes a temporary extension when you quit it or after 24 hours, so download a backup now
+and then (Preferences → **Backup**) in case it comes back empty. To keep it installed, package it
+as a Mac app with Xcode (`xcrun safari-web-extension-packager /path/to/new-tab`) and run the app.
+Without an Apple Developer account, tick **Allow unsigned extensions** in Settings → Developer each
+time you open Safari.
+
+Safari has no extension APIs for bookmarks, history or recently closed tabs, so Jump and the
+sidebar don't show them. Tiles show their own logo or a letter instead of the site's icon, and
+searches go to google.com rather than the browser's search engine. The Website widget hasn't been
+tried in Safari.
+
 ## Folders
 
 - **Make one:** drag a tile onto the middle of another tile. Both go into a new folder and its name
@@ -104,15 +132,25 @@ A folder moves with its tiles when you move it to another group. Folders can't g
 The Markets widget starts on the right of the page; Layout mode moves it anywhere, and up to five
 copies can each follow their own list (say, coins in one and currencies in another).
 
-- **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins
-  and currency pairs you want and untick the rest; the list updates as you go. To follow a coin
-  that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're done.
-  New picks go to the bottom of the list.
+- **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins,
+  indexes and currency pairs you want and untick the rest; the list updates as you go. To follow a
+  coin that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're
+  done. New picks go to the bottom of the list.
 - **Coins:** BTC, SOL, XRP and ETH by default, as Bybit spot prices in USDT. Each row shows the
   price, its 24h change and a sparkline of the last 24 hours. A coin Bybit doesn't list shows a dash.
+- **US indexes:** SPY, QQQ and the Dow (DJIA), as CNBC quotes. Each row shows the last
+  regular-session price, its change on the day and a sparkline of that session; outside market
+  hours that's the last close.
 - **Currency pairs:** USD/ILS by default; EUR/ILS, GBP/ILS, EUR/USD, GBP/USD, USD/JPY and USD/CHF
   are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
-- **Click a row** to open the coin's chart on Bybit (or the pair on Google Finance).
+- **Click a row** to open the coin's chart on Bybit (the index on CNBC, or the pair on Google
+  Finance); the candles icon at the end opens it on TradingView.
+- **Drag a row** up or down to reorder the list; a line shows where it will land.
+- **Segments:** right-click a row and choose **New segment above** to put a heading over it (say,
+  *US* over SPY), type its name and press Enter (Esc cancels). The rows below a heading, up to the
+  next one, belong to it, and dragging a heading moves its rows with it. Right-click a heading to
+  rename or remove it (its rows stay, under the heading above), or right-click anywhere else in the
+  widget for a new segment at the bottom. Rows that belong to no segment stay at the top.
 
 Prices refresh every 30 seconds while the tab is open and visible, and all open new tabs share one
 copy, so having many tabs open doesn't multiply the requests.
@@ -235,6 +273,28 @@ Schedules come from ESPN's public site API and from Jolpica F1 (the successor of
 both free and without a key. Team schedules are checked every 6 hours and the F1 calendar once a
 day; every copy and every open tab shares one fetch.
 
+## Website
+
+The Website widget shows a page from any site, live, the way it looks in a tab: your Pinterest
+feed, a GitHub repo, a dashboard. Add it from the Layout mode tray (up to five), type an address
+in it and press **Show**.
+
+- **Access, once per site.** Most sites refuse to be shown inside another page, so the extension
+  lifts that refusal for its own widgets, and only for sites you give it access to: Show opens
+  Chrome's prompt (*Read and change your data on …pinterest.com*). Everywhere else in Chrome the
+  site keeps its protection. If you decline, the widget offers **Allow access** again.
+  chrome://extensions → New Tab → Details → Site access lists the sites, and removing one there
+  takes it off the widget too.
+- **Logged in as you are.** The widget uses your Chrome cookies, so log in to the site once in a
+  normal tab and the widget shows your own feed.
+- **The head:** **Home** goes back to the start address, **Reload** reloads the page the widget is
+  on, **Open** opens that page in a tab (a new one if *Open links in a new tab* is on), and the
+  gear opens its settings.
+- **Settings** (Preferences → Layout → *Website · pinterest.com*): the **Address** it starts on,
+  and **Zoom** (50–100%). Sites lay themselves out for the widget's width, so a narrow widget gets
+  the phone layout; at 60% a site is drawn as if the widget were two thirds wider, so more fits.
+- Only in the extension: on the Live Server preview the widget is a link to the site.
+
 ## Search bar and AI chats
 
 The bar searches Google or sends your message to **Claude**, **ChatGPT** or **Gemini**. Choose
@@ -277,7 +337,7 @@ rearrange them.
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
-  and the search bar are single; Markets, GitHub, Sports, tiles blocks and Claude allow five each. A
+  and the search bar are single; Markets, GitHub, Sports, Website, tiles blocks and Claude allow five each. A
   chip is greyed out at the limit or when nothing fits. **Reset layout** puts one copy of each
   widget back in its default place, keeping its settings.
 - **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its
@@ -333,12 +393,14 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Widget | Talks to | How often |
 | --- | --- | --- |
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
+| Markets (indexes) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores); team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
 | Sports (F1) | `api.jolpi.ca` | calendar once a day; hourly after a race until the result is in |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
+| Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |
 
 Remove a widget in Layout mode and it stops fetching.
 
@@ -352,6 +414,10 @@ Remove a widget in Layout mode and it stops fetching.
 - Claude, ChatGPT, Gemini: if you're signed out of the site, nothing is sent; sign in and send it
   again. If a site changes its page and the send button can't be found, your message is left in
   the box and you press Enter yourself.
+- Website: some sign-ins refuse to run inside a widget (Google's, among others), so log in to the
+  site in a normal tab. A few sites notice they're in a widget and stay blank; **Open** shows them
+  in a tab. A link to another site loads in the widget only if that site allows it. The page's
+  shortcuts (Ctrl+K, …) don't work while the site has the cursor; click outside it first.
 - No sync between computers; use a backup file to move your setup.
 - Sports: ESPN's site API is public but unofficial and can change without notice. The widget then
   keeps the last schedule it had and says ESPN is unreachable. F1 "live" follows the timetable,

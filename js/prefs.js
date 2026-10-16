@@ -313,6 +313,12 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
       case 'sports':
         return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'website':
+        return [
+          row('Address', textFor('Address', `${copy.id}.url`, s.url, 'pinterest.com', v => set('url', v), { maxLength: 2000 }),
+            'The page the widget starts on. A new site asks for access in the widget'),
+          sliderFor('Zoom', `${copy.id}.zoom`, s.zoom, 50, 100, v => set('zoom', v), { step: 5, unit: '%' }),
+        ];
       default:
         return [row('No settings', el('span'))];
     }

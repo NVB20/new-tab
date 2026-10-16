@@ -233,12 +233,27 @@ test('copyTitle names a copy for labels and Preferences', () => {
   assert.equal(copyTitle({ type: 'github', settings: { parts: ['heatmap', 'commits'] } }, groups), 'GitHub · Map + Commits');
   assert.equal(copyTitle({ type: 'github', settings: { parts: [] } }, groups), 'GitHub · nothing chosen');
   assert.equal(copyTitle({ type: 'clock', settings: {} }, groups), 'Clock');
+  assert.equal(copyTitle({ type: 'website', settings: { url: 'https://www.pinterest.com/ideas/' } }, groups), 'Website · pinterest.com');
+  assert.equal(copyTitle({ type: 'website', settings: { url: '' } }, groups), 'Website · no address');
+  assert.equal(copyTitle({ type: 'website', settings: { url: 'javascript:alert(1)' } }, groups), 'Website · no address');
   assert.equal(TYPES.clock.max, 1);
   assert.equal(TYPES.tiles.max, 5);
 });
 
+test('a Website copy keeps its address and a zoom from 50 to 100 percent', () => {
+  const clean = s => normalizeLayout({ widgets: [{ type: 'website', x: 0, y: 0, settings: s }] }).widgets[0].settings;
+  assert.deepEqual(clean(undefined), { url: '', zoom: 100 });
+  assert.deepEqual(clean({ url: 'pinterest.com', zoom: 65 }), { url: 'pinterest.com', zoom: 65 });
+  assert.equal(clean({ zoom: 10 }).zoom, 50);
+  assert.equal(clean({ zoom: 400 }).zoom, 100);
+  assert.equal(clean({ zoom: '80' }).zoom, 100);
+  assert.equal(clean({ url: 42 }).url, '');
+  assert.equal(clean({ url: 'x'.repeat(3000) }).url.length, 2000);
+  assert.equal(TYPES.website.max, 5);
+});
+
 test('prefsSection says where Preferences keeps a type’s settings', () => {
-  for (const type of ['clock', 'markets', 'github', 'tiles']) assert.equal(prefsSection(type), 'layout', type);
+  for (const type of ['clock', 'markets', 'github', 'tiles', 'website']) assert.equal(prefsSection(type), 'layout', type);
   assert.equal(prefsSection('search'), 'search');
   for (const type of ['tasks', 'notes', 'claude']) assert.equal(prefsSection(type), null, type);
   assert.equal(prefsSection('weather'), 'layout');   // an unknown type falls back to its own group

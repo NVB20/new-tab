@@ -122,3 +122,60 @@ export async function webSearch(text, { newTab = false } = {}) {
   }
   await openUrl('https://www.google.com/search?q=' + encodeURIComponent(text), { newTab });
 }
+
+// ---- Website widget: access to a site, the header rules that let it show in a frame, and the
+// page a frame is on ----
+
+export const canFrameSites = hasChrome && !!c.permissions && !!c.declarativeNetRequest;
+export const extensionId = hasChrome ? c.runtime.id : '';
+
+export async function hasSiteAccess(pattern) {
+  return canFrameSites && c.permissions.contains({ origins: [pattern] });
+}
+
+// Chrome's prompt. It needs the click that asked for it, so call it before awaiting anything else.
+export async function requestSiteAccess(pattern) {
+  if (!canFrameSites) return false;
+  try {
+    return await c.permissions.request({ origins: [pattern] });
+  } catch (err) {
+    console.warn('Could not ask for access to', pattern, err);
+    return false;
+  }
+}
+
+// fn() runs when the extension gains or loses access to any site (here, in another tab, or in
+// chrome://extensions). Returns a function that stops it.
+export function onSiteAccessChange(fn) {
+  if (!canFrameSites) return () => {};
+  const listener = () => fn();
+  c.permissions.onAdded.addListener(listener);
+  c.permissions.onRemoved.addListener(listener);
+  return () => {
+    c.permissions.onAdded.removeListener(listener);
+    c.permissions.onRemoved.removeListener(listener);
+  };
+}
+
+// Replaces the dynamic rules with ids 1…maxId by `rules`. Every tab writes the whole set it
+// derives from the shared layout, so tabs racing each other agree on the result.
+export async function setFrameRules(rules, maxId) {
+  if (!canFrameSites) return;
+  await c.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: Array.from({ length: maxId }, (_, i) => i + 1),
+    addRules: rules,
+  });
+}
+
+// content/site-frame.js, which tells a Website widget the page its frame is on. Registered once
+// for every site and kept across restarts; Chrome only injects it where the extension has access.
+export async function registerFrameScript() {
+  if (!canFrameSites || !c.scripting) return;
+  try {
+    const id = 'site-frame';
+    if ((await c.scripting.getRegisteredContentScripts({ ids: [id] })).length) return;
+    await c.scripting.registerContentScripts([{ id, matches: ['*://*/*'], js: ['content/site-frame.js'], allFrames: true, runAt: 'document_start' }]);
+  } catch (err) {
+    console.warn('Could not register the Website frame script', err);   // another tab may have just done it
+  }
+}

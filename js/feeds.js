@@ -41,6 +41,32 @@ export function fxCurrencies(items) {
   return [...set].sort();
 }
 
+// CNBC quotes for several symbols → { [symbol]: { price, change, name, time } } for the ones it
+// knows, with change as a fraction. Its numbers come formatted: '52,002.41', '-1.11%', 'UNCH'.
+export function parseCnbcQuotes(json) {
+  const list = json?.FormattedQuoteResult?.FormattedQuote;
+  const num = v => finite(parseFloat(String(v).replace(/,/g, '')));
+  const quotes = {};
+  for (const q of Array.isArray(list) ? list : []) {
+    const price = q?.code === 0 ? num(q.last) : null;
+    if (price == null) continue;
+    quotes[q.symbol] = { price, change: (num(q.change_pct) ?? 0) / 100, name: String(q.name ?? q.symbol), time: String(q.last_timedate ?? '') };
+  }
+  return quotes;
+}
+
+// CNBC price bars (New York time, oldest first) → the closes of the latest regular session,
+// 9:30 to 16:00, which is the session a quote's change is measured over.
+export function parseCnbcSession(json) {
+  const bars = json?.barData?.priceBars;
+  if (!Array.isArray(bars)) return [];
+  const session = bars
+    .map(b => ({ day: String(b?.tradeTime).slice(0, 8), time: String(b?.tradeTime).slice(8, 12), close: Number(b?.close) }))
+    .filter(b => b.time >= '0930' && b.time < '1600' && Number.isFinite(b.close));
+  const last = session.at(-1)?.day;
+  return session.filter(b => b.day === last).map(b => b.close);
+}
+
 // GitHub commit search results → commit rows, newest first, with the message's first line.
 export function parseCommits(json) {
   if (!Array.isArray(json?.items)) return [];
@@ -118,7 +144,9 @@ export function timeAgo(ms, now = Date.now()) {
 
 const COIN = /^[A-Z0-9]{2,10}$/;
 const PAIR = /^[A-Z]{3}\/[A-Z]{3}$/;
-export const isPair = id => id.includes('/');
+export const SEGMENT_MAX = 24;
+export const isPair = id => PAIR.test(id);
+export const isSegment = item => item.startsWith('#');
 
 // "btc, SOL xrp" → ['BTC', 'SOL', 'XRP'] (tickers only, no duplicates).
 export function parseCoins(text) {
@@ -126,15 +154,54 @@ export function parseCoins(text) {
   return [...new Set(coins)];
 }
 
-// Markets items: coin tickers ('BTC') and currency pairs ('EUR/ILS'), valid ones once, in order.
-// Anything but a list gives null.
+// A segment heading's entry in the Markets list for a typed name, or null when there's no name.
+export function segmentItem(name) {
+  const text = String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, SEGMENT_MAX).trim();
+  return text ? '#' + text : null;
+}
+
+// Markets items: coin tickers ('BTC'), currency pairs ('EUR/ILS') and segment headings
+// ('#Crypto'), in order. Products are kept once, valid ones only; a heading keeps its case and may
+// repeat. Anything but a list gives null.
 export function cleanMarketItems(list) {
   if (!Array.isArray(list)) return null;
-  const items = list
-    .filter(i => typeof i === 'string')
-    .map(i => i.trim().toUpperCase())
-    .filter(i => COIN.test(i) || PAIR.test(i));
-  return [...new Set(items)];
+  const seen = new Set();
+  return list.filter(i => typeof i === 'string').map(i => i.trim()).flatMap(i => {
+    if (isSegment(i)) return segmentItem(i.slice(1)) ?? [];
+    const id = i.toUpperCase();
+    if (!(COIN.test(id) || PAIR.test(id)) || seen.has(id)) return [];
+    seen.add(id);
+    return id;
+  });
+}
+
+// Where the block of the Markets entry at i ends (exclusive): a heading's runs over its rows up to
+// the next heading, a row's is the row alone.
+export function blockEnd(items, i) {
+  if (!isSegment(items[i])) return i + 1;
+  let end = i + 1;
+  while (end < items.length && !isSegment(items[end])) end++;
+  return end;
+}
+
+// The Markets list with the entry at `from` (a heading with its rows) moved to just before index
+// `to` of the list as it is (items.length for the end). A drop inside the block changes nothing.
+export function moveMarketItem(items, from, to) {
+  const end = blockEnd(items, from);
+  if (to >= from && to <= end) return [...items];
+  const rest = [...items.slice(0, from), ...items.slice(end)];
+  rest.splice(to > end ? to - (end - from) : to, 0, ...items.slice(from, end));
+  return rest;
+}
+
+// Where a dragged heading lands when dropped on the entry at `over` (in its top half when upper):
+// a heading's top half puts it above that segment, anywhere else below the segment's last row.
+// Rows that belong to no segment stay at the top, so a drop on them lands above the first heading.
+export function headingDropIndex(items, over, upper) {
+  let start = over;
+  while (start >= 0 && !isSegment(items[start])) start--;
+  if (start < 0) return items.findIndex(isSegment);
+  return start === over && upper ? start : blockEnd(items, start);
 }
 
 // GitHub's contribution calendar (github.com/users/<user>/contributions) → each day's activity

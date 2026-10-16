@@ -20,11 +20,16 @@
     "sessions",
     "tabs",
     "favicon",
-    "search"
+    "search",
+    "declarativeNetRequestWithHostAccess",
+    "scripting"
   ],
   "host_permissions": [
     "https://github.com/*",
     "https://*.speeddial2.com/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
   ],
   "content_scripts": [
     {
