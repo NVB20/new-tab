@@ -33,12 +33,25 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
   const folder = store.get().tiles.find(t => t.id === folderId);
   if (!folder) return;
 
-  const nameInput = el('input', {
-    type: 'text', class: 'folder-name', value: folder.title, placeholder: 'Folder name', dir: 'auto', maxLength: 60, 'aria-label': 'Folder name',
-    oninput: () => store.update(s => {
+  // The name is saved once typing pauses, and on Enter, on leaving the box or on closing: each
+  // save redraws every tiles block (the folder's tile shows the name).
+  let renameTimer = 0;
+  const saveName = () => {
+    if (!renameTimer) return;
+    clearTimeout(renameTimer);
+    renameTimer = 0;
+    store.update(s => {
       const f = s.tiles.find(t => t.id === folderId);
       if (f) f.title = nameInput.value.trim() || 'Folder';
-    }),
+    }, ['tiles']);
+  };
+  const nameInput = el('input', {
+    type: 'text', class: 'folder-name', value: folder.title, placeholder: 'Folder name', dir: 'auto', maxLength: 60, 'aria-label': 'Folder name',
+    oninput: () => {
+      clearTimeout(renameTimer);
+      renameTimer = setTimeout(saveName, 300);
+    },
+    onchange: saveName,
     onkeydown: e => { if (e.key === 'Enter') nameInput.blur(); },
   });
   const grid = el('div', { class: 'grid folder-grid' });
@@ -121,6 +134,7 @@ export function openFolder(store, folderId, { tileNode, focusName = false }) {
   dialog.addEventListener('click', e => { if (e.target === dialog && isOutside(dialog, e)) dialog.close(); });
   const unsubscribe = store.subscribe(render, ['tiles', 'prefs']);
   dialog.addEventListener('close', () => {
+    saveName();
     unsubscribe();
     dialog.remove();
   });

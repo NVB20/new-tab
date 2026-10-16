@@ -35,6 +35,7 @@ const MAX_WALLPAPER_SIDE = 2560;
 const BACKUP_FORMAT = 'new-tab-backup';
 const OFFSET_KEY = 'newtab:prefs-offset';
 const KEEP_VISIBLE = 120;   // px of the panel that stay inside the window while dragging
+const SEARCH_DELAY_MS = 120;   // a search builds every section, so it waits for a pause in typing
 
 // enterLayoutMode() opens Layout mode (the panel closes first).
 export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
@@ -535,12 +536,16 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
 
   const nav = el('nav', { class: 'prefs-nav', 'aria-label': 'Preference sections' });
   const content = el('div', { class: 'prefs-content' });
+  let searchTimer = 0;
   const search = el('input', {
     type: 'search', class: 'pref-input', placeholder: 'Search', 'aria-label': 'Search preferences',
     autocomplete: 'off', spellcheck: false,
     oninput: () => {
-      setQuery(search.value);
-      redraw();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        setQuery(search.value);
+        redraw();
+      }, SEARCH_DELAY_MS);
     },
     onkeydown: e => {
       // Esc empties the box first; once it's empty, Esc closes the panel as usual.
@@ -574,6 +579,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
   document.body.append(dialog);
 
   function setQuery(text) {
+    clearTimeout(searchTimer);   // a search still waiting would undo this
     search.value = text;
     query = text.trim();
   }
