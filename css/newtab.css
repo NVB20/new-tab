@@ -471,7 +471,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .tile.drop-into { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* The window fits its tiles: fixed-width columns, at most five per row. */
-.folder-dlg { width: fit-content; min-width: 300px; max-width: calc(100vw - 32px); padding: 16px 18px 18px; transition: box-shadow 0.15s; }
+.dlg.folder-dlg { width: fit-content; min-width: 300px; max-width: calc(100vw - 32px); padding: 16px 18px 18px; transition: box-shadow 0.15s; }
 .folder-dlg.drag-out { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
 .folder-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--muted); }
 .folder-name {
