@@ -7,7 +7,8 @@ import { el, icon, widgetEmpty } from './ui.js';
 import { copyById, TYPES } from './layout.js';
 import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules } from './website.js';
 import {
-  canFrameSites, extensionId, hasSiteAccess, requestSiteAccess, onSiteAccessChange, setFrameRules, registerFrameScript, faviconUrl, openUrl,
+  canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, onSiteAccessChange, setFrameRules,
+  registerFrameScript, faviconUrl, openUrl,
 } from './chrome-api.js';
 
 const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a changed address
@@ -129,6 +130,12 @@ export function mountWebsite(root, store, copy, ctx) {
     const my = ++seq;
     const raw = settings().url;
     const url = siteUrl(raw);
+    if (framingNeedsReload) {
+      showMessage('reload', url,
+        widgetEmpty('Chrome is still running this extension without the permissions Website widgets need. Reloading it once turns them on.'),
+        el('button', { type: 'button', class: 'btn btn-primary', text: 'Reload the extension', onclick: reloadExtension }));
+      return;
+    }
     if (!canFrameSites) {
       showMessage(`outside:${url}`, url, widgetEmpty('Websites show in the extension only. ',
         url && el('a', { href: url, target: '_blank', rel: 'noopener', text: `Open ${siteDomain(url)}` })));

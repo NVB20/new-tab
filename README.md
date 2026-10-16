@@ -294,6 +294,9 @@ in it and press **Show**.
   and **Zoom** (50–100%). Sites lay themselves out for the widget's width, so a narrow widget gets
   the phone layout; at 60% a site is drawn as if the widget were two thirds wider, so more fits.
 - Only in the extension: on the Live Server preview the widget is a link to the site.
+- **After updating the files:** Chrome keeps the extension's old permissions until it's reloaded,
+  so the widget says so and offers **Reload the extension** (or press ↻ on New Tab in
+  chrome://extensions).
 
 ## Search bar and AI chats
 
