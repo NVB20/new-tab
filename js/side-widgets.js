@@ -92,13 +92,15 @@ export function mountSideWidgets(root, store) {
 
   // ---- Markets ----
 
-  function marketRow({ label, href, title, value, change, closes }) {
+  // The symbol's link stretches over the whole row; chart is an optional link in the last column.
+  function marketRow({ label, href, title, value, change, closes, chart }) {
     const trend = trendOf(change);
-    return el('a', { class: 'mk-row', title, ...linkProps(href) },
-      el('span', { class: 'mk-sym', text: label }),
+    return el('div', { class: 'mk-row' },
+      el('a', { class: 'mk-sym', title, text: label, ...linkProps(href) }),
       closes.length > 1 ? sparkline(closes, trend) : el('span'),
       el('span', { class: 'mk-price', text: value }),
-      el('span', { class: `mk-chg ${trend}`, text: change == null ? '' : formatChange(change) }));
+      el('span', { class: `mk-chg ${trend}`, text: change == null ? '' : formatChange(change) }),
+      chart ? el('a', { class: 'mk-tv', title: chart.title, 'aria-label': chart.title, ...linkProps(chart.href) }, icon('candles', 15)) : el('span'));
   }
 
   const coinRow = ({ id, ticker, closes }) => marketRow({
@@ -108,6 +110,7 @@ export function mountSideWidgets(root, store) {
     value: ticker ? formatPrice(ticker.price) : '—',
     change: ticker?.change ?? null,
     closes,
+    chart: { href: `https://www.tradingview.com/chart/?symbol=BYBIT:${id}USDT`, title: `${id}/USDT chart on TradingView` },
   });
 
   const pairRow = ({ id, fx }) => marketRow({
