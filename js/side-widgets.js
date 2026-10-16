@@ -10,7 +10,7 @@ import {
 const PRICE_TTL = 30e3;
 const KLINE_TTL = 5 * 60e3;
 const FX_TTL = 60 * 60e3;
-const GITHUB_TTL = 10 * 60e3;
+const GITHUB_TTL = 60 * 60e3;   // GitHub is fetched at most once an hour
 const REFRESH_MS = 30e3;
 const RECONFIGURE_MS = 800;   // wait for typing to stop before refetching after a settings change
 const SPARK = { w: 64, h: 18 };
@@ -144,14 +144,16 @@ export function mountSideWidgets(root, store) {
     githubBody.replaceChildren(form, empty('Shows your latest commits in any repo, and your open pull requests.'));
   }
 
-  function renderGithub({ data, error }, user) {
+  function renderGithub({ data, at, error }, user) {
     const parts = [];
     if (error && !data) {
       parts.push(empty(error.rateLimited
-        ? 'GitHub’s hourly limit is used up. It resets within the hour; a token in Preferences raises it.'
+        ? 'GitHub’s hourly limit is used up. The widget tries again in an hour (or press Refresh later).'
         : error.status === 401 ? 'GitHub rejected the token. Check it in Preferences → Widgets.'
           : error.status === 404 ? 'GitHub user not found. Check the username in Preferences → Widgets.'
             : 'Couldn’t reach GitHub.'));
+    } else if (!data) {
+      parts.push(empty('Loading…'));
     }
     if (data) {
       if (data.pulls.length) {
@@ -175,16 +177,20 @@ export function mountSideWidgets(root, store) {
         : [empty('No commits found.')]));
       const t = data.tokenInfo;
       if (t) {
-        parts.push(el('p', { class: 'widget-note' },
-          !t.privateRepos
-            ? `Token works but sees no private repos in ${t.owners.join(', ')}. It needs Contents: read-only, and an organisation may still have to approve it. `
+        parts.push(el('p', {
+          class: 'widget-note',
+          text: !t.privateRepos
+            ? `Token works but sees no private repos in ${t.owners.join(', ')}. It needs Contents: read-only, and an organisation may still have to approve it.`
             : t.unreadable
-              ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only. `
-              : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}. `,
-          // Results are cached for 10 minutes; after changing the token's access, skip the wait.
-          el('button', { type: 'button', class: 'link-btn', text: 'Check again', onclick: () => loadGithub(true) })));
+              ? `Token sees ${t.privateRepos} private repos but can’t read commits in ${t.unreadable}. Give it Contents: read-only.`
+              : `Token: ${t.privateRepos} private repos, your commits in ${t.withCommits}.`,
+        }));
       }
     }
+    // GitHub is checked at most once an hour; Refresh skips the wait (e.g. after changing the token).
+    parts.push(el('p', { class: 'widget-note' },
+      at ? `Updated ${timeAgo(at) === 'now' ? 'just now' : `${timeAgo(at)} ago`} · ` : '',
+      el('button', { type: 'button', class: 'link-btn', text: 'Refresh', onclick: () => loadGithub(true) })));
     githubBody.replaceChildren(...parts);
   }
 
@@ -285,7 +291,7 @@ export function mountSideWidgets(root, store) {
     const w = prefs().widgets;
     if (!w.enabled) return;
     if (w.markets.enabled) loadMarkets();
-    if (w.github.enabled) loadGithub();   // served from cache until it's 10 minutes old
+    if (w.github.enabled) loadGithub();   // served from the saved copy until it's an hour old
   }
 
   store.subscribe(onPrefs, ['prefs']);

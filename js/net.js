@@ -31,16 +31,42 @@ function store(key, data) {
   }
 }
 
-// Cached value if younger than ttlMs, else fetched and parsed fresh. On failure the last value
-// is returned with error set, so widgets keep showing something while offline.
+function readAttempt(key) {
+  try {
+    return JSON.parse(localStorage.getItem(PREFIX + key + ':attempt') ?? 'null');
+  } catch {
+    return null;
+  }
+}
+
+function writeAttempt(key, error) {
+  const record = { at: Date.now(), error: error ? { status: error.status, rateLimited: !!error.rateLimited, message: error.message } : null };
+  try {
+    localStorage.setItem(PREFIX + key + ':attempt', JSON.stringify(record));
+  } catch {
+    // cache is only a speed-up
+  }
+}
+
+// Saved value if fetched less than ttlMs ago, else fetched and parsed fresh. Every attempt is
+// recorded before it starts, so a failure (or a fetch already running in another tab) isn't
+// retried until ttlMs has passed. On failure the last good value is returned with error set.
+// ttlMs = 0 always fetches (manual refresh).
 export async function feed(key, ttlMs, load) {
   const hit = peek(key);
-  if (hit && Date.now() - hit.at < ttlMs) return { data: hit.data, at: hit.at };
+  const now = Date.now();
+  if (hit && now - hit.at < ttlMs) return { data: hit.data, at: hit.at };
+  const attempt = readAttempt(key);
+  if (attempt && now - attempt.at < ttlMs) {
+    return { data: hit?.data ?? null, at: hit?.at ?? 0, error: attempt.error ?? undefined };
+  }
+  writeAttempt(key, null);
   try {
     const data = await load();
     if (data != null) store(key, data);
     return { data: data ?? hit?.data ?? null, at: Date.now() };
   } catch (error) {
+    writeAttempt(key, error);
     return { data: hit?.data ?? null, at: hit?.at ?? 0, error };
   }
 }
