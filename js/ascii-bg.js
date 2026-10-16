@@ -3,6 +3,7 @@
 // Only cells whose look changed are redrawn, using a pre-rendered glyph atlas.
 
 import { GLYPHS, hash2, streakField, falloff, ringOffset, level } from './ascii-field.js';
+import { backgroundImage } from './util.js';
 
 const CHARSET = GLYPHS;
 const FONT = '"Cascadia Mono", Consolas, "SF Mono", Menlo, monospace';
@@ -255,8 +256,7 @@ export function mountAsciiBackground(canvas, store) {
 
   function sync() {
     const p = store.get().prefs;
-    const wallpaper = p.background.useUpload ? store.wallpaper : p.background.url;
-    const want = p.background.pattern === 'ascii' && !wallpaper;
+    const want = p.background.pattern === 'ascii' && !backgroundImage(p.background, store.wallpaper);
     const nextMode = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 
     canvas.hidden = !want;

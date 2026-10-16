@@ -79,6 +79,24 @@ test('Markets coins and USD/ILS switch from older versions become the item list'
   assert.deepEqual(items({ items: 'BTC' }).items, DEFAULT_PREFS.widgets.markets.items);
 });
 
+test('the old switch that hid every widget becomes each widget switched off', () => {
+  const w = normalizeState({ prefs: { widgets: { enabled: false, tasks: { enabled: true }, markets: { enabled: true } } } }).prefs.widgets;
+  assert.equal(w.enabled, true);
+  for (const name of ['clock', 'tasks', 'notes', 'markets', 'github']) assert.equal(w[name].enabled, false, name);
+});
+
+test('each widget keeps its own switch when the old master switch was on', () => {
+  const w = normalizeState({ prefs: { widgets: { enabled: true, notes: { enabled: false } } } }).prefs.widgets;
+  assert.equal(w.notes.enabled, false);
+  assert.equal(w.clock.enabled, true);
+});
+
+test('saved backgrounds from before showImage keep showing their image', () => {
+  const bg = normalizeState({ prefs: { background: { url: 'https://x/a.jpg' } } }).prefs.background;
+  assert.equal(bg.showImage, true);
+  assert.equal(bg.url, 'https://x/a.jpg');
+});
+
 test('normalizeState keeps task timestamps, history and daily counts, dropping junk', () => {
   const s = normalizeState({
     tasks: [{ id: 't', text: 'a', done: true, createdAt: 5, doneAt: 9 }, { id: 'u', text: 'old task' }],

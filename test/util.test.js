@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeUrl, hostOf, fuzzyScore, clamp, uid } from '../js/util.js';
+import { normalizeUrl, hostOf, fuzzyScore, clamp, uid, backgroundImage } from '../js/util.js';
 
 test('normalizeUrl adds https when there is no scheme', () => {
   assert.equal(normalizeUrl('example.com'), 'https://example.com/');
@@ -45,4 +45,11 @@ test('clamp bounds numbers', () => {
 test('uid returns distinct strings', () => {
   assert.notEqual(uid(), uid());
   assert.equal(typeof uid(), 'string');
+});
+
+test('backgroundImage is the upload or the link while showImage is on', () => {
+  const bg = { showImage: true, useUpload: false, url: 'https://x/a.jpg' };
+  assert.equal(backgroundImage(bg, 'data:w'), 'https://x/a.jpg');
+  assert.equal(backgroundImage({ ...bg, useUpload: true }, 'data:w'), 'data:w');
+  assert.equal(backgroundImage({ ...bg, showImage: false }, 'data:w'), '');
 });

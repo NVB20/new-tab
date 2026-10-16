@@ -8,6 +8,12 @@ export function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
+// The image shown behind the page, or '' when the ASCII or plain background shows instead.
+export function backgroundImage(background, wallpaper) {
+  if (!background.showImage) return '';
+  return background.useUpload ? wallpaper : background.url;
+}
+
 // "host:port" is not a scheme, so the lookahead rejects a digit right after the colon.
 const SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d)/i;
 
