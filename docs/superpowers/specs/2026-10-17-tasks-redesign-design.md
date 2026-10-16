@@ -115,6 +115,12 @@ In All, finished tasks sit under **▸ Finished (3)** at the bottom, closed by d
 or close. **Clear** on that line replaces *Clear done* (finished tasks go to the week's history, as
 now). Whether it's open is remembered.
 
+### Narrow (2 cells)
+
+The text keeps about 5em (7em wider); when the flag, date and counts don't fit beside it they wrap
+onto their own line on the right. The tray stacks each label above its controls, and the High tab
+shows its flag alone.
+
 ### Drag
 
 Rows drag by their line (not the tray, so its inputs select text normally), with the drop line as
