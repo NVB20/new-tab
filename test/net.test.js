@@ -7,8 +7,10 @@ globalThis.localStorage = {
   getItem: k => (memory.has(k) ? memory.get(k) : null),
   setItem: (k, v) => memory.set(k, String(v)),
   removeItem: k => memory.delete(k),
+  get length() { return memory.size; },
+  key: i => [...memory.keys()][i] ?? null,
 };
-const { feed } = await import('../js/net.js');
+const { feed, peek, sweep } = await import('../js/net.js');
 
 const HOUR = 3600e3;
 beforeEach(() => memory.clear());
@@ -70,4 +72,15 @@ test('callers in this tab share a request in flight; an attempt started by anoth
   const other = await feed('j', HOUR, slow);
   assert.equal(calls, 1);
   assert.equal(other.data, null);
+});
+
+test('sweep removes the saved values a test rejects, with their attempt records', async () => {
+  await feed('live:a:20261001', HOUR, async () => 1);
+  await feed('live:a:20261016', HOUR, async () => 2);
+  await feed('other', HOUR, async () => 3);
+  sweep('live:', key => key.slice(-8) >= '20261013');
+  assert.equal(peek('live:a:20261001'), null);
+  assert.equal(memory.has('newtab:cache:live:a:20261001:attempt'), false);
+  assert.equal(peek('live:a:20261016').data, 2);
+  assert.equal(peek('other').data, 3);
 });

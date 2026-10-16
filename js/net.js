@@ -88,3 +88,18 @@ export async function feed(key, ttlMs, load) {
   inflight.set(key, run);
   return run;
 }
+
+// Removes saved values, and their attempt records, whose key starts with prefix and fails
+// keep(key). For caches keyed by day, which would otherwise pile up.
+export function sweep(prefix, keep) {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    for (const k of keys) {
+      if (!k?.startsWith(PREFIX + prefix)) continue;
+      if (!keep(k.slice(PREFIX.length).replace(/:attempt$/, ''))) localStorage.removeItem(k);
+    }
+  } catch {
+    // cache is only a speed-up
+  }
+}
