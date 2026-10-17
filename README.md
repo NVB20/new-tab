@@ -329,6 +329,9 @@ and The Winter Soldier).
 What you've watched belongs to the page, not the widget: removing the widget and adding it back
 keeps it, and backups include it. The order is part of the extension, so nothing is fetched.
 
+**A Marvel tab:** give a tab [its own layout](#a-tab-with-its-own-layout) and stretch the widget
+over the whole page; a wide widget lays the list out in columns.
+
 ## Website
 
 The Website widget shows a page from any site, live, the way it looks in a tab: your Pinterest
@@ -409,12 +412,31 @@ rearrange them.
   resize it, D duplicates, Delete removes.
 - Under 900px the widgets stack in one column, top to bottom then left to right.
 
+### A tab with its own layout
+
+Every group tab shows the same page, the main layout, until you give one a layout of its own: a
+Marvel tab with only the Marvel widget across the whole page, say, while Home keeps the clock,
+tiles and the rest.
+
+- **Right-click the tab → Own layout…** and start from an **empty page** or a **copy of the main
+  layout**. The tab opens in Layout mode, and the tray says whose layout you're editing
+  ("Marvel’s own layout"). Add, move and resize as on the main page; limits count per layout, so
+  the Marvel tab and Home can each have a Marvel widget (both show the same progress).
+- A tab with its own layout has a small layout mark after its name.
+- **Right-click it → Use the main layout** deletes its own layout, and the tab shows the main
+  page again. Preferences → Layout has the same switch for the tab you're on, and lists the
+  widgets of the layout that tab shows.
+- Switching to a tab with another layout while Layout mode is on ends Layout mode and keeps what
+  you changed. Deleting a group deletes its layout too.
+- A tiles block that follows the tabs shows the tab's own tiles, on either kind of layout.
+
 ## Everything else
 
 - **Tiles:** click to open; Ctrl+click or middle-click opens a new tab. Right-click to edit, move to
   another group or delete. Drag to reorder, or drop on a group tab to move it there.
 - **Groups:** click to switch, double-click or right-click to rename or delete, and **+** next to
-  the tabs adds one. Drag tabs to reorder.
+  the tabs adds one. Drag tabs to reorder. Right-click one to give it
+  [its own layout](#a-tab-with-its-own-layout).
 - **Jump:** **Ctrl+K** or **/** (or the search icon). Searches tiles, open tabs, bookmarks, history
   and recently closed tabs. ↑ ↓ to pick, Enter to open, Ctrl+Enter for a new tab.
 - **Sidebar:** the panel icon in the header: Chrome bookmarks, the last week of history and
