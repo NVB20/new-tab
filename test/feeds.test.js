@@ -74,6 +74,15 @@ test('parseCnbcSession keeps the closes of the latest regular session', () => {
   assert.deepEqual(parseCnbcSession({ status: 'ERROR' }), []);
 });
 
+test('parseCnbcSession skips the stray Saturday bar CNBC repeats Friday\'s close in', () => {
+  const bar = (tradeTime, close) => ({ tradeTime, close: String(close) });
+  const json = { barData: { priceBars: [
+    bar('20261016093000', 770), bar('20261016094000', 768), bar('20261016155000', 763.25),
+    bar('20261017041000', 761.26), bar('20261017124000', 761.26),
+  ] } };
+  assert.deepEqual(parseCnbcSession(json), [770, 768, 763.25]);
+});
+
 test('parseCnbcDay keeps the closes of the 24 hours up to the latest bar', () => {
   const hour = 3600e3;
   const bar = (h, close) => ({ tradeTimeinMills: h * hour, close: String(close) });

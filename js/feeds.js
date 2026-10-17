@@ -165,14 +165,17 @@ export function parseCnbcQuotes(json) {
 }
 
 // CNBC price bars (New York time, oldest first) → the closes of the latest regular session,
-// 9:30 to 16:00, which is the session a quote's change is measured over.
+// 9:30 to 16:00, which is the session a quote's change is measured over. A day with a single bar
+// in those hours isn't one: on a weekend CNBC repeats Friday's close in a stray Saturday bar.
 export function parseCnbcSession(json) {
   const bars = json?.barData?.priceBars;
   if (!Array.isArray(bars)) return [];
   const session = bars
     .map(b => ({ day: String(b?.tradeTime).slice(0, 8), time: String(b?.tradeTime).slice(8, 12), close: Number(b?.close) }))
     .filter(b => b.time >= '0930' && b.time < '1600' && Number.isFinite(b.close));
-  const last = session.at(-1)?.day;
+  const perDay = new Map();
+  for (const b of session) perDay.set(b.day, (perDay.get(b.day) ?? 0) + 1);
+  const last = [...perDay].filter(([, n]) => n > 1).at(-1)?.[0] ?? session.at(-1)?.day;
   return session.filter(b => b.day === last).map(b => b.close);
 }
 
