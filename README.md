@@ -315,18 +315,15 @@ link is at the bottom of the list), including where it splits a season because s
 happens in the middle of it (Agents of SHIELD season 1 in three parts, around Thor: The Dark World
 and The Winter Soldier).
 
-- **Up next** is the first entry you haven't watched, with its number in the order, its kind or
-  season and episodes, and the year it came out. **Watched** ticks it, and the list moves on to
-  the next one. Notes say when something needs care ("Watch its credits scene after Avengers:
-  Endgame"), and when you reach Infinity War or Endgame, Up next reminds you which credits scenes
-  to watch after it.
-- **The list** has every entry, numbered as in the article. Click a row to tick or untick it.
-  It opens scrolled to your next entry.
+- **The list** has every entry, numbered as in the article, with its kind or season and episodes,
+  and the year it came out. Click a row to tick or untick it. It opens scrolled to your next
+  entry, the first you haven't watched, which is highlighted. Hover an entry for its note, where
+  it needs care ("Watch its credits scene after Avengers: Endgame").
 - **Starting midway:** right-click an entry and choose **Watched everything up to here**. **Not
   watched from here on** undoes a run of ticks.
 - **Preferences → Layout → Marvel:** **Show** everything, everything but the Marvel TV shows
   (Agents of SHIELD, the Netflix shows and the rest of 2013–2020, which the MCU now places outside
-  its main timeline), or the 38 films only. Progress and Up next count only what's shown. **Hide
+  its main timeline), or the 38 films only. Progress and the next entry count only what's shown. **Hide
   watched** drops ticked entries from the list; **Clear** starts over.
 
 What you've watched belongs to the page, not the widget: removing the widget and adding it back
