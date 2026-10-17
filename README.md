@@ -54,10 +54,10 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles, and stack up to three widgets in one spot. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
-| **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to five copies can split them up. |
+| **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to three copies can split them up. |
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
-| **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
-| **Weather** | A city's weather now, the next hours and the week ahead, in °C or °F; up to five, each with its own city. |
+| **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to two, each with its own address and zoom. |
+| **Weather** | A city's weather now, the next hours and the week ahead, in °C or °F; up to three, each with its own city. |
 | **Marvel** | Every MCU film, series, short and special in the order the story happens, what to watch next, and what you've watched. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with importance flags, due dates, repeats, subtasks, Today / Upcoming / High views, search, quick-add shorthand and a week of finished-task history, and a notes pad. |
@@ -157,7 +157,7 @@ A folder moves with its tiles when you move it to another group. Folders can't g
 
 ## Markets
 
-The Markets widget starts on the right of the page; Layout mode moves it anywhere, and up to five
+The Markets widget starts on the right of the page; Layout mode moves it anywhere, and up to three
 copies can each follow their own list (say, coins in one and currencies in another).
 
 - **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins,
@@ -198,7 +198,7 @@ click **✎** to go straight to its own list.
 Each copy lists the seven parts below in its own order. A switch shows or hides a part, and **↑**
 and **↓** move it, so the widget draws them top to bottom in that order. A part you switch off keeps
 its place for when you switch it back on. A new copy shows the activity map, pull requests, issues
-and commits. Up to five copies can split the parts up: the map in one corner, commits in another,
+and commits. Up to three copies can split the parts up: the map in one corner, commits in another,
 issues in a third. With more than one, each copy has its own numbered list.
 
 - **Profile stats:** one line with your followers, public repos and the stars on your own repos
@@ -329,7 +329,7 @@ under the clock). It shows one city's weather:
   as does Preferences → Layout → Weather.
 - Times are the city's own, and follow the Clock's 12/24-hour setting. Hover an hour or a day for
   the conditions in words.
-- Up to five copies, each with its own city and units.
+- Up to three copies, each with its own city and units.
 
 Forecasts come from [Open-Meteo](https://open-meteo.com/), free and without a key; city search
 from its geocoding API. A forecast is fetched at most every 15 minutes, and every copy and open
@@ -371,7 +371,7 @@ over the whole page; a wide widget lays the list out in columns.
 ## Website
 
 The Website widget shows a page from any site, live, the way it looks in a tab: your Pinterest
-feed, a GitHub repo, a dashboard. Add it from the Layout mode tray (up to five), type an address
+feed, a GitHub repo, a dashboard. Add it from the Layout mode tray (up to two), type an address
 in it and press **Show**.
 
 - **Access, once per site.** Most sites refuse to be shown inside another page, so the extension
@@ -437,9 +437,9 @@ rearrange them.
 - **Each widget's toolbar:** settings (its group in Preferences, or for the search bar its own
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
-- **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
-  and the search bar are single; Markets, GitHub, Sports, Website, tiles blocks and Claude allow five each. A
-  chip is greyed out at the limit or when nothing fits; a new page fills every cell, and the tray
+- **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes,
+  Claude, Marvel and the search bar are single; Markets and GitHub allow three, Website two, Sports
+  and tiles blocks five. A chip is greyed out at the limit or when nothing fits; a new page fills every cell, and the tray
   then says so. Hover a chip, or Tab to it, for a card with what the widget does and the real
   widget as it would look, while an outline shows the cells it would take; a greyed-out chip's
   card says why. **Reset layout** puts one copy of each widget back in its default place, keeping
@@ -460,13 +460,15 @@ one, say.
   swaps them); the outline says "Stack with Markets". Or use **Stack onto…** (the layers button) in
   the widget's toolbar, which also says why a spot can't take it: a stack holds three at most, the
   spot must be at least each widget's minimum size, and the search bar never stacks.
+- **Add a third** the same ways, or from the stack itself: **Add to stack…** (the layers button in
+  the stack's toolbar) lists the other widgets, and the one you pick joins and shows.
 - **Switch** with the dots along the bottom; pointing at the stack turns them into the widgets'
   icons. The wheel over them, a sideways swipe over the stack, or ←/→ on a focused one switch too.
   A new tab opens on the widget you looked at last.
 - The widgets behind keep running (a Website stays loaded, Markets keeps its prices), so switching
   is instant.
-- **A stack's toolbar acts on the widget showing:** its settings, duplicate (to a free spot),
-  **Take out** (back to a spot of its own) and remove. With one widget left, it's a plain widget
+- **The rest of a stack's toolbar acts on the widget showing:** its settings, duplicate (to a free
+  spot), **Take out** (back to a spot of its own) and remove. With one widget left, it's a plain widget
   again. Limits count stacked widgets too, and Reset layout takes stacks apart.
 - Under 900px a stack shows the widget in front, at its height.
 

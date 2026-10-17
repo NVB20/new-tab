@@ -52,7 +52,12 @@ A stack is one entry in `layout.widgets`:
   minimum size, or for the search bar. The stack takes the target's spot and shows what joined.
 - **Stack onto…** in a widget's toolbar does the same from a menu (the keyboard way): every other
   widget and stack, greyed out with the reason when it can't take it.
-- **A stack's toolbar acts on the widget showing:** Settings (its section), Duplicate (to a free
+- **Add to stack…** in a stack's toolbar (the layers button, where a widget has Stack onto…) works
+  the other way round: every other widget and stack, greyed out with the reason when it can't join
+  (too many, needs a bigger spot, the search bar); the one picked joins in the stack's spot and
+  shows. Greyed out itself when the stack holds three. (Added 2026-10-17: looking for a way to add a
+  third, the stack's own toolbar is where you look.)
+- **The rest of a stack's toolbar acts on the widget showing:** Settings (its section), Duplicate (to a free
   spot), **Take out** (to a free spot at its default size, else its minimum; greyed out when nothing
   fits) and Remove. D and Delete do the same. With one widget left, it's a plain widget again.
 - The frame label reads "Stack · Markets, Sports"; resizing stops at the stack's minimum.

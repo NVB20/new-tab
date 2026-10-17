@@ -4,7 +4,7 @@ Date: 2026-10-17
 Status: built (asked for as "add a weather widget")
 
 A new widget type, **Weather**, shows one city's conditions now, the next hours and the week
-ahead. Up to five copies, each with its own city and units.
+ahead. Up to three copies, each with its own city and units.
 
 ## Data
 
@@ -59,7 +59,7 @@ snow, storm, fog, wind; clear uses the existing sun and moon.
   cleaned by `cleanWeather` (a place needs a name and coordinates on the globe).
 - Preferences → Layout → Weather: the city (changed with ✎) and the Units choice.
 - Copy title: "Weather · Tel Aviv", or "Weather · no place".
-- Size 3 × 4, minimum 2 × 2, up to 5 copies. Never on a page converted from before Layout mode.
+- Size 3 × 4, minimum 2 × 2, up to 3 copies (like Markets and GitHub). Never on a page converted from before Layout mode.
 - **Default place:** the clock column, under the clock. Both columns' minimums already filled all
   12 rows, so Weather is a *spare* type: when its column's minimums don't fit it goes in the other
   column, and when neither has room `placeDefaults` leaves it out (setup then says there's no room).
