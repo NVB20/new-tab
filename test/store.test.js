@@ -363,3 +363,20 @@ test('a saved bar from before ChatGPT and Gemini keeps its settings and gets the
   const s = normalizeState({ prefs: { search: { enabled: true, google: false, claude: true, mode: 'claude' } } });
   assert.deepEqual(s.prefs.search, { google: false, claude: true, chatgpt: false, gemini: false, mode: 'claude' });
 });
+
+test('a new install starts setup; a page saved before setup counts as done; a saved key is kept', () => {
+  assert.deepEqual(normalizeState(null).onboarding, { done: false, step: 'intro' });
+  assert.deepEqual(normalizeState({ groups: [] }).onboarding, { done: true, step: 'done' });
+  assert.deepEqual(normalizeState({ onboarding: { done: false, step: 'sites' } }).onboarding, { done: false, step: 'sites' });
+  assert.deepEqual(normalizeState({ onboarding: { done: true, step: 'moves' } }).onboarding, { done: true, step: 'moves' });
+  assert.deepEqual(normalizeState({ onboarding: { done: 'yes', step: 7 } }).onboarding, { done: false, step: 'intro' });
+});
+
+test('store notifies onboarding subscribers when setup moves on', async () => {
+  const store = createStore(memoryAdapter());
+  await store.load();
+  let calls = 0;
+  store.subscribe(() => calls++, ['onboarding']);
+  store.update(s => { s.onboarding.step = 'name'; });
+  assert.equal(calls, 1);
+});
