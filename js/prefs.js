@@ -46,8 +46,8 @@ const OFFSET_KEY = 'newtab:prefs-offset';
 const KEEP_VISIBLE = 120;   // px of the panel that stay inside the window while dragging
 const SEARCH_DELAY_MS = 120;   // a search builds every section, so it waits for a pause in typing
 
-// enterLayoutMode() opens Layout mode (the panel closes first).
-export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
+// enterLayoutMode() opens Layout mode and runSetup() first-run setup (the panel closes first).
+export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null } = {}) {
   const prefs = () => store.get().prefs;
   // One setting of a widget copy on the canvas (see layout.js). Sliders and text fields call
   // these on every input event, so only prefs is compared.
@@ -201,6 +201,9 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
       sub(shown === 'image', imageRows(image)),
       title('Top bar'),
       toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
+      runSetup && title('Setup'),
+      runSetup && row('First-run setup', el('button', { type: 'button', class: 'btn', onclick: () => { dialog.close(); runSetup(); } }, 'Run setup again'),
+        'Your name, the look, sites, widgets and the moves worth knowing, over the page as it is'),
     ];
   }
 
@@ -781,7 +784,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
 }
 
 // Large photos are scaled down so the stored wallpaper stays a few MB at most.
-async function shrinkImage(file) {
+export async function shrinkImage(file) {
   if (!file.type.startsWith('image/')) throw new Error('it isn’t an image file.');
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, MAX_WALLPAPER_SIDE / Math.max(bitmap.width, bitmap.height));

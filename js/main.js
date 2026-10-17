@@ -17,16 +17,37 @@ const lazy = load => {
   return () => (promise ??= load());
 };
 const jump = lazy(() => import('./jump.js').then(m => m.setupJump(store)));
-const prefs = lazy(() => import('./prefs.js').then(m => m.setupPrefs(store, { enterLayoutMode: () => layout().then(l => l.enter()) })));
+const prefs = lazy(() => import('./prefs.js').then(m => m.setupPrefs(store, {
+  enterLayoutMode: () => layout().then(l => l.enter()),
+  runSetup: () => setup().then(s => s.start({ again: true })),
+})));
 const sidebar = lazy(() => import('./sidebar.js').then(m => m.setupSidebar()));
 const layout = lazy(() => import('./edit-mode.js').then(m => m.setupEditMode(store, canvas, ctx)));
 const ctx = { openPrefs: (id, anchor) => prefs().then(p => p.open(id, anchor)) };
 const openJump = () => jump().then(j => j.open());
+// First-run setup, and Preferences → Run setup again: a card over the page that builds it as you
+// answer. Loaded only when it's needed.
+const setup = lazy(() => import('./onboarding.js').then(m => m.setupOnboarding(store, canvas, {
+  openJump,
+  enterLayout: () => layout().then(l => l.enter()),
+  exitLayout: () => layout().then(l => l.exit()),
+})));
+
+// A first run keeps the widgets hidden until setup decides which to show, so the full page doesn't
+// flash first.
+const firstRun = !store.get().onboarding.done;
+if (firstRun) document.body.classList.add('ob-setup', 'ob-fresh');
 
 mountTheme(store);
 mountGroups(document.getElementById('groups'), store);
 const canvasRoot = document.getElementById('canvas');
 const canvas = mountCanvas(canvasRoot, store, ctx);
+if (firstRun) {
+  setup().then(s => s.start(), err => {
+    console.warn('Setup didn’t load.', err);
+    document.body.classList.remove('ob-setup', 'ob-fresh');
+  });
+}
 // The tiles draw their saved logos from the localStorage copy; reading the full set from
 // chrome.storage (and fetching new ones) waits for a quiet moment.
 idle(() => startIconCache(store));
