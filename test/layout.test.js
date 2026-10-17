@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   COLS, ROWS, TYPES, GITHUB_PARTS, fits, firstFree, countOf, stackOrder, defaultLayout, normalizeLayout,
   addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle, prefsSection,
+  placeDefaults, atDefaultPlaces, swapPlan, swapCopy,
   cleanGithubParts, moveGithubPart, showGithubPart,
 } from '../js/layout.js';
 
@@ -328,4 +329,80 @@ test('showGithubPart switches a part on in its place, or off', () => {
   assert.deepEqual(showGithubPart(s, 'heatmap', true), s);
   assert.deepEqual(showGithubPart(s, 'junk', true), s);
   assert.deepEqual(showGithubPart(s, 'repos', false).order, s.order);
+});
+
+test('Website has a default place in the far column', () => {
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'markets', 'website', 'search', 'tiles']);
+  assert.deepEqual(rect(byType(l).website), [9, 5, 3, 6]);
+});
+
+test('placeDefaults puts the given types in their default places, keeping copies already there', () => {
+  const l = defaultLayout(legacy());
+  const clock = byType(l).clock;
+  moveCopy(l, clock.id, { x: 0, y: 0, w: 2, h: 2 });
+  l.widgets = placeDefaults(l, ['clock', 'website', 'tiles']);
+  const t = byType(l);
+  assert.equal(t.clock.id, clock.id);
+  assert.equal(t.clock.settings.name, 'Niv');
+  assert.deepEqual(rect(t.clock), [0, 0, 3, 4]);
+  assert.deepEqual(rect(t.website), [9, 0, 3, 12]);
+  assert.deepEqual(t.website.settings, { url: '', zoom: 100 });
+  assert.deepEqual(rect(t.tiles), [3, 0, 6, 12]);
+  assert.equal(l.widgets.length, 3);
+});
+
+test('placeDefaults keeps the clock column’s side and a search bar at the bottom', () => {
+  const l = defaultLayout(legacy({ search: { enabled: true, row: -1 }, widgets: { ...legacy().widgets, position: 'right' } }));
+  l.widgets = placeDefaults(l, ['clock', 'search', 'tiles']);
+  assert.equal(byType(l).clock.x, 9);
+  assert.deepEqual(rect(byType(l).search), [0, 11, 9, 1]);
+});
+
+test('atDefaultPlaces tells a page in its default places from one arranged by hand', () => {
+  const l = defaultLayout(legacy());
+  assert.equal(atDefaultPlaces(l), true);
+  moveCopy(l, byType(l).clock.id, { x: 0, y: 0, w: 3, h: 3 });
+  assert.equal(atDefaultPlaces(l), false);
+  l.widgets = placeDefaults(l, l.widgets.map(c => c.type));
+  assert.equal(atDefaultPlaces(l), true);
+});
+
+test('a drop on a column neighbour swaps their order', () => {
+  const l = defaultLayout(legacy());
+  const t = byType(l);
+  const drop = { x: 9, y: 2, w: 3, h: 5 };
+  assert.equal(moveCopy(l, t.markets.id, drop), false);
+  assert.deepEqual(swapPlan(l, t.markets.id, drop), { a: { x: 9, y: 7, w: 3, h: 5 }, b: { id: t.github.id, x: 9, y: 0, w: 3, h: 7 } });
+  assert.equal(swapCopy(l, t.markets.id, drop), true);
+  assert.deepEqual(rect(byType(l).github), [9, 0, 3, 7]);
+  assert.deepEqual(rect(byType(l).markets), [9, 7, 3, 5]);
+});
+
+test('row neighbours swap order; other pairs trade corners, each keeping its size', () => {
+  const row = { cols: COLS, rows: ROWS, widgets: [
+    { id: 'a', type: 'notes', x: 0, y: 0, w: 3, h: 3, settings: {} },
+    { id: 'b', type: 'claude', x: 3, y: 0, w: 4, h: 3, settings: {} },
+  ] };
+  assert.equal(swapCopy(row, 'a', { x: 2, y: 0, w: 3, h: 3 }), true);
+  assert.deepEqual(row.widgets.map(rect), [[4, 0, 3, 3], [0, 0, 4, 3]]);
+  const apart = { cols: COLS, rows: ROWS, widgets: [
+    { id: 'a', type: 'notes', x: 0, y: 0, w: 3, h: 3, settings: {} },
+    { id: 'b', type: 'claude', x: 6, y: 6, w: 3, h: 3, settings: {} },
+  ] };
+  assert.equal(swapCopy(apart, 'a', { x: 5, y: 5, w: 3, h: 3 }), true);
+  assert.deepEqual(apart.widgets.map(rect), [[5, 5, 3, 3], [0, 0, 3, 3]]);
+});
+
+test('swapPlan refuses drops on two copies, off the canvas, or trades that don’t fit', () => {
+  const l = defaultLayout(legacy());
+  const t = byType(l);
+  assert.equal(swapPlan(l, t.clock.id, { x: 2, y: 0, w: 3, h: 4 }), null);
+  assert.equal(swapPlan(l, t.markets.id, { x: 10, y: 0, w: 3, h: 5 }), null);
+  const tight = { cols: COLS, rows: ROWS, widgets: [
+    { id: 'a', type: 'notes', x: 0, y: 0, w: 2, h: 2, settings: {} },
+    { id: 'b', type: 'website', x: 6, y: 0, w: 6, h: 12, settings: {} },
+  ] };
+  assert.equal(swapPlan(tight, 'a', { x: 5, y: 0, w: 2, h: 2 }), null);
+  assert.equal(swapCopy(tight, 'a', { x: 5, y: 0, w: 2, h: 2 }), false);
 });

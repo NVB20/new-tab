@@ -146,7 +146,7 @@ export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.
 // ---- default layout ----
 
 const NEAR = { clock: 4, tasks: 4, notes: 4, claude: 2 };   // the clock column, top to bottom
-const FAR = { markets: 5, github: 7, sports: 5 };           // the other column
+const FAR = { markets: 5, github: 7, sports: 5, website: 6 };   // the other column
 
 // Heights of a column sum to at most ROWS: the tallest shrinks first, never below its minimum.
 // With fill, one widget alone takes the whole column.
@@ -303,6 +303,72 @@ export function moveCopy(layout, id, rect) {
   if (next.w < t.min[0] || next.h < t.min[1] || !fits(layout, next, id)) return false;
   Object.assign(copy, next);
   return true;
+}
+
+// A drop on a taken spot that can trade places: the spot overlaps exactly one other copy and both
+// fit after the trade. Neighbours in a column (same x and width) or a row (same y and height) swap
+// order; any other pair trades corners, the dragged copy taking the spot and the other the dragged
+// copy's old corner, each keeping its size. Returns { a: the dragged copy's rect, b: { id, rect } }
+// or null.
+export function swapPlan(layout, id, rect) {
+  const a = layout.widgets.find(c => c.id === id);
+  if (!a || !inside(rect)) return null;
+  const hit = layout.widgets.filter(c => c.id !== id && overlaps(rect, c));
+  if (hit.length !== 1) return null;
+  const b = hit[0];
+  let na;
+  let nb;
+  if (a.x === b.x && a.w === b.w && (a.y + a.h === b.y || b.y + b.h === a.y)) {
+    const top = Math.min(a.y, b.y);
+    nb = { x: b.x, y: a.y < b.y ? top : top + a.h, w: b.w, h: b.h };
+    na = { x: a.x, y: a.y < b.y ? top + b.h : top, w: a.w, h: a.h };
+  } else if (a.y === b.y && a.h === b.h && (a.x + a.w === b.x || b.x + b.w === a.x)) {
+    const left = Math.min(a.x, b.x);
+    nb = { x: a.x < b.x ? left : left + a.w, y: b.y, w: b.w, h: b.h };
+    na = { x: a.x < b.x ? left + b.w : left, y: a.y, w: a.w, h: a.h };
+  } else {
+    na = { x: rect.x, y: rect.y, w: a.w, h: a.h };
+    nb = { x: a.x, y: a.y, w: b.w, h: b.h };
+  }
+  const clear = r => inside(r) && !layout.widgets.some(c => c.id !== a.id && c.id !== b.id && overlaps(r, c));
+  if (!clear(na) || !clear(nb) || overlaps(na, nb)) return null;
+  return { a: na, b: { id: b.id, ...nb } };
+}
+
+export function swapCopy(layout, id, rect) {
+  const plan = swapPlan(layout, id, rect);
+  if (!plan) return false;
+  const { id: otherId, ...other } = plan.b;
+  Object.assign(layout.widgets.find(c => c.id === id), plan.a);
+  Object.assign(layout.widgets.find(c => c.id === otherId), other);
+  return true;
+}
+
+// The given types in their default places, one copy each: a copy already on the page keeps its id
+// and settings (the first of its type), a new one gets its type's defaults. The clock column stays
+// on its side and the search bar at the bottom if it was there. For setup's Widgets step.
+export function placeDefaults(layout, types) {
+  const first = new Map();
+  for (const c of layout.widgets) if (!first.has(c.type)) first.set(c.type, c);
+  const near = layout.widgets.find(c => c.type in NEAR);
+  const side = near && near.x >= COLS / 2 ? 'right' : 'left';
+  const barAt = first.get('search')?.y === ROWS - 1 ? 'bottom' : 'top';
+  return defaultPositions([...new Set(types)], side, barAt).map(p => {
+    const own = first.get(p.type);
+    return own ? { ...own, ...p } : { id: uid(), ...p, settings: TYPES[p.type].defaults() };
+  });
+}
+
+// Whether the page is still in the places placeDefaults gives it: one copy per type, nothing moved
+// or resized by hand.
+export function atDefaultPlaces(layout) {
+  const types = layout.widgets.map(c => c.type);
+  if (new Set(types).size !== types.length) return false;
+  const want = placeDefaults(layout, types);
+  return want.length === layout.widgets.length && want.every(p => {
+    const c = layout.widgets.find(w => w.id === p.id);
+    return c && c.x === p.x && c.y === p.y && c.w === p.w && c.h === p.h;
+  });
 }
 
 // Back to the default places: the first copy of each type stays, with its settings; the clock
