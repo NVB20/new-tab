@@ -1,6 +1,6 @@
-// The page layout: widget copies on a 12 × 12 grid of cells, their sizes and limits, the default
-// layout a saved state from before Layout mode converts to, and the moves Layout mode makes.
-// Pure (unit-tested in Node).
+// The page layout: widget copies on a 12 × 12 grid of cells, their sizes and limits, stacks (2–3
+// copies sharing one spot), the default layout a saved state from before Layout mode converts to,
+// and the moves Layout mode makes. Pure (unit-tested in Node).
 
 import { uid, clamp } from './util.js';
 import { cleanMarketItems } from './feeds.js';
@@ -145,7 +145,98 @@ export function firstFree(layout, w, h) {
   return null;
 }
 
-export const countOf = (layout, type) => layout.widgets.filter(c => c.type === type).length;
+// Stacked copies count too.
+export const countOf = (layout, type) => copiesOf(layout).filter(c => c.type === type).length;
+
+// ---- stacks ----
+// A stack is one entry in layout.widgets: 2–3 copies in one spot, one showing at a time.
+//   { id, type: 'stack', x, y, w, h, front: <id of the copy showing>, items: [{ id, type, settings }, …] }
+// Its copies have no place of their own. The search bar is never in one.
+
+export const STACK_MAX = 3;
+export const isStack = c => c?.type === 'stack';
+// Every copy on a layout, stacked or not.
+export const copiesOf = layout => layout.widgets.flatMap(c => (isStack(c) ? c.items : [c]));
+export const stackOf = (layout, id) => layout.widgets.find(c => isStack(c) && c.items.some(it => it.id === id)) ?? null;
+const placeless = ({ id, type, settings }) => ({ id, type, settings });
+const membersOf = c => (isStack(c) ? c.items : [placeless(c)]);
+
+// The smallest a copy or a stack can be, [w, h]: a stack is its biggest member's minimum, each way.
+export function minOf(c) {
+  if (!isStack(c)) return TYPES[c.type].min;
+  return c.items.reduce(([w, h], it) => [Math.max(w, TYPES[it.type].min[0]), Math.max(h, TYPES[it.type].min[1])], [1, 1]);
+}
+
+// Why `id` (a copy or a stack) can't join `targetId`, or null when it can: 'search' (the search
+// bar never stacks), 'full' (more than STACK_MAX copies), 'small' (the target's spot is under a
+// member's minimum size) or 'missing'.
+export function stackProblem(layout, id, targetId) {
+  const a = layout.widgets.find(c => c.id === id);
+  const b = layout.widgets.find(c => c.id === targetId);
+  if (!a || !b || a === b) return 'missing';
+  const items = [...membersOf(b), ...membersOf(a)];
+  if (items.some(it => it.type === 'search')) return 'search';
+  if (items.length > STACK_MAX) return 'full';
+  const [w, h] = minOf({ type: 'stack', items });
+  return b.w < w || b.h < h ? 'small' : null;
+}
+
+// `id` (a copy or a stack) joins `targetId` in the target's spot, and shows. Returns the stack, or
+// null when it can't (stackProblem).
+export function stackCopy(layout, id, targetId) {
+  if (stackProblem(layout, id, targetId)) return null;
+  const a = layout.widgets.find(c => c.id === id);
+  const b = layout.widgets.find(c => c.id === targetId);
+  const stack = isStack(b) ? b : { id: uid(), type: 'stack', x: b.x, y: b.y, w: b.w, h: b.h, front: b.id, items: membersOf(b) };
+  stack.items.push(...membersOf(a));
+  stack.front = isStack(a) ? a.front : a.id;
+  layout.widgets = layout.widgets.filter(c => c !== a).map(c => (c === b ? stack : c));
+  return stack;
+}
+
+// Copy `id` leaves its stack: the next one along shows if it was showing, and a stack of one is
+// that copy again, in the stack's spot. Returns the copy (without a place), or null.
+function leaveStack(layout, id) {
+  const stack = stackOf(layout, id);
+  if (!stack) return null;
+  const i = stack.items.findIndex(it => it.id === id);
+  const [copy] = stack.items.splice(i, 1);
+  if (stack.front === id) stack.front = stack.items[Math.min(i, stack.items.length - 1)].id;
+  if (stack.items.length === 1) {
+    const [only] = stack.items;
+    layout.widgets = layout.widgets.map(c => (c === stack ? { id: only.id, type: only.type, x: c.x, y: c.y, w: c.w, h: c.h, settings: only.settings } : c));
+  }
+  return copy;
+}
+
+// Takes a stacked copy out to the first spot that takes its default size, else its minimum.
+// Returns the copy, or null when it isn't stacked or nothing fits.
+export function unstackCopy(layout, id) {
+  const copy = stackOf(layout, id)?.items.find(it => it.id === id);
+  if (!copy) return null;
+  const t = TYPES[copy.type];
+  const spot = firstFree(layout, ...t.size) ?? firstFree(layout, ...t.min);
+  if (!spot) return null;
+  leaveStack(layout, id);
+  const out = { id: copy.id, type: copy.type, ...spot, settings: copy.settings };
+  layout.widgets.push(out);
+  return out;
+}
+
+// Shows copy `id` in stack `stackId`. Returns whether anything changed.
+export function setFront(layout, stackId, id) {
+  const stack = layout.widgets.find(c => c.id === stackId);
+  if (!isStack(stack) || stack.front === id || !stack.items.some(it => it.id === id)) return false;
+  stack.front = id;
+  return true;
+}
+
+// A copy or a stack with new ids (and front following its copy), for a copied layout.
+function renewed(c) {
+  if (!isStack(c)) return { ...structuredClone(c), id: uid() };
+  const items = c.items.map(it => ({ ...structuredClone(it), id: uid() }));
+  return { ...c, id: uid(), front: items[c.items.findIndex(it => it.id === c.front)]?.id ?? items[0].id, items };
+}
 
 // ---- tab layouts ----
 // prefs.layout is the main layout; prefs.layouts holds the tabs (groups) that have their own.
@@ -154,10 +245,14 @@ export const allLayouts = state => [state.prefs.layout, ...Object.values(state.p
 export const ownLayout = (state, groupId) => state.prefs.layouts?.[groupId] ?? null;
 // The layout the page shows: the active tab's own, else the main one.
 export const activeLayout = state => ownLayout(state, state.activeGroupId) ?? state.prefs.layout;
+// A copy, stacked or not, or a stack, in any layout.
 export const copyById = (state, id) => {
   for (const l of allLayouts(state)) {
-    const copy = l.widgets.find(c => c.id === id);
-    if (copy) return copy;
+    for (const c of l.widgets) {
+      if (c.id === id) return c;
+      const copy = isStack(c) && c.items.find(it => it.id === id);
+      if (copy) return copy;
+    }
   }
   return null;
 };
@@ -167,7 +262,7 @@ export const copyById = (state, id) => {
 export function giveOwnLayout(state, groupId, from = 'copy') {
   if (!state.groups.some(g => g.id === groupId)) return null;
   const main = state.prefs.layout;
-  const layout = { cols: COLS, rows: ROWS, widgets: from === 'copy' ? main.widgets.map(c => ({ ...structuredClone(c), id: uid() })) : [] };
+  const layout = { cols: COLS, rows: ROWS, widgets: from === 'copy' ? main.widgets.map(renewed) : [] };
   state.prefs.layouts = { ...state.prefs.layouts, [groupId]: layout };
   return layout;
 }
@@ -178,18 +273,27 @@ export function dropOwnLayout(state, groupId) {
   return true;
 }
 
-// The groups' own layouts, each valid. A key that isn't a group goes, and a copy id the main
-// layout or an earlier tab already uses gets a new one, so copyById finds one copy per id.
-// state.groups and state.prefs.layout must already be clean.
+// Every id on a layout: its copies, stacked or not, and its stacks.
+const idsOf = layout => layout.widgets.flatMap(c => (isStack(c) ? [c.id, ...c.items.map(it => it.id)] : [c.id]));
+
+// The groups' own layouts, each valid. A key that isn't a group goes, and an id (a copy's or a
+// stack's) the main layout or an earlier tab already uses gets a new one, so copyById finds one
+// per id. state.groups and state.prefs.layout must already be clean.
 export function normalizeLayouts(raw, state) {
   const out = {};
-  const seen = new Set(state.prefs.layout.widgets.map(c => c.id));
+  const seen = new Set(idsOf(state.prefs.layout));
   for (const g of state.groups) {
     if (!isObj(raw) || !isObj(raw[g.id])) continue;
     const layout = normalizeLayout(raw[g.id], state);
     for (const c of layout.widgets) {
-      if (seen.has(c.id)) c.id = uid();
-      seen.add(c.id);
+      for (const it of isStack(c) ? [c, ...c.items] : [c]) {
+        if (seen.has(it.id)) {
+          const id = uid();
+          if (it !== c && c.front === it.id) c.front = id;
+          it.id = id;
+        }
+        seen.add(it.id);
+      }
     }
     out[g.id] = layout;
   }
@@ -274,24 +378,61 @@ export function defaultLayout(old) {
 
 // ---- validation ----
 
+// A stack's copies are each cleaned and counted against their type's limit. A search bar or a copy
+// past STACK_MAX gets a spot of its own after the rest; a stack of one is that copy, in the
+// stack's spot; an empty one goes; front is one of its copies.
 export function normalizeLayout(raw, state) {
   const layout = { cols: COLS, rows: ROWS, widgets: [] };
   const ids = new Set();
-  const docked = [];   // tiles blocks that still carry a docked bar (an earlier version of this)
-  for (const c of Array.isArray(raw?.widgets) ? raw.widgets : []) {
+  const ownId = id => {
+    const out = str(id) && !ids.has(id) ? id : uid();
+    ids.add(out);
+    return out;
+  };
+  const settingsOf = c => TYPES[c.type].clean(isObj(c.settings) ? c.settings : {}, state);
+  // Its saved place, else the first free spot of that size, else of the minimum size, or null.
+  const place = (c, size, min) => {
+    const w = clamp(int(c.w, size[0]), min[0], COLS);
+    const h = clamp(int(c.h, size[1]), min[1], ROWS);
+    const rect = { x: clamp(int(c.x, 0), 0, COLS - w), y: clamp(int(c.y, 0), 0, ROWS - h), w, h };
+    return fits(layout, rect) ? rect : firstFree(layout, w, h) ?? firstFree(layout, ...min);
+  };
+  const addPlain = (c, id = null) => {
     const t = isObj(c) && TYPES[c.type];
-    if (!t || countOf(layout, c.type) >= t.max) continue;
-    const w = clamp(int(c.w, t.size[0]), t.min[0], COLS);
-    const h = clamp(int(c.h, t.size[1]), t.min[1], ROWS);
-    let rect = { x: clamp(int(c.x, 0), 0, COLS - w), y: clamp(int(c.y, 0), 0, ROWS - h), w, h };
-    if (!fits(layout, rect)) rect = firstFree(layout, w, h) ?? firstFree(layout, ...t.min);
-    if (!rect) continue;
-    const id = str(c.id) && !ids.has(c.id) ? c.id : uid();
-    ids.add(id);
-    const copy = { id, type: c.type, ...rect, settings: t.clean(isObj(c.settings) ? c.settings : {}, state) };
+    if (!t || countOf(layout, c.type) >= t.max) return null;
+    const rect = place(c, t.size, t.min);
+    if (!rect) return null;
+    const copy = { id: id ?? ownId(c.id), type: c.type, ...rect, settings: settingsOf(c) };
     layout.widgets.push(copy);
-    if (c.type === 'tiles' && Number.isInteger(c.settings?.bar)) docked.push({ copy, bottom: c.settings.bar === -1 });
+    return copy;
+  };
+  const docked = [];   // tiles blocks that still carry a docked bar (an earlier version of this)
+  const loose = [];    // copies a stack can't keep
+  for (const c of Array.isArray(raw?.widgets) ? raw.widgets : []) {
+    if (!isStack(c)) {
+      const copy = addPlain(c);
+      if (copy?.type === 'tiles' && Number.isInteger(c.settings?.bar)) docked.push({ copy, bottom: c.settings.bar === -1 });
+      continue;
+    }
+    const items = [];
+    for (const it of Array.isArray(c.items) ? c.items : []) {
+      const t = isObj(it) && TYPES[it.type];
+      if (!t || countOf(layout, it.type) + items.filter(x => x.type === it.type).length >= t.max) continue;
+      if (it.type === 'search' || items.length >= STACK_MAX) loose.push(it);
+      else items.push({ id: ownId(it.id), type: it.type, settings: settingsOf(it) });
+    }
+    if (items.length === 1) addPlain({ ...items[0], x: c.x, y: c.y, w: c.w, h: c.h }, items[0].id);
+    if (items.length < 2) continue;
+    const size = items.reduce(([w, h], it) => [Math.max(w, TYPES[it.type].size[0]), Math.max(h, TYPES[it.type].size[1])], [1, 1]);
+    const rect = place(c, size, minOf({ type: 'stack', items }));
+    if (!rect) {
+      loose.push(...items);
+      continue;
+    }
+    const front = items.some(it => it.id === c.front) ? c.front : items[0].id;
+    layout.widgets.push({ id: ownId(c.id), type: 'stack', ...rect, front, items });
   }
+  for (const c of loose) addPlain(c);
   // A bar docked in a block becomes the page's bar: one row off the top (or bottom) of the block.
   for (const { copy, bottom } of docked) {
     if (countOf(layout, 'search') >= TYPES.search.max) break;
@@ -309,7 +450,7 @@ export function normalizeLayout(raw, state) {
 // The first group no tiles block shows (a block that follows the tabs shows the active group),
 // or null (follow the tabs).
 function unshownGroup(layout, groups, activeGroupId) {
-  const shown = new Set(layout.widgets.filter(c => c.type === 'tiles').map(c => c.settings.group ?? activeGroupId));
+  const shown = new Set(copiesOf(layout).filter(c => c.type === 'tiles').map(c => c.settings.group ?? activeGroupId));
   return groups.find(g => !shown.has(g.id))?.id ?? null;
 }
 
@@ -341,10 +482,10 @@ export function addCopy(layout, type, settings, groups = [], activeGroupId = nul
   return copy;
 }
 
-// A copy with the same settings. A tiles block is pinned to the next group not shown yet and gets
-// columns to suit its width.
+// A copy with the same settings, in a spot of its own (a stacked one's too). A tiles block is
+// pinned to the next group not shown yet and gets columns to suit its width.
 export function duplicateCopy(layout, id, groups = [], activeGroupId = null) {
-  const from = layout.widgets.find(c => c.id === id);
+  const from = copiesOf(layout).find(c => c.id === id);
   if (!from) return null;
   const settings = structuredClone(from.settings);
   if (from.type === 'tiles') {
@@ -354,20 +495,22 @@ export function duplicateCopy(layout, id, groups = [], activeGroupId = null) {
   return addCopy(layout, from.type, settings, groups, activeGroupId);
 }
 
+// Removes a copy (out of its stack, if it's in one) or a whole stack.
 export function removeCopy(layout, id) {
+  if (leaveStack(layout, id)) return true;
   const before = layout.widgets.length;
   layout.widgets = layout.widgets.filter(c => c.id !== id);
   return layout.widgets.length < before;
 }
 
-// Moves or resizes a copy when the result is inside the canvas, clear of the others and not
-// under the type's minimum.
+// Moves or resizes a copy or a stack when the result is inside the canvas, clear of the others and
+// not under its minimum.
 export function moveCopy(layout, id, rect) {
   const copy = layout.widgets.find(c => c.id === id);
   if (!copy) return false;
-  const t = TYPES[copy.type];
+  const [minW, minH] = minOf(copy);
   const next = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
-  if (next.w < t.min[0] || next.h < t.min[1] || !fits(layout, next, id)) return false;
+  if (next.w < minW || next.h < minH || !fits(layout, next, id)) return false;
   Object.assign(copy, next);
   return true;
 }
@@ -416,7 +559,7 @@ export function swapCopy(layout, id, rect) {
 // on its side and the search bar at the bottom if it was there. For setup's Widgets step.
 export function placeDefaults(layout, types) {
   const first = new Map();
-  for (const c of layout.widgets) if (!first.has(c.type)) first.set(c.type, c);
+  for (const c of copiesOf(layout)) if (!first.has(c.type)) first.set(c.type, c);
   const near = layout.widgets.find(c => c.type in NEAR);
   const side = near && near.x >= COLS / 2 ? 'right' : 'left';
   const barAt = first.get('search')?.y === ROWS - 1 ? 'bottom' : 'top';
@@ -426,9 +569,10 @@ export function placeDefaults(layout, types) {
   });
 }
 
-// Whether the page is still in the places placeDefaults gives it: one copy per type, nothing moved
-// or resized by hand.
+// Whether the page is still in the places placeDefaults gives it: one copy per type, nothing moved,
+// resized or stacked by hand.
 export function atDefaultPlaces(layout) {
+  if (layout.widgets.some(isStack)) return false;
   const types = layout.widgets.map(c => c.type);
   if (new Set(types).size !== types.length) return false;
   const want = placeDefaults(layout, types);
@@ -438,20 +582,26 @@ export function atDefaultPlaces(layout) {
   });
 }
 
-// Back to the default places: the first copy of each type stays, with its settings; the clock
-// column keeps its side. Returns the copies that were removed.
+// Back to the default places: the first copy of each type stays, with its settings, and stacks come
+// apart; the clock column keeps its side. Returns the copies that were removed.
 export function resetLayout(layout) {
   const kept = new Map();
-  for (const c of layout.widgets) if (!kept.has(c.type)) kept.set(c.type, c);
-  const removed = layout.widgets.filter(c => kept.get(c.type) !== c);
-  const near = [...kept.values()].find(c => c.type in NEAR);
+  const all = copiesOf(layout);
+  for (const c of all) if (!kept.has(c.type)) kept.set(c.type, c);
+  const removed = all.filter(c => kept.get(c.type) !== c);
+  const near = layout.widgets.find(c => c.type in NEAR);
   const side = near && near.x >= COLS / 2 ? 'right' : 'left';
-  layout.widgets = defaultPositions([...kept.keys()], side).map(p => ({ ...kept.get(p.type), ...p }));
+  layout.widgets = defaultPositions([...kept.keys()], side).map(p => {
+    const { id, type, settings } = kept.get(p.type);
+    return { id, type, x: p.x, y: p.y, w: p.w, h: p.h, settings };
+  });
   return removed;
 }
 
-// "Tiles · Work", "GitHub · Map + Commits", "Clock": for frame labels and Preferences.
+// "Tiles · Work", "GitHub · Map + Commits", "Clock", "Stack · Markets, Sports": for frame labels
+// and Preferences.
 export function copyTitle(copy, groups = []) {
+  if (isStack(copy)) return `Stack · ${copy.items.map(it => TYPES[it.type]?.label ?? it.type).join(', ')}`;
   const label = TYPES[copy.type]?.label ?? copy.type;
   if (copy.type === 'tiles') {
     const group = groups.find(g => g.id === copy.settings.group);

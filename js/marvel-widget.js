@@ -1,9 +1,10 @@
 // Marvel: the MCU in the order the story happens (marvel.js), and what's been watched. The ticks
 // are the page's (state.marvel): removing the widget and adding it back keeps them.
 
-import { el, widgetHead, showMenu } from './ui.js';
+import { el, icon, widgetHead, showMenu } from './ui.js';
 import { copyById, TYPES } from './layout.js';
-import { SOURCE, KINDS, shownEntries, nextUp, watchedUpTo, unwatchedFrom, numberOf, cleanWatched } from './marvel.js';
+import { openUrl } from './chrome-api.js';
+import { SOURCE, KINDS, shownEntries, nextUp, watchedUpTo, unwatchedFrom, numberOf, cleanWatched, disneyUrl } from './marvel.js';
 
 // "Season 1 · episodes 1–7" or "Film"; the year is apart, so a narrow widget can drop it.
 const what = e => e.part || KINDS[e.kind];
@@ -25,6 +26,19 @@ export function mountMarvel(root, store, copy) {
   const section = el('section', { class: 'widget widget-marvel' }, head, bar, scroller);
   root.append(section);
 
+  const newTab = () => store.get().prefs.openInNewTab;
+
+  // ▶ beside the row: the title's page on Disney+ (a series' page for each of its parts), opened
+  // like a tile (Ctrl+click or middle-click: a new tab). Shown on hover and on the next entry.
+  function play(e) {
+    const href = disneyUrl(e);
+    if (!href) return null;
+    return el('a', {
+      class: 'icon-btn mv-play', href, title: 'Watch on Disney+', 'aria-label': `Watch ${e.title} on Disney+`,
+      ...(newTab() ? { target: '_blank', rel: 'noopener' } : {}),
+    }, icon('play', 14));
+  }
+
   function row(e, done, isNext) {
     const box = el('input', {
       type: 'checkbox', class: 'mv-check', checked: done,
@@ -37,7 +51,8 @@ export function mountMarvel(root, store, copy) {
         box,
         el('span', { class: 'mv-text' },
           el('span', { class: 'mv-title', text: e.title }),
-          el('span', { class: 'mv-meta' }, what(e), el('span', { class: 'mv-year', text: ` · ${e.year}` })))));
+          el('span', { class: 'mv-meta' }, what(e), el('span', { class: 'mv-year', text: ` · ${e.year}` })))),
+      play(e));
   }
 
   // The next entry near the top of the list, with the one before it still in view.
@@ -99,9 +114,11 @@ export function mountMarvel(root, store, copy) {
     e.preventDefault();
     const id = item.dataset.id;
     const shown = shownEntries(settings().show);
+    const href = disneyUrl(shown.find(x => x.id === id));
     const r = item.getBoundingClientRect();
     const at = e.clientX || e.clientY ? [e.clientX, e.clientY] : [r.left + 24, r.bottom];
     showMenu(...at, [
+      ...(href ? [{ label: 'Watch on Disney+', icon: 'play', action: () => openUrl(href, { newTab: newTab() }) }, { separator: true }] : []),
       { label: 'Watched everything up to here', icon: 'check', action: () => setWatched(watchedUpTo(watched(), shown, id)) },
       { label: 'Not watched from here on', icon: 'undo', action: () => setWatched(unwatchedFrom(watched(), shown, id)) },
     ]);

@@ -66,6 +66,7 @@ const ICONS = {
   upload: '<path d="M12 15V4M7 9l5-5 5 5M5 20h14"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   trend: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  play: '<path d="M8 5.5v13l10.5-6.5z"/>',
   shield: '<circle cx="12" cy="12" r="9"/><path d="M12 7.2 13.18 10.38 16.57 10.52 13.9 12.62 14.82 15.88 12 14 9.18 15.88 10.1 12.62 7.44 10.52 10.82 10.38z" fill="currentColor" stroke="none"/>',
   trophy: '<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5a2.5 2.5 0 0 0 2.7 4M17 6h2.5a2.5 2.5 0 0 1-2.7 4M12 14v3M8.5 20h7M9.5 17h5"/>',
   racecar: '<circle cx="6.5" cy="15.5" r="2.75"/><circle cx="17" cy="15.5" r="2.75"/><path d="M1.5 8h4M3 8v5h4.5l3-3.5H12l1 2h4l5 3.75M22.5 17.5h-2.5M9.25 16.5h5"/>',
@@ -92,6 +93,8 @@ const ICONS = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
   caret: '<path d="m8 10 4 4 4-4"/>',
   grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
+  stack: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  unstack: '<rect x="3" y="9" width="12" height="12" rx="2"/><path d="M13 11l8-8M15 3h6v6"/>',
 };
 
 const iconCache = new Map();
@@ -183,19 +186,22 @@ export function showMenu(x, y, items) {
     if (item.separator) return el('div', { class: 'menu-sep', role: 'separator' });
     if (item.heading) return el('div', { class: 'menu-heading', text: item.heading });
     const choice = typeof item.checked === 'boolean';
+    // A disabled item stays in the list, greyed out, with a note saying why.
     return el('button', {
       class: 'menu-item' + (item.danger ? ' danger' : '') + (item.className ? ' ' + item.className : ''),
       type: 'button',
       role: choice ? 'menuitemradio' : 'menuitem',
       'aria-checked': choice ? String(item.checked) : null,
+      disabled: !!item.disabled,
       onclick: () => { closeMenu(); item.action(); },
     }, item.icon && icon(item.icon, 16), el('span', { dir: 'auto', text: item.label }),
+    item.note && el('span', { class: 'menu-note', text: item.note }),
     item.checked && el('span', { class: 'menu-check' }, icon('check', 14)));
   }));
   menu.addEventListener('keydown', e => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
-    const buttons = [...menu.querySelectorAll('.menu-item')];
+    const buttons = [...menu.querySelectorAll('.menu-item:not(:disabled)')];
     const i = buttons.indexOf(document.activeElement);
     buttons[(i + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
   });
@@ -206,7 +212,7 @@ export function showMenu(x, y, items) {
   menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
   menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
   menuEl = menu;
-  menu.querySelector('.menu-item')?.focus({ preventScroll: true });
+  menu.querySelector('.menu-item:not(:disabled)')?.focus({ preventScroll: true });
 }
 
 addEventListener('pointerdown', e => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);

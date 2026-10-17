@@ -6,6 +6,7 @@ import {
   placeDefaults, atDefaultPlaces, swapPlan, swapCopy,
   cleanGithubParts, moveGithubPart, showGithubPart,
   copyById, allLayouts, ownLayout, activeLayout, giveOwnLayout, dropOwnLayout, normalizeLayouts,
+  isStack, copiesOf, minOf, stackOf, stackProblem, stackCopy, unstackCopy, setFront,
 } from '../js/layout.js';
 
 const legacy = over => ({
@@ -511,4 +512,201 @@ test('normalizeLayouts keeps the layouts of groups that exist, valid, with ids n
   assert.notEqual(out.g2.widgets[0].id, taken);
   assert.deepEqual(rect(out.g2.widgets[0]), [0, 0, 12, 12]);
   assert.deepEqual(normalizeLayouts(undefined, s), {});
+});
+
+// ---- stacks ----
+
+const page = () => ({
+  cols: COLS, rows: ROWS, widgets: [
+    { id: 'm', type: 'markets', x: 0, y: 0, w: 3, h: 5, settings: { items: ['BTC'] } },
+    { id: 's', type: 'sports', x: 3, y: 0, w: 3, h: 5, settings: TYPES.sports.defaults() },
+    { id: 'g', type: 'github', x: 6, y: 0, w: 3, h: 6, settings: TYPES.github.defaults() },
+    { id: 'w', type: 'website', x: 9, y: 0, w: 3, h: 6, settings: { url: 'pinterest.com', zoom: 100 } },
+    { id: 'c', type: 'claude', x: 0, y: 5, w: 3, h: 2, settings: {} },
+    { id: 'b', type: 'search', x: 3, y: 5, w: 6, h: 1, settings: {} },
+  ],
+});
+
+test('a widget dropped on another makes a stack in the target’s spot, showing what joined', () => {
+  const l = page();
+  const st = stackCopy(l, 's', 'm');
+  assert.equal(isStack(st), true);
+  assert.deepEqual(rect(st), [0, 0, 3, 5]);
+  assert.deepEqual(st.items.map(c => c.id), ['m', 's']);
+  assert.ok(st.items.every(c => !('x' in c)));   // stacked copies have no place of their own
+  assert.equal(st.front, 's');
+  assert.equal(l.widgets.some(c => c.id === 's' || c.id === 'm'), false);
+  assert.ok(fits(l, { x: 3, y: 0, w: 3, h: 5 }));   // Sports' old spot is free
+  assert.deepEqual(copiesOf(l).map(c => c.id).sort(), ['b', 'c', 'g', 'm', 's', 'w']);
+  assert.equal(countOf(l, 'sports'), 1);
+  assert.deepEqual(minOf(st), [2, 3]);
+  // A third joins the stack.
+  assert.equal(stackCopy(l, 'w', st.id), st);
+  assert.deepEqual(st.items.map(c => c.id), ['m', 's', 'w']);
+  assert.equal(st.front, 'w');
+  assert.equal(stackOf(l, 'w'), st);
+  assert.equal(stackOf(l, 'g'), null);
+});
+
+test('stackProblem says why a widget can’t join: the search bar, more than three, or too small a spot', () => {
+  const l = page();
+  assert.equal(stackProblem(l, 's', 'm'), null);
+  assert.equal(stackProblem(l, 'b', 'm'), 'search');
+  assert.equal(stackProblem(l, 'm', 'b'), 'search');
+  assert.equal(stackProblem(l, 'g', 'c'), 'small');   // GitHub needs 3 × 3; Claude's spot is 3 × 2
+  assert.equal(stackProblem(l, 'c', 'g'), null);
+  assert.equal(stackProblem(l, 'm', 'm'), 'missing');
+  assert.equal(stackProblem(l, 'nope', 'm'), 'missing');
+  const st = stackCopy(l, 's', 'm');
+  stackCopy(l, 'w', st.id);
+  assert.equal(stackProblem(l, 'g', st.id), 'full');
+  assert.equal(stackCopy(l, 'g', st.id), null);        // refused: nothing changes
+  assert.equal(st.items.length, 3);
+  assert.ok(l.widgets.some(c => c.id === 'g'));
+  // A stack joins another widget or stack only up to three.
+  const l2 = page();
+  const a = stackCopy(l2, 's', 'm');
+  const b = stackCopy(l2, 'w', 'g');
+  assert.equal(stackProblem(l2, a.id, b.id), 'full');
+  const l3 = page();
+  const one = stackCopy(l3, 's', 'm');
+  const both = stackCopy(l3, one.id, 'g');
+  assert.deepEqual(both.items.map(c => c.id), ['g', 'm', 's']);
+  assert.equal(both.front, 's');                       // what the joining stack was showing
+  assert.equal(l3.widgets.some(c => c.id === one.id), false);
+});
+
+test('removing a stacked widget keeps the rest stacked; with one left it’s a plain widget in the stack’s spot', () => {
+  const l = page();
+  const st = stackCopy(l, 's', 'm');
+  stackCopy(l, 'w', st.id);
+  setFront(l, st.id, 's');
+  assert.equal(removeCopy(l, 's'), true);
+  assert.deepEqual(st.items.map(c => c.id), ['m', 'w']);
+  assert.equal(st.front, 'w');                         // the next one along
+  assert.equal(removeCopy(l, 'w'), true);
+  assert.deepEqual(l.widgets.find(c => c.id === 'm'), { id: 'm', type: 'markets', x: 0, y: 0, w: 3, h: 5, settings: { items: ['BTC'] } });
+  assert.equal(l.widgets.some(isStack), false);
+  assert.equal(removeCopy(l, 'nope'), false);
+});
+
+test('taking a widget out puts it in a free spot at its default size, else its minimum, else refuses', () => {
+  const l = page();
+  stackCopy(l, 's', 'm');
+  const out = unstackCopy(l, 'm');
+  assert.deepEqual(rect(out), [3, 0, 3, 5]);           // Markets' default size, in the first free spot
+  assert.deepEqual(out.settings, { items: ['BTC'] });
+  const left = l.widgets.find(c => c.id === 's');      // one left: a plain widget again
+  assert.equal(left.type, 'sports');
+  assert.deepEqual(rect(left), [0, 0, 3, 5]);
+  assert.equal(unstackCopy(l, 'm'), null);             // not in a stack
+  const full = { cols: COLS, rows: ROWS, widgets: [{ id: 'st', type: 'stack', x: 0, y: 0, w: 12, h: 12, front: 'n', items: [{ id: 'n', type: 'notes', settings: {} }, { id: 'q', type: 'claude', settings: {} }] }] };
+  assert.equal(unstackCopy(full, 'n'), null);          // no room anywhere: it stays
+  assert.equal(full.widgets[0].items.length, 2);
+});
+
+test('setFront shows a member of the stack, and nothing else', () => {
+  const l = page();
+  const st = stackCopy(l, 's', 'm');
+  assert.equal(setFront(l, st.id, 'm'), true);
+  assert.equal(st.front, 'm');
+  assert.equal(setFront(l, st.id, 'm'), false);        // already showing
+  assert.equal(setFront(l, st.id, 'g'), false);        // not in it
+  assert.equal(setFront(l, 'g', 'g'), false);          // not a stack
+  assert.equal(st.front, 'm');
+});
+
+test('normalizeLayout keeps stacks valid: members cleaned and counted, the bar and a fourth out, one member plain', () => {
+  const l = normalizeLayout({ widgets: [
+    { id: 'st', type: 'stack', x: 0, y: 0, w: 3, h: 6, front: 'gone', items: [
+      { id: 'k', type: 'clock', settings: { face: 'nope' } },
+      { id: 'n', type: 'notes' },
+      { type: 'junk' },
+      { id: 'q', type: 'search' },
+      { id: 'm1', type: 'markets', settings: { items: ['BTC'] } },
+      { id: 'm2', type: 'markets', settings: { items: ['ETH'] } },
+    ] },
+    { id: 'k2', type: 'clock', x: 3, y: 0 },
+    { id: 'solo', type: 'stack', x: 6, y: 0, w: 3, h: 4, front: 'x', items: [{ id: 'x', type: 'claude' }] },
+    { id: 'none', type: 'stack', x: 9, y: 0, w: 3, h: 3, items: [] },
+    { id: 'tiny', type: 'stack', x: 9, y: 6, w: 1, h: 1, front: 'g1', items: [{ id: 'g1', type: 'github' }, { id: 't', type: 'tasks' }] },
+  ] }, state(null));
+  const st = l.widgets.find(c => c.id === 'st');
+  assert.deepEqual(rect(st), [0, 0, 3, 6]);
+  assert.deepEqual(st.items.map(c => [c.id, c.type]), [['k', 'clock'], ['n', 'notes'], ['m1', 'markets']]);
+  assert.equal(st.items[0].settings.face, 'classic');
+  assert.equal(st.front, 'k');                         // a front that isn't a member: the first
+  assert.equal(countOf(l, 'clock'), 1);                // the stacked clock counts: the second goes
+  assert.equal(l.widgets.some(c => c.id === 'k2'), false);
+  assert.deepEqual(l.widgets.find(c => c.id === 'x'), { id: 'x', type: 'claude', x: 6, y: 0, w: 3, h: 4, settings: {} });
+  assert.equal(l.widgets.some(c => c.id === 'none' || c.id === 'solo'), false);
+  assert.deepEqual(rect(l.widgets.find(c => c.id === 'tiny')), [9, 6, 3, 3]);   // its biggest member's minimum
+  assert.equal(l.widgets.find(c => c.id === 'q').type, 'search');              // out of the stack, in a spot of its own
+  assert.equal(l.widgets.find(c => c.id === 'm2').type, 'markets');
+  assert.equal(countOf(l, 'markets'), 2);
+  for (const c of l.widgets) assert.ok(fits(l, c, c.id));
+  // Ids stay unique across stacks and their members.
+  const dup = normalizeLayout({ widgets: [
+    { id: 'a', type: 'notes', x: 0, y: 0, w: 3, h: 3 },
+    { id: 'a', type: 'stack', x: 3, y: 0, w: 3, h: 3, front: 'a', items: [{ id: 'a', type: 'claude' }, { id: 'c', type: 'tasks' }] },
+  ] }, state(null));
+  const ids = copiesOf(dup).map(c => c.id).concat(dup.widgets.filter(isStack).map(c => c.id));
+  assert.equal(new Set(ids).size, 4);
+  assert.ok(dup.widgets.filter(isStack).every(c => c.items.some(i => i.id === c.front)));
+});
+
+test('limits count stacked widgets; a stacked widget duplicates to a free spot', () => {
+  const l = page();
+  stackCopy(l, 's', 'm');
+  const d = duplicateCopy(l, 's');
+  assert.equal(d.type, 'sports');
+  assert.deepEqual(d.settings, TYPES.sports.defaults());
+  assert.equal(stackOf(l, d.id), null);
+  assert.equal(countOf(l, 'sports'), 2);
+  const one = { cols: COLS, rows: ROWS, widgets: [{ id: 'st', type: 'stack', x: 0, y: 0, w: 3, h: 4, front: 'k', items: [{ id: 'k', type: 'clock', settings: TYPES.clock.defaults() }, { id: 'n', type: 'notes', settings: {} }] }] };
+  assert.equal(addCopy(one, 'clock'), null);           // the clock in the stack is the page's one
+  assert.equal(copyTitle(one.widgets[0]), 'Stack · Clock, Notes');
+});
+
+test('a stack moves and resizes as one, down to its biggest member’s minimum', () => {
+  const l = page();
+  const st = stackCopy(l, 'c', 'g');                   // GitHub (3 × 3 at least) and Claude
+  assert.deepEqual(minOf(st), [3, 3]);
+  assert.equal(moveCopy(l, st.id, { x: 6, y: 0, w: 2, h: 6 }), false);
+  assert.equal(moveCopy(l, st.id, { x: 6, y: 0, w: 3, h: 3 }), true);
+  assert.deepEqual(rect(st), [6, 0, 3, 3]);
+});
+
+test('Reset layout takes stacks apart, and a page with a stack isn’t in its default places', () => {
+  const l = page();
+  stackCopy(l, 's', 'm');
+  assert.deepEqual(resetLayout(l), []);
+  assert.equal(l.widgets.some(isStack), false);
+  assert.deepEqual(l.widgets.map(c => c.type).sort(), ['claude', 'github', 'markets', 'search', 'sports', 'website']);
+  assert.deepEqual(l.widgets.find(c => c.id === 'm').settings, { items: ['BTC'] });
+  for (const c of l.widgets) assert.ok(fits(l, c, c.id));
+  const d = { cols: COLS, rows: ROWS, widgets: placeDefaults({ cols: COLS, rows: ROWS, widgets: [] }, ['clock', 'notes', 'markets']) };
+  assert.equal(atDefaultPlaces(d), true);
+  stackCopy(d, byType(d).notes.id, byType(d).clock.id);
+  assert.equal(atDefaultPlaces(d), false);
+});
+
+test('a tab’s own layout copies stacks with new ids; copyById finds stacked copies and stacks', () => {
+  const s = tabs();
+  const main = s.prefs.layout;
+  const { tasks, notes } = byType(main);
+  const st = stackCopy(main, notes.id, tasks.id);
+  assert.equal(copyById(s, notes.id).type, 'notes');
+  assert.equal(copyById(s, st.id), st);
+  const own = giveOwnLayout(s, 'g2', 'copy');
+  const copied = own.widgets.find(isStack);
+  assert.deepEqual(copied.items.map(c => c.type), ['tasks', 'notes']);
+  assert.notEqual(copied.id, st.id);
+  assert.ok(copied.items.every(c => !st.items.some(m => m.id === c.id)));
+  assert.equal(copied.front, copied.items[1].id);      // still showing Notes
+  // A member id another layout uses is renamed, and front follows it.
+  const out = normalizeLayouts({ g2: { widgets: [{ id: 'z', type: 'stack', x: 0, y: 0, w: 3, h: 4, front: notes.id, items: [{ id: notes.id, type: 'notes' }, { id: 'q', type: 'claude' }] }] } }, s);
+  const z = out.g2.widgets[0];
+  assert.notEqual(z.items[0].id, notes.id);
+  assert.equal(z.front, z.items[0].id);
 });

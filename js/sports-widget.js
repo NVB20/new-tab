@@ -5,7 +5,7 @@
 import { el, icon, widgetHead, widgetSub, widgetEmpty } from './ui.js';
 import { feed, fetchJson, peek, sweep } from './net.js';
 import { timeAgo } from './feeds.js';
-import { copyById, allLayouts, TYPES } from './layout.js';
+import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, F1_SESSIONS, F1_SESSION_LABELS, teamOf, schedulePath, parseSchedule, nextPhases, joinParts,
   parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl, etDay, parseF1Season, parseF1Last, raceAwaitingResult,
@@ -97,7 +97,7 @@ export function mountSports(root, store, copy) {
   const prefs = () => store.get().prefs;
   const linkProps = href => (prefs().openInNewTab ? { href, target: '_blank', rel: 'noopener' } : { href });
   // Times follow the Clock's 12/24-hour setting.
-  const hour24 = () => allLayouts(store.get()).flatMap(l => l.widgets).find(c => c.type === 'clock')?.settings.hour24 ?? true;
+  const hour24 = () => allLayouts(store.get()).flatMap(copiesOf).find(c => c.type === 'clock')?.settings.hour24 ?? true;
 
   const list = el('div', { class: 'sp-list' });
   const notes = el('div', { class: 'sp-notes' });

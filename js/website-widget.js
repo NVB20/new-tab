@@ -4,7 +4,7 @@
 // can lift them, and the widget is a link to the site.
 
 import { el, icon, widgetEmpty } from './ui.js';
-import { copyById, allLayouts, TYPES } from './layout.js';
+import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules, framePatterns, sameRules } from './website.js';
 import {
   canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, onSiteAccessChange, setFrameRules,
@@ -20,7 +20,7 @@ const ALLOW = 'fullscreen; clipboard-write; autoplay; encrypted-media; picture-i
 // tab's own, so switching tabs rewrites nothing). Each is written only when Chrome doesn't hold
 // it already, so a new tab usually just reads them.
 async function syncSites(store) {
-  const domains = siteDomains(allLayouts(store.get()).flatMap(l => l.widgets)).slice(0, MAX_SITES);
+  const domains = siteDomains(allLayouts(store.get()).flatMap(copiesOf)).slice(0, MAX_SITES);
   const rules = frameRules(domains, extensionId);
   const syncRules = async () => {
     try {
