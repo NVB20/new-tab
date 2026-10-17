@@ -438,11 +438,13 @@ rearrange them.
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes,
-  Claude, Marvel and the search bar are single; Markets and GitHub allow three, Website two, Sports
-  and tiles blocks five. A chip is greyed out at the limit or when nothing fits; a new page fills every cell, and the tray
-  then says so. Hover a chip, or Tab to it, for a card with what the widget does and the real
-  widget as it would look, while an outline shows the cells it would take; a greyed-out chip's
-  card says why. **Reset layout** puts one copy of each widget back in its default place, keeping
+  Claude, Marvel and the search bar are single; Markets, GitHub and Weather allow three, Website two,
+  Sports and tiles blocks five. When nothing is free (a new page fills every cell), adding makes room:
+  the biggest widget gives up its bottom rows (or its right-hand columns) and the new one takes
+  them; nothing goes under its smallest size. A chip is greyed out at the limit, or when every
+  widget is already too small to give anything up. Hover a chip, or Tab to it, for a card with what the widget does and the real
+  widget as it would look, while an outline shows the cells it would take; the card says which
+  widget gets smaller to make room, and a greyed-out chip's card says why. **Reset layout** puts one copy of each widget back in its default place, keeping
   its settings.
 - **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its
   heading), with its own number of columns (Preferences → Layout). Two blocks can show Work and

@@ -158,7 +158,8 @@ export function setupEditMode(store, canvas, ctx) {
     let roomless = 0;
     chips.replaceChildren(...Object.entries(TYPES).map(([type, t]) => {
       const n = countOf(l, type);
-      const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
+      // A free spot, or room another widget can make by shrinking.
+      const room = plannedCopy(l, type, s.groups, s.activeGroupId);
       const chip = el('button', { type: 'button', class: 'tray-chip', dataset: { type }, 'aria-describedby': 'widget-preview', onclick: e => add(type, e.detail > 0) },
         icon('plus', 13), el('span', { text: t.label }), el('b', { text: t.max === 1 ? (n ? 'on' : 'off') : `${n}/${t.max}` }));
       // Greyed out, but still hoverable and focusable so its preview can say why.
@@ -296,6 +297,10 @@ export function setupEditMode(store, canvas, ctx) {
     delete ghost.dataset.note;
     ghost.hidden = !plan;
     if (plan) ghost.style.gridArea = gridArea(plan);
+    // The widget that makes room: dashed, at the size it shrinks to.
+    const giver = plan?.shrink && layout().widgets.find(c => c.id === plan.shrink.id);
+    other.hidden = !giver;
+    if (giver) other.style.gridArea = gridArea({ x: giver.x, y: giver.y, w: plan.shrink.w, h: plan.shrink.h });
   }
 
   function hidePreview() {
@@ -304,6 +309,7 @@ export function setupEditMode(store, canvas, ctx) {
     if (preview.type === null) return;
     preview.hide();
     ghost.hidden = true;
+    other.hidden = true;
   }
 
   chips.addEventListener('pointerover', e => {

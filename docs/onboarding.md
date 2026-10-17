@@ -52,8 +52,9 @@ Details per step:
   ends setup.
 - **Widgets:** on a page still in its default places, every tick re-flows the page
   (`placeDefaults`). Weather goes under the clock; when the clock column is full it goes in the
-  other column, and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits and an
-  untick removes it; nothing else moves. Setup works on the layout of the tab you're on.
+  other column, and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits (or
+  where the biggest widget makes room by shrinking, as the Layout mode tray does) and an untick
+  removes it; nothing else moves. Setup works on the layout of the tab you're on.
 - **Connect:** search engines (one always stays on), the Weather city (a search: results are chips,
   picking one puts it in the widget) and °C or °F, GitHub username (saved when typing pauses),
   Markets coins, indexes, commodities and pairs, Sports (Messi's teams, F1, NBA and NFL teams from a list), a

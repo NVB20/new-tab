@@ -486,10 +486,34 @@ function unshownGroup(layout, groups, activeGroupId) {
 // that takes the type's default size, else its minimum size, with the type's default settings. A
 // new tiles block is pinned to the first group no block shows, with columns to suit its width.
 // Null when the type is at its limit or nothing fits.
+// Room on a full page for a copy of `size` (else `min`, [w, h]): the biggest widget or stack that
+// can spare it gives up its bottom rows, or else its right-hand columns, staying at least its own
+// minimum. { spot, shrink: { id, w, h } } (the giver's new size), or null.
+export function makeRoom(layout, size, min) {
+  const givers = [...layout.widgets].sort((a, b) => b.w * b.h - a.w * a.h);
+  for (const [w, h] of [size, min]) {
+    for (const c of givers) {
+      const [minW, minH] = minOf(c);
+      if (c.w >= min[0] && c.h - h >= minH) {
+        return { spot: { x: c.x, y: c.y + c.h - h, w: Math.min(w, c.w), h }, shrink: { id: c.id, w: c.w, h: c.h - h } };
+      }
+      if (c.h >= min[1] && c.w - w >= minW) {
+        return { spot: { x: c.x + c.w - w, y: c.y, w, h: Math.min(h, c.h) }, shrink: { id: c.id, w: c.w - w, h: c.h } };
+      }
+    }
+  }
+  return null;
+}
+
+// What a tray click would add: { type, x, y, w, h, settings }, in a free spot of the default size,
+// else the minimum, else in room another widget makes (then shrink says which, and to what), or
+// null at the type's limit or when nothing can make room.
 export function plannedCopy(layout, type, groups = [], activeGroupId = null) {
   const t = TYPES[type];
   if (!t || countOf(layout, type) >= t.max) return null;
-  const spot = firstFree(layout, ...t.size) ?? firstFree(layout, ...t.min);
+  const free = firstFree(layout, ...t.size) ?? firstFree(layout, ...t.min);
+  const room = free ? null : makeRoom(layout, t.size, t.min);
+  const spot = free ?? room?.spot;
   if (!spot) return null;
   const settings = t.defaults();
   if (type === 'tiles') {
@@ -497,15 +521,17 @@ export function plannedCopy(layout, type, groups = [], activeGroupId = null) {
     // Columns to suit the width it landed in: the default block is 6 wide with 5 columns.
     settings.columns = clamp(Math.round(spot.w * 5 / 6), 2, 10);
   }
-  return { type, ...spot, settings };
+  return { type, ...spot, settings, ...(room ? { shrink: room.shrink } : {}) };
 }
 
-// Adds the planned copy, with `settings` over the planned ones. Returns the copy, or null when
-// the type is at its limit or nothing fits.
+// Adds the planned copy, with `settings` over the planned ones, shrinking the widget that makes
+// room for it. Returns the copy, or null when the type is at its limit or nothing can make room.
 export function addCopy(layout, type, settings, groups = [], activeGroupId = null) {
   const plan = plannedCopy(layout, type, groups, activeGroupId);
   if (!plan) return null;
-  const copy = { id: uid(), ...plan, settings: { ...plan.settings, ...(isObj(settings) ? structuredClone(settings) : {}) } };
+  const { shrink, ...planned } = plan;
+  if (shrink) Object.assign(layout.widgets.find(c => c.id === shrink.id), { w: shrink.w, h: shrink.h });
+  const copy = { id: uid(), ...planned, settings: { ...planned.settings, ...(isObj(settings) ? structuredClone(settings) : {}) } };
   layout.widgets.push(copy);
   return copy;
 }

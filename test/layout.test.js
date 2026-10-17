@@ -157,12 +157,11 @@ test('a bar still docked in a block (an earlier layout) becomes the page\'s bar,
   assert.deepEqual(rect(has.widgets[1]), [0, 0, 6, 11]);
 });
 
-test('addCopy takes the default size, else the minimum, else refuses; duplicates copy settings', () => {
+test('addCopy takes the default size, else the minimum; duplicates copy settings', () => {
   const l = defaultLayout(legacy());
   assert.equal(addCopy(l, 'clock'), null);                     // limit 1
   assert.equal(addCopy(l, 'search'), null);                    // limit 1 too
-  assert.equal(addCopy(l, 'weather'), null);
-  assert.equal(addCopy(l, 'claude'), null);                    // no room
+  assert.equal(addCopy(l, 'horoscope'), null);                 // no such type
   removeCopy(l, byType(l).search.id);
   const bar = addCopy(l, 'search');
   assert.deepEqual(rect(bar), [3, 0, 6, 1]);                   // the default size fits where the bar was
@@ -209,8 +208,7 @@ test('a new tiles copy is pinned to the first group no block shows; a block foll
 test('plannedCopy is what a tray click would add, without adding it', () => {
   const l = defaultLayout(legacy());
   assert.equal(plannedCopy(l, 'clock'), null);                 // limit 1
-  assert.equal(plannedCopy(l, 'claude'), null);                // no room
-  assert.equal(plannedCopy(l, 'weather'), null);
+  assert.equal(plannedCopy(l, 'horoscope'), null);             // no such type
   removeCopy(l, byType(l).search.id);
   assert.deepEqual(plannedCopy(l, 'search'), { type: 'search', x: 3, y: 0, w: 6, h: 1, settings: {} });
   removeCopy(l, byType(l).notes.id);
@@ -222,6 +220,45 @@ test('plannedCopy is what a tray click would add, without adding it', () => {
   const { id, ...added } = addCopy(l, 'markets');
   assert.equal(typeof id, 'string');
   assert.deepEqual(added, m);                                  // the click adds exactly the plan
+});
+
+test('on a full page the biggest widget gives up its bottom rows, else its right-hand columns', () => {
+  const l = defaultLayout(legacy());
+  const tiles = byType(l).tiles;
+  assert.deepEqual(rect(tiles), [3, 1, 6, 11]);
+  assert.equal(firstFree(l, 2, 2), null);                      // every cell is taken
+  const plan = plannedCopy(l, 'weather');
+  assert.deepEqual(rect(plan), [3, 8, 3, 4]);                  // the default size, under the tiles
+  assert.deepEqual(plan.shrink, { id: tiles.id, w: 6, h: 7 });
+  assert.deepEqual(rect(tiles), [3, 1, 6, 11]);                // a plan changes nothing
+  const weather = addCopy(l, 'weather');
+  assert.deepEqual(rect(weather), [3, 8, 3, 4]);
+  assert.equal('shrink' in weather, false);
+  assert.deepEqual(rect(tiles), [3, 1, 6, 7]);
+  // The cells beside it are free now: the next one fits there without shrinking anything.
+  const sports = plannedCopy(l, 'sports');
+  assert.deepEqual([rect(sports), sports.shrink], [[6, 8, 2, 3], undefined]);   // at its minimum
+  // A widget too short to give rows up gives columns.
+  const tall = { cols: COLS, rows: ROWS, widgets: [
+    { id: 'a', type: 'tiles', x: 0, y: 0, w: 9, h: 3, settings: {} },
+    { id: 'b', type: 'markets', x: 9, y: 0, w: 3, h: 3, settings: {} },
+    { id: 'c', type: 'tiles', x: 0, y: 3, w: 12, h: 9, settings: {} },
+  ] };
+  assert.deepEqual(rect(plannedCopy(tall, 'weather')), [0, 8, 3, 4]);   // c: 12 × 9, the biggest, gets shorter
+  const thin = { cols: COLS, rows: ROWS, widgets: [{ id: 'a', type: 'tiles', x: 0, y: 0, w: 12, h: 12, settings: {} }] };
+  thin.widgets[0].h = 3;
+  thin.widgets.push({ id: 'b', type: 'tiles', x: 0, y: 3, w: 12, h: 3, settings: {} }, { id: 'c', type: 'tiles', x: 0, y: 6, w: 12, h: 3, settings: {} },
+    { id: 'd', type: 'tiles', x: 0, y: 9, w: 12, h: 3, settings: {} });
+  const side = plannedCopy(thin, 'weather');
+  assert.deepEqual([rect(side), side.shrink], [[9, 0, 3, 3], { id: 'a', w: 9, h: 3 }]);
+});
+
+test('nothing goes under its minimum to make room: with every widget at its smallest, the chip refuses', () => {
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  for (let y = 0; y < ROWS; y += 3) for (let x = 0; x < COLS; x += 3) l.widgets.push({ id: `t${x}-${y}`, type: 'tiles', x, y, w: 3, h: 3, settings: {} });
+  assert.equal(plannedCopy(l, 'weather'), null);
+  assert.equal(addCopy(l, 'weather'), null);
+  assert.ok(l.widgets.every(c => c.w === 3 && c.h === 3));
 });
 
 test('plannedCopy pins a new tiles block and gives it columns for its width, as addCopy does', () => {
