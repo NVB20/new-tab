@@ -16,6 +16,7 @@ const HEATMAP = `${frame('github')} .gh-heatmap`;
 //   stage      'dark' or 'light': a glowing backdrop over the page (the page shows otherwise)
 //   glow       the stage's blue glow over a shot of the page
 //   depth      blur the page's edges, clear around the camera's subject
+//   hide       selectors of page parts left out of the shot (the top bar in a close-up)
 //   camera     keys { f, focus, zoom, rx, ry, at }: the focus element's centre goes to the point
 //              at ('center' or [x, y]), scaled by zoom and tilted rx/ry degrees; eased between keys
 //   words      cues { f, text, at: 'top' | 'center' | 'left', to?, size?, type? }; *starred* words
@@ -24,7 +25,7 @@ const HEATMAP = `${frame('github')} .gh-heatmap`;
 //   float      widgets lifted onto the stage { sel, f, x, y, scale, rx?, ry? } (centre in px)
 //   brackets   corner brackets closing in on the first floating widget at frame f
 //   logo       { f, pill, pillF, dark? }: the icon and name, then a pill (dark: a dark pill)
-//   curves     thin arcs drawing in on the stage
+//   curves     thin arcs on the stage: true draws them in, 'drawn' shows them whole
 //   cursor     pointer keys { f, x, y } or { f, sel }, hide: gone from that key on
 //   drags      { from, to, sel, by: [cols, rows] } or { from, to, sel, onto: selector }
 //   fx         'sparklines' (the floating Markets lines draw in) or 'heatmap' (the map fills in)
@@ -43,39 +44,39 @@ export const SCENES = [
     camera: [
       { f: 0, focus: copy('w-tiles') + ' .tile[data-id="t-github"]', zoom: 3, at: 'center' },
       { f: 10, focus: copy('w-tiles') + ' .tile[data-id="t-github"]', zoom: 2.8, at: 'center' },
-      { f: 3 * BEAT, focus: '#canvas', zoom: 0.8, rx: 16, ry: -14, at: [960, 620] },
-      { f: 6 * BEAT - 1, focus: '#canvas', zoom: 0.76, rx: 13, ry: -9, at: [960, 620] },
+      { f: 3 * BEAT, focus: '#canvas', zoom: 0.94, rx: 22, ry: -16, at: [980, 730] },
+      { f: 6 * BEAT - 1, focus: '#canvas', zoom: 0.9, rx: 18, ry: -10, at: [980, 730] },
     ],
     cursor: [{ f: 0, x: 975, y: 560 }, { f: 9, x: 990, y: 575 }, { f: 12, x: 990, y: 575, hide: true }],
     words: [{ f: 3 * BEAT, text: 'Every site, *one click*', at: 'top' }],
   },
   {
     name: 'markets', frames: 6 * BEAT, stage: 'dark', fx: 'sparklines',
-    float: [{ sel: frame('markets'), f: 0, x: 1250, y: 560, scale: 1.15, ry: -12 }],
+    float: [{ sel: frame('markets'), f: 0, x: 1240, y: 560, scale: 1.3, ry: -14 }],
     brackets: { f: BEAT },
     words: [{ f: 0, text: 'Live *markets*', at: 'left' }],
   },
   {
-    name: 'github', frames: 6 * BEAT, glow: true, depth: true, fx: 'heatmap',
+    name: 'github', frames: 6 * BEAT, glow: true, depth: true, fx: 'heatmap', hide: ['header.topbar'],
     camera: [
-      { f: 0, focus: HEATMAP, zoom: 2.2, rx: 20, ry: 0, at: [960, 650] },
-      { f: 6 * BEAT - 1, focus: HEATMAP, zoom: 2.5, rx: 14, ry: -5, at: [960, 640] },
+      { f: 0, focus: HEATMAP, zoom: 2.3, rx: 20, ry: 0, at: [960, 660] },
+      { f: 6 * BEAT - 1, focus: HEATMAP, zoom: 2.65, rx: 14, ry: -5, at: [960, 650] },
     ],
     words: [{ f: BEAT, text: 'Your *GitHub*, at a glance', at: 'top' }],
   },
   {
     name: 'cards', frames: 5 * BEAT, stage: 'dark',
     float: [
-      { sel: frame('sports'), f: 0, x: 690, y: 610, scale: 1.05, ry: 10 },
-      { sel: frame('weather'), f: 8, x: 1230, y: 610, scale: 1.05, ry: -10 },
+      { sel: frame('sports'), f: 0, x: 590, y: 640, scale: 1.45, ry: 12 },
+      { sel: frame('weather'), f: 8, x: 1330, y: 640, scale: 1.45, ry: -12 },
     ],
     words: [{ f: 0, text: 'Scores.', at: 'top' }, { f: BEAT, text: '*Weather.*', at: 'top' }],
   },
   {
     name: 'layout', frames: 5 * BEAT, group: 'g-work', layoutMode: true, glow: true,
     camera: [
-      { f: 0, focus: '#canvas', zoom: 0.86, at: [960, 610] },
-      { f: 5 * BEAT - 1, focus: '#canvas', zoom: 0.84, at: [960, 610] },
+      { f: 0, focus: '#canvas', zoom: 0.96, at: [960, 700] },
+      { f: 5 * BEAT - 1, focus: '#canvas', zoom: 0.94, at: [960, 700] },
     ],
     drags: [
       { from: 0, to: 12, sel: copy('w2-weather'), by: [2, 4] },
@@ -88,7 +89,7 @@ export const SCENES = [
     words: [{ f: 0, text: 'No account.', at: 'center' }, { f: BEAT, text: '*Free.*', at: 'center' }],
   },
   {
-    name: 'end', frames: 4 * BEAT, stage: 'light', curves: true,
+    name: 'end', frames: 4 * BEAT, stage: 'light', curves: 'drawn',
     logo: { f: 0, pill: 'Free for Chrome', pillF: BEAT, dark: true },
   },
 ];
