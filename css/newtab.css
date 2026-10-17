@@ -882,6 +882,77 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   .mv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); column-gap: 20px; }
 }
 
+/* ---------- Weather ---------- */
+
+.widget-root > .widget-weather { display: flex; flex-direction: column; overflow: hidden; }
+.widget-weather.editing { overflow: hidden auto; }
+.wx-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.wx-body[hidden] { display: none; }
+
+.wx-now { flex: none; display: flex; align-items: center; gap: 10px; }
+.wx-now-icon { flex: none; display: grid; color: var(--accent); }
+.wx-temp { flex: none; font-size: 40px; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.wx-now-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wx-cond, .wx-hilo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wx-cond { font-size: 14px; }
+.wx-hilo { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: pre; }
+/* Feels like, wind, humidity, sun: one line; what doesn't fit wraps out of sight. */
+.wx-meta { flex: none; display: flex; flex-wrap: wrap; column-gap: 10px; height: 1.4em; overflow: hidden; margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+
+/* The next hours: as many as fit the width, side by side; the rest wrap into rows of no height. */
+.wx-hours {
+  flex: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); grid-template-rows: auto; grid-auto-rows: 0;
+  overflow: hidden; list-style: none; margin: 10px 0 0; padding: 0; border-block: 1px solid var(--border);
+}
+.wx-hour { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 8px 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.wx-hour-at { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.wx-hour > .icon { color: var(--muted); }
+.wx-hour:first-child .wx-hour-at { color: var(--accent); }
+.wx-rain { font-size: 10.5px; color: #5aa9e6; line-height: 1; }
+
+/* The week: as many days as fit the height; the rest wrap into a column out of sight. */
+.wx-days {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; flex-wrap: wrap; align-content: flex-start;
+  overflow: hidden; list-style: none; margin: 6px 0 0; padding: 0;
+}
+.wx-day {
+  width: 100%; display: grid; grid-template-columns: 44px 34px 30px minmax(24px, 1fr) 30px; align-items: center; gap: 6px;
+  height: 28px; font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.wx-day-name { overflow: hidden; white-space: nowrap; }
+.wx-day:first-child .wx-day-name { color: var(--accent); }
+.wx-day-icon { display: flex; align-items: center; gap: 2px; color: var(--muted); }
+.wx-lo { text-align: right; color: var(--muted); }
+.wx-hi { text-align: right; }
+.wx-bar { position: relative; height: 4px; border-radius: 2px; background: var(--hover); }
+.wx-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: inherit; background: linear-gradient(90deg, #5aa9e6, var(--accent)); }
+
+/* Editor: the city search, its results and the units. */
+.wx-editor > .widget-sub:first-child { margin-top: 0; }
+.wx-current { margin: 0 0 6px; font-size: 13px; }
+.wx-search { width: 100%; }
+.wx-results { list-style: none; margin: 6px 0 0; padding: 0; }
+.wx-result {
+  display: flex; align-items: baseline; gap: 6px; width: 100%; margin: 0 -6px; padding: 4px 6px; border: 0; border-radius: 7px;
+  background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.wx-result span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.wx-result:hover, .wx-result:focus-visible { background: var(--hover); outline: none; }
+.wx-status:empty { display: none; }
+.wx-editor .sp-chips + .widget-note { margin-top: 12px; }
+.wx-editor a { color: inherit; }
+
+/* Short: just now. Narrow: a smaller now, the bars go. */
+@container (max-height: 200px) {
+  .wx-hours, .wx-days { display: none; }
+}
+@container (max-width: 230px) {
+  .wx-temp { font-size: 32px; }
+  .wx-now-icon .icon { width: 34px; height: 34px; }
+  .wx-day { grid-template-columns: 38px 1fr 30px 30px; }
+  .wx-bar { display: none; }
+}
+
 /* ---------- Tiles ---------- */
 
 /* Laid out by .grid-wrap. */

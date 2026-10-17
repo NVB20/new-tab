@@ -15,6 +15,8 @@ import { hasChrome, historySearch, bookmarksTree, requestSiteAccess } from './ch
 import { rankSites, barItems } from './suggest.js';
 import { NBA_TEAMS, NFL_TEAMS, teamOf } from './sports.js';
 import { siteUrl, sitePattern } from './website.js';
+import { searchUrl, parsePlaces, placeLabel } from './weather.js';
+import { fetchJson } from './net.js';
 import { hostOf, normalizeUrl, uid } from './util.js';
 import { addSavedIcons } from './icon-cache.js';
 import { shrinkImage } from './prefs.js';
@@ -31,16 +33,16 @@ const PRETICK = 6;   // most visited sites ticked to start with, when the group 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const THEMES = [['auto', 'Auto', 'auto'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon'], ['blue', 'Blue', 'drop'], ['github', 'GitHub', 'branch']];
 const BACKGROUNDS = [['ascii', 'ASCII'], ['none', 'Plain'], ['image', 'Image']];
-const NEAR = ['clock', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
+const NEAR = ['clock', 'weather', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
 // The widgets setup offers, in its order, with their taglines. Keep it a literal: the commit check
 // (.claude/hooks/onboarding-check.mjs) reads these keys as the types setup offers.
 const WIDGETS = {
-  clock: ABOUT.clock.tagline, search: ABOUT.search.tagline, tasks: ABOUT.tasks.tagline,
+  clock: ABOUT.clock.tagline, weather: ABOUT.weather.tagline, search: ABOUT.search.tagline, tasks: ABOUT.tasks.tagline,
   notes: ABOUT.notes.tagline, markets: ABOUT.markets.tagline, github: ABOUT.github.tagline,
   sports: ABOUT.sports.tagline, website: ABOUT.website.tagline, claude: ABOUT.claude.tagline,
   marvel: ABOUT.marvel.tagline,
 };
-const CONNECTS = ['search', 'github', 'markets', 'sports', 'website'];
+const CONNECTS = ['search', 'weather', 'github', 'markets', 'sports', 'website'];
 const ENGINES = [['google', 'Google'], ['claude', 'Claude'], ['chatgpt', 'ChatGPT'], ['gemini', 'Gemini']];
 const MARKETS = [
   ['Coins', ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE']], ['US indexes', ['SPY', 'QQQ', 'DJIA']],
@@ -127,8 +129,12 @@ export function setupOnboarding(store, canvas, ctx) {
     if (step === 'arrange') return 'dock';
     const near = layout().widgets.find(c => NEAR.includes(c.type));
     const nearSide = near && near.x >= 6 ? 'right' : 'left';
+    const farSide = nearSide === 'left' ? 'right' : 'left';
+    // Weather fills in under the clock: with nothing to fill in the far column, the card goes there.
+    const weatherNear = layout().widgets.some(c => c.type === 'weather' && (c.x >= 6) === (nearSide === 'right'));
+    if (step === 'connect' && weatherNear && !['github', 'markets', 'sports', 'website'].some(has)) return farSide;
     if (step === 'connect' || step === 'moves') return nearSide;
-    return nearSide === 'left' ? 'right' : 'left';
+    return farSide;
   }
 
   function go(to) {
@@ -380,6 +386,7 @@ export function setupOnboarding(store, canvas, ctx) {
           el('div', { class: 'ob-chips' }, ENGINES.map(([v, name]) => chip(name, prefs().search[v], () => toggleEngine(v)))),
           hint('Claude, ChatGPT and Gemini open a new chat and send what you typed.')));
       }
+      if (has('weather')) parts.push(part('cloud-sun', 'Weather', weatherField()));
       if (has('github')) {
         parts.push(part('branch', 'GitHub', githubField(),
           hint('Public activity shows straight away. Private repos need a token, which stays in Preferences → GitHub.')));
@@ -592,7 +599,10 @@ export function setupOnboarding(store, canvas, ctx) {
       const on = copiesOf(l).some(c => c.type === type);
       if (atDefaultPlaces(l)) {
         const types = [...new Set(l.widgets.map(c => c.type))].filter(t => t !== type);
-        l.widgets = placeDefaults(l, on ? types : [...types, type]);
+        // A spare type (layout.js) is left out when both columns are full.
+        const placed = placeDefaults(l, on ? types : [...types, type]);
+        noRoom = !on && !placed.some(c => c.type === type);
+        if (!noRoom) l.widgets = placed;
       } else if (on) {
         for (const c of copiesOf(l).filter(c => c.type === type)) removeCopy(l, c.id);
       } else {
@@ -699,6 +709,55 @@ export function setupOnboarding(store, canvas, ctx) {
       });
     }
     return [el('div', { class: 'ob-row' }, input, el('button', { type: 'button', class: 'btn', onclick: show }, 'Show')), status];
+  }
+
+  // A city search: each result is a chip, and picking one puts it in the widget.
+  function weatherField() {
+    const settings = () => copyOf('weather')?.settings;
+    const status = hint(settings()?.place ? `Showing ${placeLabel(settings().place)}.` : 'Type a city, then pick it.');
+    const results = el('div', { class: 'ob-chips' });
+    let seq = 0;
+    let timer = 0;
+    async function search() {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      const my = ++seq;
+      if (q.length < 2) return;
+      let places = null;
+      try {
+        places = parsePlaces(await fetchJson(searchUrl(q)));
+      } catch {
+        // said below
+      }
+      if (my !== seq) return;
+      status.textContent = places == null ? 'Couldn’t search. Check the connection and try again.' : places.length ? '' : `Nothing found for “${q}”.`;
+      results.replaceChildren(...(places ?? []).map(p => el('button', {
+        type: 'button', class: 'ob-chip', 'aria-pressed': String(placeLabel(settings()?.place) === placeLabel(p)),
+        onclick: () => {
+          setCopy(copyOf('weather').id, { place: p });
+          for (const b of results.children) b.setAttribute('aria-pressed', 'false');
+          results.children[places.indexOf(p)]?.setAttribute('aria-pressed', 'true');
+          status.textContent = `Showing ${placeLabel(p)}.`;
+        },
+      }, placeLabel(p, { region: true }))));
+    }
+    const input = el('input', {
+      type: 'text', class: 'pref-input', placeholder: 'Your city', value: settings()?.place?.name ?? '',
+      spellcheck: false, autocomplete: 'off', 'aria-label': 'City for the weather', maxLength: 100,
+      oninput: () => {
+        clearTimeout(timer);
+        timer = setTimeout(search, 400);
+      },
+      onkeydown: e => { if (e.key === 'Enter') search(); },
+    });
+    const unit = el('div', { class: 'ob-chips' }, [['c', '°C'], ['f', '°F']].map(([value, text]) => el('button', {
+      type: 'button', class: 'ob-chip', 'aria-pressed': String(settings()?.unit === value),
+      onclick: e => {
+        setCopy(copyOf('weather').id, { unit: value });
+        for (const b of unit.children) b.setAttribute('aria-pressed', String(b === e.currentTarget));
+      },
+    }, text)));
+    return [el('div', { class: 'ob-row' }, input, unit), results, status];
   }
 
   // ---- Moves ----

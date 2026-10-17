@@ -46,4 +46,8 @@ export const ABOUT = {
     tagline: 'The MCU in story order',
     about: 'Every MCU film, series, short and special in the order the story happens, with the next one to watch highlighted. Tick what you’ve watched as you go.',
   },
+  weather: {
+    tagline: 'Now, by the hour, the week',
+    about: 'A city’s weather now, the next hours and the week ahead, from Open-Meteo. Pick the city and °C or °F with ✎; each copy can show a different city.',
+  },
 };

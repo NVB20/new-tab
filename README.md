@@ -57,6 +57,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to five copies can split them up. |
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
+| **Weather** | A city's weather now, the next hours and the week ahead, in °C or °F; up to five, each with its own city. |
 | **Marvel** | Every MCU film, series, short and special in the order the story happens, what to watch next, and what you've watched. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with importance flags, due dates, repeats, subtasks, Today / Upcoming / High views, search, quick-add shorthand and a week of finished-task history, and a notes pad. |
@@ -129,8 +130,8 @@ Preferences.
 4. **Widgets:** which go on the page; they take their default places as you tick them.
 5. **Arrange:** Layout mode, inside setup, with its moves listed (stacking among them). Skipped in
    a window under 900px wide.
-6. **Connect:** only what your widgets need: search engines, your GitHub username, coins and pairs,
-   teams, a Website address.
+6. **Connect:** only what your widgets need: search engines, your city for the weather, your GitHub
+   username, coins and pairs, teams, a Website address.
 7. **Moves:** Ctrl+K, Ctrl+Space and a right-click, ticked off as you try them.
 
 - Esc folds the card into **Resume setup**. Closing the tab keeps your place: the next new tab
@@ -312,6 +313,28 @@ you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's 
 Schedules come from ESPN's public site API and from Jolpica F1 (the successor of the Ergast API),
 both free and without a key. Team schedules are checked every 6 hours and the F1 calendar once a
 day; every copy and every open tab shares one fetch.
+
+## Weather
+
+Add the **Weather** widget in [Layout mode](#layout-mode) (or in setup's Widgets step, where it goes
+under the clock). It shows one city's weather:
+
+- **Now:** the conditions, the temperature, today's high and low, what it feels like, the wind,
+  the humidity and the next sunrise or sunset.
+- **The next hours:** as many as fit the width, with the chance of rain when it's 20% or more.
+- **The week:** today and the days after, each with its low and high on a bar over the week's
+  range, as many as fit the height. A short widget shows only now; a narrow one drops the bars.
+- **Choose the city:** hover the widget and click **✎**, type a city and pick it from the list
+  (arrow keys and Enter work too). The same editor switches between °C with km/h and °F with mph,
+  as does Preferences → Layout → Weather.
+- Times are the city's own, and follow the Clock's 12/24-hour setting. Hover an hour or a day for
+  the conditions in words.
+- Up to five copies, each with its own city and units.
+
+Forecasts come from [Open-Meteo](https://open-meteo.com/), free and without a key; city search
+from its geocoding API. A forecast is fetched at most every 15 minutes, and every copy and open
+tab showing the same city shares it. If Open-Meteo can't be reached the widget keeps the last
+forecast it had and says how old it is.
 
 ## Marvel
 
@@ -528,6 +551,7 @@ Chrome profile only. Nothing is sent anywhere except the requests the widgets ne
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores); team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
 | Sports (F1) | `api.jolpi.ca` | calendar once a day; hourly after a race until the result is in |
+| Weather | `api.open-meteo.com` (the forecast for the city's coordinates); `geocoding-api.open-meteo.com` (the name you type, while choosing a city) | every 15 min while visible |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 | Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |

@@ -7,6 +7,7 @@ import { CLOCK_FACES } from './clock-widget.js';
 import { setTheme } from './store.js';
 import { copyById, copiesOf, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary, activeLayout, ownLayout } from './layout.js';
 import { askOwnLayout, askMainLayout } from './groups.js';
+import { placeLabel } from './weather.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 // The GitHub widget's parts as Preferences → GitHub lists them.
@@ -370,6 +371,14 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
         return [row('Products', el('span'), 'Use ✎ on the widget to choose them')];
       case 'sports':
         return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'weather':
+        return [
+          row('City', el('span'), s.place ? `${placeLabel(s.place, { region: true })}. Use ✎ on the widget to change it` : 'Use ✎ on the widget to choose it'),
+          row('Units', choice('Units', s.unit, [
+            { value: 'c', label: '°C, km/h' },
+            { value: 'f', label: '°F, mph' },
+          ], v => set('unit', v))),
+        ];
       case 'marvel': {
         const n = store.get().marvel.watched.length;
         return [

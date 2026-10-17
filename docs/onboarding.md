@@ -51,9 +51,11 @@ Details per step:
   Preferences does and setup carries on at Widgets; a New Tab backup restores the whole page and
   ends setup.
 - **Widgets:** on a page still in its default places, every tick re-flows the page
-  (`placeDefaults`). Once something was arranged by hand, a tick adds a copy where it fits and an
+  (`placeDefaults`). Weather goes under the clock; when the clock column is full it goes in the
+  other column, and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits and an
   untick removes it; nothing else moves. Setup works on the layout of the tab you're on.
-- **Connect:** search engines (one always stays on), GitHub username (saved when typing pauses),
+- **Connect:** search engines (one always stays on), the Weather city (a search: results are chips,
+  picking one puts it in the widget) and °C or °F, GitHub username (saved when typing pauses),
   Markets coins, indexes, commodities and pairs, Sports (Messi's teams, F1, NBA and NFL teams from a list), a
   Website address (Show asks Chrome for access to the site).
 - **Moves:** noticed by watching the page (Jump's dialog opening, the search bar's input getting
@@ -63,7 +65,8 @@ Details per step:
 Throughout:
 
 - **The card stays clear of what the step changes:** opposite the clock column while the page fills
-  in, beside it for Connect and Moves, above the tray in Arrange, a sheet along the bottom under 900px.
+  in, beside it for Connect and Moves (for Connect, opposite it when Weather, under the clock, is the
+  only widget there is to fill in), above the tray in Arrange, a sheet along the bottom under 900px.
 - **Esc** folds the card into **Resume setup**; Layout mode and dialogs keep their own Esc. Opening
   Layout mode from the top bar or a right-click hides the card until Done.
 - **Every answer goes straight into the store.** Nothing is applied at the end, so skipping keeps
@@ -77,10 +80,11 @@ Throughout:
 | Clock: name, 24/12-hour | Name |
 | Theme, accent, background (ASCII, plain, picture) | Look |
 | Tiles from history, the bookmarks bar, Speed Dial 2, a backup | Sites |
-| Every widget type: Clock, Search bar, Tasks, Notes, Markets, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
+| Every widget type: Clock, Weather, Search bar, Tasks, Notes, Markets, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
 | Layout mode: drag, resize, swap, remove, the tray and its previews | Arrange, Moves |
 | Widget stacks (a tip: drop onto another's middle) | Arrange |
 | Search bar engines (Google, Claude, ChatGPT, Gemini) | Connect |
+| Weather city, °C or °F | Connect |
 | GitHub username | Connect |
 | Markets coins, US indexes, commodities, currency pairs | Connect |
 | Sports teams and F1 | Connect |

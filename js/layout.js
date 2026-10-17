@@ -8,6 +8,7 @@ import { cleanSports } from './sports.js';
 import { siteUrl, siteDomain } from './website.js';
 import { VIEWS as TASK_VIEWS } from './tasks.js';
 import { SHOWS as MARVEL_SHOWS } from './marvel.js';
+import { cleanWeather } from './weather.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -86,6 +87,12 @@ export const TYPES = {
     label: 'Marvel', icon: 'shield', size: [3, 6], min: [2, 3], max: 1,
     defaults: () => ({ show: 'all', hideWatched: false }),
     clean: s => ({ show: MARVEL_SHOWS.includes(s.show) ? s.show : 'all', hideWatched: bool(s.hideWatched, false) }),
+  },
+  // place: { name, region, country, lat, lon }, or null until one is chosen; unit: 'c' or 'f'.
+  weather: {
+    label: 'Weather', icon: 'cloud-sun', size: [3, 4], min: [2, 2], max: 5,
+    defaults: () => cleanWeather({}),
+    clean: s => cleanWeather(s),
   },
 };
 
@@ -307,8 +314,28 @@ export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.
 
 // The clock column, top to bottom. Marvel goes here: the other column's four minimums already
 // take all 12 rows.
-const NEAR = { clock: 4, tasks: 4, notes: 4, claude: 2, marvel: 6 };
+const NEAR = { clock: 4, weather: 4, tasks: 4, notes: 4, claude: 2, marvel: 6 };
 const FAR = { markets: 5, github: 7, sports: 5, website: 6 };   // the other column
+// Types that came after both columns' minimums filled all 12 rows: one goes in the other column
+// when its own is full, and is left out when both are.
+const SPARE = ['weather'];
+const fitsColumn = types => types.reduce((n, t) => n + TYPES[t].min[1], 0) <= ROWS;
+
+// The types each column takes: a spare that doesn't fit in its own column moves to the other.
+function columns(types) {
+  const near = Object.keys(NEAR).filter(t => types.includes(t));
+  const far = Object.keys(FAR).filter(t => types.includes(t));
+  for (const [own, other] of [[near, far], [far, near]]) {
+    for (const t of SPARE.filter(s => own.includes(s))) {
+      if (fitsColumn(own)) break;
+      own.splice(own.indexOf(t), 1);
+      if (fitsColumn([...other, t])) other.push(t);
+    }
+  }
+  return { near, far };
+}
+
+const HEIGHTS = { ...NEAR, ...FAR };
 
 // Heights of a column sum to at most ROWS: the tallest that is above its minimum shrinks first.
 // With fill, one widget alone takes the whole column.
@@ -333,8 +360,9 @@ function column(items, fill) {
 // and between them the search bar (one row, at the top or the bottom) over the tiles block, which
 // is wider when a column is empty.
 export function defaultPositions(types, side = 'left', barAt = 'top') {
-  const near = column(Object.keys(NEAR).filter(t => types.includes(t)).map(type => ({ type, h: NEAR[type] })), false);
-  const far = column(Object.keys(FAR).filter(t => types.includes(t)).map(type => ({ type, h: FAR[type] })), true);
+  const cols = columns(types);
+  const near = column(cols.near.map(type => ({ type, h: HEIGHTS[type] })), false);
+  const far = column(cols.far.map(type => ({ type, h: HEIGHTS[type] })), true);
   const right = side === 'right';
   const nearX = right ? 9 : 0;
   const farX = right ? 0 : 9;
@@ -612,5 +640,6 @@ export function copyTitle(copy, groups = []) {
     const url = siteUrl(copy.settings.url);
     return `${label} · ${url ? siteDomain(url) : 'no address'}`;
   }
+  if (copy.type === 'weather') return `${label} · ${copy.settings.place?.name ?? 'no place'}`;
   return label;
 }

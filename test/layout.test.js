@@ -111,7 +111,7 @@ test('normalizeLayout drops junk, clamps, resolves overlaps and enforces limits'
     { id: 'c', type: 'markets', x: 0, y: 0, w: 3, h: 3, settings: { items: ['eth', 'bad!'] } },
     { id: 'd', type: 'tiles', x: 20, y: 20, w: 3, h: 3, settings: { group: 'g9', columns: 99, bar: 'x' } },
     { type: 'github', x: 9, y: 0, w: 3, h: 3, settings: { parts: ['commits', 'heatmap', 'junk'] } },
-    { id: 'e', type: 'weather', x: 0, y: 0, w: 2, h: 2 },
+    { id: 'e', type: 'horoscope', x: 0, y: 0, w: 2, h: 2 },
     'junk',
   ] };
   const l = normalizeLayout(raw, state(raw));
@@ -382,6 +382,38 @@ test('Marvel: one copy, its own settings, never on an old page, last in the cloc
   assert.deepEqual(rect(t.marvel), [0, 9, 3, 3]);
   assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
   assert.ok(atDefaultPlaces(l));
+});
+
+test('Weather: up to five copies, a city each, never on an old page, under the clock', () => {
+  assert.equal(TYPES.weather.max, 5);
+  assert.equal(prefsSection('weather'), 'layout');
+  assert.deepEqual(TYPES.weather.defaults(), { place: null, unit: 'c' });
+  assert.equal(byType(defaultLayout(legacy())).weather, undefined);
+  assert.equal(copyTitle({ type: 'weather', settings: { place: null } }), 'Weather · no place');
+  assert.equal(copyTitle({ type: 'weather', settings: { place: { name: 'Oslo' } } }), 'Weather · Oslo');
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'weather', 'tasks', 'tiles']);
+  const t = byType(l);
+  assert.deepEqual(rect(t.weather), [0, 4, 3, 4]);
+  assert.deepEqual(rect(t.tasks), [0, 8, 3, 4]);
+  assert.ok(atDefaultPlaces(l));
+});
+
+test('Weather goes in the far column when the clock column is full, and is left out when both are', () => {
+  const near = ['clock', 'tasks', 'notes', 'claude', 'marvel'];
+  const far = ['markets', 'github', 'sports', 'website'];
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, [...near, 'weather', 'markets', 'tiles']);
+  let t = byType(l);
+  assert.equal(t.weather.x, 9);
+  assert.deepEqual(rect(t.marvel), [0, 9, 3, 3]);   // the clock column as it was
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  assert.ok(atDefaultPlaces(l));
+  l.widgets = placeDefaults(l, [...near, ...far, 'weather', 'tiles']);
+  t = byType(l);
+  assert.equal(t.weather, undefined);
+  assert.deepEqual(Object.keys(t).sort(), [...near, ...far, 'tiles'].sort());
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
 });
 
 test('placeDefaults puts the given types in their default places, keeping copies already there', () => {

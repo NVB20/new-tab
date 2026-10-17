@@ -94,6 +94,15 @@ const ICONS = {
   caret: '<path d="m8 10 4 4 4-4"/>',
   grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
   stack: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  // Weather (weather.js picks one per condition).
+  cloud: '<path d="M7 19h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 5.9 12.1 3.6 3.6 0 0 0 7 19z"/>',
+  'cloud-sun': '<path d="M8 1.5V3M1.5 8H3M3.4 3.4l1.06 1.06M12.6 3.4l-1.06 1.06"/><path d="M5.53 10.47A3.5 3.5 0 1 1 11.45 7.4"/><path d="M9 20h8.5a3.5 3.5 0 0 0 .4-6.98A5 5 0 0 0 8.3 14.1 3 3 0 0 0 9 20z"/>',
+  'cloud-moon': '<path d="M10.6 8.6A4 4 0 0 1 5.4 3.4a4 4 0 1 0 5.2 5.2z"/><path d="M9 20h8.5a3.5 3.5 0 0 0 .4-6.98A5 5 0 0 0 8.3 14.1 3 3 0 0 0 9 20z"/>',
+  rain: '<path d="M7 15h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 5.9 8.1 3.6 3.6 0 0 0 7 15z"/><path d="m8.5 18-1 2.5M12.5 18l-1 2.5M16.5 18l-1 2.5"/>',
+  snow: '<path d="M7 15h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 5.9 8.1 3.6 3.6 0 0 0 7 15z"/><path d="M8 18.5h.01M12 18.5h.01M16 18.5h.01M10 21.5h.01M14 21.5h.01" stroke-width="2.6"/>',
+  storm: '<path d="M7 15h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 5.9 8.1 3.6 3.6 0 0 0 7 15z"/><path d="m13 15.5-2.5 3.5h3L11 22.5"/>',
+  fog: '<path d="M5.5 12a6 6 0 0 1 11.5-2.97A4 4 0 0 1 20.5 12"/><path d="M3 15.5h18M6 19h12"/>',
+  wind: '<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h7"/>',
   unstack: '<rect x="3" y="9" width="12" height="12" rx="2"/><path d="M13 11l8-8M15 3h6v6"/>',
 };
 
