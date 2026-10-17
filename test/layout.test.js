@@ -427,6 +427,37 @@ test('Weather goes in the far column when the clock column is full, and is left 
   assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
 });
 
+test('Countdown: up to three copies, one countdown each (Next up to start), never on an old page, under the clock', () => {
+  assert.equal(TYPES.countdown.max, 3);
+  assert.equal(prefsSection('countdown'), null);
+  assert.deepEqual(TYPES.countdown.defaults(), { show: 'next' });
+  assert.deepEqual(TYPES.countdown.clean({ show: 'abc' }), { show: 'abc' });
+  assert.deepEqual(TYPES.countdown.clean({ show: 4 }), { show: 'next' });
+  assert.equal(byType(defaultLayout(legacy())).countdown, undefined);
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'countdown', 'tasks', 'tiles']);
+  const t = byType(l);
+  assert.deepEqual(rect(t.countdown), [0, 4, 3, 3]);
+  assert.deepEqual(rect(t.tasks), [0, 7, 3, 4]);
+  assert.ok(atDefaultPlaces(l));
+});
+
+test('Countdown moves to the far column before Weather does, and is left out when both columns are full', () => {
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'weather', 'countdown', 'tasks', 'notes', 'claude', 'marvel', 'markets', 'tiles']);
+  let t = byType(l);
+  assert.equal(t.countdown.x, 9);
+  assert.equal(t.weather.x, 9);   // the clock column's minimums still sum past 12 without it
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  l.widgets = placeDefaults(l, ['clock', 'weather', 'countdown', 'tasks', 'markets', 'tiles']);
+  t = byType(l);
+  assert.equal(t.countdown.x, 0);   // room for all four under the clock
+  assert.equal(t.weather.x, 0);
+  l.widgets = placeDefaults(l, ['clock', 'tasks', 'notes', 'claude', 'marvel', 'markets', 'github', 'sports', 'website', 'countdown', 'tiles']);
+  assert.equal(byType(l).countdown, undefined);
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+});
+
 test('placeDefaults puts the given types in their default places, keeping copies already there', () => {
   const l = defaultLayout(legacy());
   const clock = byType(l).clock;

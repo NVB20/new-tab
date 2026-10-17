@@ -6,6 +6,7 @@ import { parseCoins, cleanMarketItems } from './feeds.js';
 import { isDay, PRIORITIES, REPEATS } from './tasks.js';
 import { defaultLayout, normalizeLayout, normalizeLayouts } from './layout.js';
 import { cleanWatched } from './marvel.js';
+import { cleanCountdowns } from './countdown.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
@@ -63,7 +64,7 @@ export function setTheme(prefs, theme) {
   prefs.theme = theme;
 }
 
-const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'marvel', 'prefs', 'onboarding'];
+const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'marvel', 'countdowns', 'prefs', 'onboarding'];
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
@@ -82,6 +83,9 @@ export function defaultState() {
     notes: '',
     // The Marvel widget's progress: the ids (marvel.js) watched, kept when the widget is removed.
     marvel: { watched: [] },
+    // The Countdown widgets' timers and dates (countdown.js), one list for every copy, kept when
+    // the widgets are removed. The background script reads it to ring them.
+    countdowns: [],
     // First-run setup (onboarding.js): whether it's done, and the step to resume at.
     onboarding: { done: false, step: 'intro' },
     prefs: { ...structuredClone(DEFAULT_PREFS), layout: defaultLayout(LEGACY_PREFS) },
@@ -155,6 +159,7 @@ export function normalizeState(raw) {
     .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isInteger(n) && n > 0));
   s.notes = str(raw.notes);
   s.marvel = { watched: cleanWatched(raw.marvel?.watched) };
+  s.countdowns = cleanCountdowns(raw.countdowns);
   // A page saved before setup existed was set up by hand, so it counts as done.
   const ob = raw.onboarding;
   s.onboarding = isObj(ob) ? { done: ob.done === true, step: str(ob.step, 'intro') } : { done: true, step: 'done' };

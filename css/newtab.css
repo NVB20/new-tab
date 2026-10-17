@@ -953,6 +953,80 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   .wx-bar { display: none; }
 }
 
+/* ---------- Countdown ---------- */
+
+.widget-root > .widget-countdown { display: flex; flex-direction: column; overflow: hidden; }
+.widget-countdown.editing { overflow: hidden auto; }
+.widget-countdown .widget-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cd-body[hidden] { display: none; }
+.cd-face { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+/* The count fills what the rest leaves of the frame: the widget sets its font size. */
+.cd-count {
+  display: flex; align-items: baseline; justify-content: center; gap: 0.18em; max-width: 100%;
+  font-size: 48px; font-weight: 300; line-height: 0.95; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.cd-unit { font-size: max(13px, 0.3em); font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.cd-when { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cd-bar { flex: none; width: min(100%, 220px); height: 4px; border-radius: 2px; background: var(--hover); overflow: hidden; }
+.cd-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 1s linear; }
+.cd-controls { flex: none; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 2px; }
+.cd-ctl { width: 34px; height: 34px; }
+.cd-ctl.cd-main { color: var(--accent); background: var(--accent-soft); }
+.cd-btn { padding: 5px 12px; font-size: 12.5px; }
+/* At zero: the count in the accent, popping in once. */
+.widget-countdown.done .cd-count { color: var(--accent); font-weight: 400; animation: cd-pop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes cd-pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Two cells wide: the line under the count goes. Short: a timer's line goes, its buttons shrink. */
+.widget-countdown.narrow .cd-when { display: none; }
+.widget-countdown.short .cd-face { gap: 4px; }
+.widget-countdown.short.is-timer .cd-when { display: none; }
+.widget-countdown.short .cd-ctl { width: 28px; height: 28px; }
+.widget-countdown.short .cd-btn { padding: 3px 10px; font-size: 12px; }
+
+/* ✎: the list to pick from. */
+.cd-picker { display: flex; flex-direction: column; gap: 8px; }
+.cd-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.cd-row { display: flex; align-items: center; gap: 2px; }
+.cd-pick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 8px;
+  background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.cd-pick:hover { background: var(--hover); }
+.cd-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cd-pick[aria-pressed="true"] { background: var(--accent-soft); }
+.cd-pick > .icon { flex: none; color: var(--muted); }
+.cd-pick[aria-pressed="true"] > .icon { color: var(--accent); }
+.cd-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-left { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cd-more, .cd-more-gap { flex: none; width: 28px; height: 28px; border-radius: 7px; }
+.cd-new { align-self: flex-start; padding: 6px 12px; font-size: 13px; }
+
+/* The dialog: Timer or Date, then what it needs. */
+.cd-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; }
+.cd-kind {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 10px; border: 0; border-radius: 7px;
+  background: none; color: var(--muted); font: inherit; font-size: 13.5px; cursor: pointer;
+}
+.cd-kind:hover { color: var(--text); }
+.cd-kind:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cd-kind[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.cd-part { display: flex; flex-direction: column; gap: 10px; }
+.cd-duration { display: flex; align-items: center; gap: 6px; }
+.field .cd-num { width: 68px; font-variant-numeric: tabular-nums; }
+.cd-num-unit { margin-right: 6px; font-size: 13px; color: var(--muted); }
+.cd-date-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; align-items: start; }
+.cd-check { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.cd-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+
+/* The burst at zero (confetti.js), over everything but menus. */
+.confetti { position: fixed; inset: 0; z-index: 999; width: 100vw; height: 100vh; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .widget-countdown.done .cd-count { animation: none; }
+  .cd-fill { transition: none; }
+}
+
 /* ---------- Tiles ---------- */
 
 /* Laid out by .grid-wrap. */
@@ -1494,6 +1568,8 @@ kbd {
   .widget-frame { grid-area: auto !important; container-type: normal; }
   .widget-root > .widget, .widget-tiles .grid-wrap { overflow: visible; }
   .clock-time { font-size: 56px; }
+  .cd-count { font-size: 64px; }
+  .cd-face { padding: 8px 0; }
   .face-stencil.stacked .clock-time, .face-rounded.stacked .clock-time, .face-serif.stacked .clock-time { font-size: 110px; }
   .prefs-dlg[open] { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .prefs-side { padding-right: 56px; border-right: 0; border-bottom: 1px solid var(--border); }   /* clear of the close button */

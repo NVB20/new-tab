@@ -12,6 +12,10 @@
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -22,7 +26,9 @@
     "favicon",
     "search",
     "declarativeNetRequestWithHostAccess",
-    "scripting"
+    "scripting",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://github.com/*",

@@ -51,8 +51,8 @@ Details per step:
   Preferences does and setup carries on at Widgets; a New Tab backup restores the whole page and
   ends setup.
 - **Widgets:** on a page still in its default places, every tick re-flows the page
-  (`placeDefaults`). Weather goes under the clock; when the clock column is full it goes in the
-  other column, and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits and an
+  (`placeDefaults`). Weather and then Countdown go under the clock; when the clock column is full
+  they go in the other column (Countdown first), and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits and an
   untick removes it; nothing else moves. Setup works on the layout of the tab you're on.
 - **Connect:** search engines (one always stays on), the Weather city (a search: results are chips,
   picking one puts it in the widget) and °C or °F, GitHub username (saved when typing pauses),
@@ -80,7 +80,7 @@ Throughout:
 | Clock: name, 24/12-hour | Name |
 | Theme, accent, background (ASCII, plain, picture) | Look |
 | Tiles from history, the bookmarks bar, Speed Dial 2, a backup | Sites |
-| Every widget type: Clock, Weather, Search bar, Tasks, Notes, Markets, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
+| Every widget type: Clock, Weather, Search bar, Tasks, Notes, Countdown, Markets, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
 | Layout mode: drag, resize, swap, remove, the tray and its previews | Arrange, Moves |
 | Widget stacks (a tip: drop onto another's middle) | Arrange |
 | Search bar engines (Google, Claude, ChatGPT, Gemini) | Connect |
@@ -99,7 +99,7 @@ Throughout:
 | GitHub access token | A credential: it belongs in Preferences → GitHub, with its how-to |
 | Groups, a tab's own layout | Home is enough to start; right-clicking a tab shows them when needed |
 | Folders made by dropping a tile on a tile | Learned by doing; the README covers it |
-| What's in Tasks, Notes and Marvel | Used, not configured |
+| What's in Tasks, Notes, Countdown and Marvel | Used, not configured (an empty Countdown says so and has Add one) |
 | Clock faces, tile style and size, plain background colour, blur and dim | Taste, adjusted later in Preferences |
 | Markets segments and order, GitHub parts, Sports F1 sessions, Website zoom | Each widget's ✎ or its group in Preferences |
 | The sidebar, Preferences search | Found from the top bar |

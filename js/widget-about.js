@@ -50,4 +50,8 @@ export const ABOUT = {
     tagline: 'Now, by the hour, the week',
     about: 'A city’s weather now, the next hours and the week ahead, from Open-Meteo. Pick the city and °C or °F with ✎; each copy can show a different city.',
   },
+  countdown: {
+    tagline: 'Timers and days to go',
+    about: 'Days to go until a date, like a trip or a birthday, or a timer for the oven. ✎ lists your countdowns and picks the one this copy shows; confetti and a notification when one ends.',
+  },
 };

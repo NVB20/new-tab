@@ -58,6 +58,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to two, each with its own address and zoom. |
 | **Weather** | A city's weather now, the next hours and the week ahead, in °C or °F; up to three, each with its own city. |
+| **Countdown** | Days to go until a date (a trip, a birthday every year) or a timer, big; confetti and a Chrome notification at zero. One list of countdowns; each of up to three widgets shows one. |
 | **Marvel** | Every MCU film, series, short and special in the order the story happens, what to watch next, and what you've watched. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with importance flags, due dates, repeats, subtasks, Today / Upcoming / High views, search, quick-add shorthand and a week of finished-task history, and a notes pad. |
@@ -114,7 +115,8 @@ time you open Safari.
 Safari has no extension APIs for bookmarks, history or recently closed tabs, so Jump and the
 sidebar don't show them. Tiles show their own logo or a letter instead of the site's icon, and
 searches go to google.com rather than the browser's search engine. The Website widget hasn't been
-tried in Safari.
+tried in Safari. Safari has no extension notifications either, so a countdown reaching zero shows
+only on the page.
 
 ## First run
 
@@ -336,6 +338,32 @@ from its geocoding API. A forecast is fetched at most every 15 minutes, and ever
 tab showing the same city shares it. If Open-Meteo can't be reached the widget keeps the last
 forecast it had and says how old it is.
 
+## Countdown
+
+Add the **Countdown** widget in [Layout mode](#layout-mode) (or in setup's Widgets step). Each
+countdown is one of two kinds, picked when you make it:
+
+- **Timer:** a duration (hours, minutes, seconds, or 5 min, 10 min, 25 min, 1 hour). It starts
+  when you make it; the widget has ▶ / ❚❚, ↺ to reset and **+1 min**, and a bar for how far it's
+  gone. A paused timer stays paused, even across new tabs.
+- **Date:** a day and, if you want, a time (without one it counts to the start of the day). It
+  shows the days to go, and the hours, minutes and seconds in the last 24 hours. Tick **Every
+  year** for a birthday or an anniversary: it counts to the next one.
+
+**✎** on the widget lists every countdown with the time left: click one to show it in this widget,
+or **Next up** to show whichever ends soonest. **⋯** on a row edits or deletes it, and **New
+countdown** adds one. The list belongs to the page, so two widgets can show two countdowns from it,
+and removing a widget keeps them.
+
+**At zero** confetti bursts out of the widget (once; not when your system asks for less motion),
+and the widget says **Time's up** or **Today** with **Dismiss**: a timer goes back to its start,
+a yearly date counts to next year, a one-off date leaves the list. **+1 min** on a finished timer
+runs it for another minute.
+
+Chrome also shows a notification when a countdown ends, even with no new tab open (clicking it
+opens one). That needs the extension's background script, which only reads the saved countdowns
+and keeps an alarm for each; Windows' Focus Assist (Do not disturb) can hide the notification.
+
 ## Marvel
 
 Add the **Marvel** widget in [Layout mode](#layout-mode) (or in setup's Widgets step). It lists
@@ -438,7 +466,7 @@ rearrange them.
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes,
-  Claude, Marvel and the search bar are single; Markets and GitHub allow three, Website two, Sports
+  Claude, Marvel and the search bar are single; Markets, GitHub, Weather and Countdown allow three, Website two, Sports
   and tiles blocks five. A chip is greyed out at the limit or when nothing fits; a new page fills every cell, and the tray
   then says so. Hover a chip, or Tab to it, for a card with what the widget does and the real
   widget as it would look, while an outline shows the cells it would take; a greyed-out chip's
@@ -542,7 +570,7 @@ tiles and the rest.
 
 ## Your data
 
-Tiles, groups, folders, tasks, notes, Marvel progress, settings and the wallpaper are stored in this
+Tiles, groups, folders, tasks, notes, countdowns, Marvel progress, settings and the wallpaper are stored in this
 Chrome profile only. Nothing is sent anywhere except the requests the widgets need:
 
 | Widget | Talks to | How often |
@@ -576,6 +604,9 @@ history and bookmarks on this computer; nothing about them is sent anywhere.
   in a tab. A link to another site loads in the widget only if that site allows it. The page's
   shortcuts (Ctrl+K, …) don't work while the site has the cursor; click outside it first.
 - No sync between computers; use a backup file to move your setup.
+- Countdown: a new tab left open from before doesn't see a timer started in another tab, and if
+  you then change something in that old tab it saves its own list over the new one. Open a fresh
+  new tab after starting a timer elsewhere.
 - Sports: ESPN's site API is public but unofficial and can change without notice. The widget then
   keeps the last schedule it had and says ESPN is unreachable. F1 "live" follows the timetable,
   not live timing (there is no free live timing).

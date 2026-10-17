@@ -601,10 +601,10 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     if (!await confirmDialog(message, { title: 'Import from Speed Dial 2', confirmLabel: 'Import' })) return;
     // The layout and the token stay; only the export's column count goes to the block that
     // follows the tabs. Blocks pinned to the old groups go back to following the tabs on load.
-    const { tasks, taskHistory, taskStats, notes, marvel, prefs: { layout, github } } = structuredClone(store.get());
+    const { tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { layout, github } } = structuredClone(store.get());
     const block = copiesOf(layout).find(c => c.type === 'tiles' && c.settings.group === null);
     if (block) block.settings.columns = imported.prefs.columns;
-    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, prefs: { ...imported.prefs, layout, github } });
+    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { ...imported.prefs, layout, github } });
     redraw();
   }
 

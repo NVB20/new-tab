@@ -59,6 +59,14 @@ test('normalizeState keeps the Marvel progress: known ids once, in the list’s 
   assert.deepEqual(normalizeState({ marvel: 'nope' }).marvel, { watched: [] });
 });
 
+test('normalizeState keeps the countdowns, valid ones only', () => {
+  assert.deepEqual(normalizeState(null).countdowns, []);
+  const timer = { id: 't', kind: 'timer', name: 'Tea', duration: 180e3, endsAt: 5, left: null, seen: null };
+  const s = normalizeState({ countdowns: [timer, { id: 'x', kind: 'date', date: 'soon' }, 'junk'] });
+  assert.deepEqual(s.countdowns, [timer]);
+  assert.deepEqual(normalizeState({ countdowns: { t: timer } }).countdowns, []);
+});
+
 test('a saved state from before Layout mode converts to the same page, and loses the old keys', () => {
   const s = normalizeState({ prefs: {
     columns: 7,
