@@ -26,6 +26,7 @@
   ],
   "host_permissions": [
     "https://github.com/*",
+    "https://api.github.com/*",
     "https://*.speeddial2.com/*"
   ],
   "optional_host_permissions": [

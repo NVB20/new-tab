@@ -11,7 +11,7 @@ export function mountNotes(root, store) {
     'aria-label': 'Notes',
     oninput: () => {
       const value = notesArea.value;
-      store.update(s => { s.notes = value; });
+      store.update(s => { s.notes = value; }, ['notes']);
     },
   });
   root.append(el('section', { class: 'widget widget-notes' }, widgetHead('note', 'Notes'), notesArea));

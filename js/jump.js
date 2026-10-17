@@ -5,6 +5,9 @@ import { fuzzyScore } from './util.js';
 import { openUrl, openTabs, focusTab, bookmarksSearch, historySearch, recentlyClosed, restoreSession, webSearch } from './chrome-api.js';
 
 const LIMITS = { tiles: 6, tabs: 5, bookmarks: 6, history: 6, closed: 4 };
+// Tiles, tabs and closed tabs are matched on every keystroke; bookmarks and history are asked
+// of Chrome once typing pauses this long.
+const API_DELAY_MS = 120;
 
 function rank(query, list, limit) {
   return list
@@ -33,6 +36,11 @@ export function setupJump(store) {
   let seq = 0;
   let tabs = [];
   let closed = [];
+  let tileItems = null;   // built once per opening
+  let apiTimer = 0;
+  // Rows already built while the dialog is open, by what they show, so a row that stays in the
+  // results isn't rebuilt (with a new icon image) on the next keystroke.
+  const rows = new Map();
 
   // Only the old and the new row change.
   function mark(node, on) {
@@ -56,6 +64,13 @@ export function setupJump(store) {
     else await openUrl(item.url, { newTab });
   }
 
+  const buildRow = item => el('div', { class: 'jump-item', role: 'option', 'aria-selected': 'false' },
+    el('span', { class: 'jump-ico' }, item.search ? icon('search', 16) : tileIcon(item.url, item.icon, item.title, { mini: true })),
+    el('div', { class: 'jump-text' },
+      el('div', { class: 'jump-title', dir: 'auto', text: item.title || item.url }),
+      item.url && el('div', { class: 'jump-url', text: item.url })),
+    el('span', { class: 'jump-kind', text: item.kind }));
+
   function render(sections) {
     items = sections.flatMap(s => s.items);
     nodes = [];
@@ -63,32 +78,43 @@ export function setupJump(store) {
       list.replaceChildren(el('p', { class: 'jump-empty', text: input.value.trim() ? 'No matches' : 'Type to search' }));
       return;
     }
+    const used = new Set();
     list.replaceChildren(...sections.filter(s => s.items.length).map(s => el('div', { class: 'jump-group', role: 'group', 'aria-label': s.label },
       el('div', { class: 'jump-section', text: s.label }),
       s.items.map(item => {
-        const i = nodes.length;
-        return nodes[i] = el('div', {
-          class: 'jump-item', role: 'option', 'aria-selected': 'false',
-          onmousemove: () => { if (selected !== i) select(i); },
-          onclick: e => activate(item, e.ctrlKey || e.metaKey),
-        },
-          el('span', { class: 'jump-ico' }, item.search ? icon('search', 16) : tileIcon(item.url, item.icon, item.title, { mini: true })),
-          el('div', { class: 'jump-text' },
-            el('div', { class: 'jump-title', dir: 'auto', text: item.title || item.url }),
-            item.url && el('div', { class: 'jump-url', text: item.url })),
-          el('span', { class: 'jump-kind', text: item.kind }));
+        const key = `${item.kind}\n${item.url}\n${item.title}`;
+        // The same row twice in one list (two identical tiles) needs a second node.
+        let row = used.has(key) ? buildRow(item) : rows.get(key);
+        if (!row) rows.set(key, row = buildRow(item));
+        used.add(key);
+        mark(row, false);
+        nodes.push(row);
+        return row;
       }))));
     select(Math.min(selected, items.length - 1));
   }
 
-  async function refresh() {
+  const rowAt = e => nodes.indexOf(e.target.closest?.('.jump-item'));
+  list.addEventListener('mousemove', e => {
+    const i = rowAt(e);
+    if (i >= 0 && i !== selected) select(i);
+  });
+  list.addEventListener('click', e => {
+    const i = rowAt(e);
+    if (i >= 0) activate(items[i], e.ctrlKey || e.metaKey);
+  });
+
+  function refresh() {
     const my = ++seq;
+    clearTimeout(apiTimer);
     const q = input.value.trim();
     const s = store.get();
-    const groupNames = new Map(s.groups.map(g => [g.id, g.title]));
-    // Folders have no address; the tiles inside them are listed like any other tile.
-    const tileItems = s.tiles.filter(t => t.kind !== 'folder')
-      .map(t => ({ title: t.title, url: t.url, icon: t.icon, kind: groupNames.get(t.groupId) ?? '', groupId: t.groupId }));
+    if (!tileItems) {
+      const groupNames = new Map(s.groups.map(g => [g.id, g.title]));
+      // Folders have no address; the tiles inside them are listed like any other tile.
+      tileItems = s.tiles.filter(t => t.kind !== 'folder')
+        .map(t => ({ title: t.title, url: t.url, icon: t.icon, kind: groupNames.get(t.groupId) ?? '', groupId: t.groupId }));
+    }
     const tabItems = tabs.map(t => ({ title: t.title, url: t.url, kind: 'Open tab', tab: t }));
     const closedItems = closed.map(c => ({ title: c.title, url: c.url, kind: 'Closed', sessionId: c.sessionId }));
 
@@ -110,13 +136,15 @@ export function setupJump(store) {
     selected = 0;
     render([...quick, web]);
 
-    const [bookmarks, history] = await Promise.all([bookmarksSearch(q), historySearch(q, 40)]);
-    if (my !== seq) return;
-    const seen = new Set(quick.flatMap(sec => sec.items.map(i => i.url)));
-    const bookmarkItems = rank(q, bookmarks.filter(b => !seen.has(b.url)).map(b => ({ title: b.title, url: b.url, kind: 'Bookmark' })), LIMITS.bookmarks);
-    bookmarkItems.forEach(b => seen.add(b.url));
-    const historyItems = rank(q, history.filter(h => !seen.has(h.url)).map(h => ({ title: h.title, url: h.url, kind: 'History' })), LIMITS.history);
-    render([quick[0], quick[1], { label: 'Bookmarks', items: bookmarkItems }, { label: 'History', items: historyItems }, quick[2], web]);
+    apiTimer = setTimeout(async () => {
+      const [bookmarks, history] = await Promise.all([bookmarksSearch(q), historySearch(q, 40)]);
+      if (my !== seq) return;
+      const seen = new Set(quick.flatMap(sec => sec.items.map(i => i.url)));
+      const bookmarkItems = rank(q, bookmarks.filter(b => !seen.has(b.url)).map(b => ({ title: b.title, url: b.url, kind: 'Bookmark' })), LIMITS.bookmarks);
+      bookmarkItems.forEach(b => seen.add(b.url));
+      const historyItems = rank(q, history.filter(h => !seen.has(h.url)).map(h => ({ title: h.title, url: h.url, kind: 'History' })), LIMITS.history);
+      render([quick[0], quick[1], { label: 'Bookmarks', items: bookmarkItems }, { label: 'History', items: historyItems }, quick[2], web]);
+    }, API_DELAY_MS);
   }
 
   input.addEventListener('input', () => {
@@ -134,7 +162,10 @@ export function setupJump(store) {
   });
   dialog.addEventListener('close', () => {
     seq++;
+    clearTimeout(apiTimer);
     input.value = '';
+    tileItems = null;
+    rows.clear();
   });
 
   return {

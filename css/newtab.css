@@ -132,8 +132,8 @@ button { cursor: pointer; }
   pointer-events: none;
 }
 
+/* No fade in: the page is drawn in the same task that marks it ready, so it shows at once. */
 body:not(.ready) .canvas { opacity: 0; }
-.canvas { transition: opacity 0.12s ease; }
 
 /* ---------- Header ---------- */
 
@@ -266,7 +266,9 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
   border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(12px); }
+/* Nearly opaque instead of a blur of the wallpaper behind it: it looks the same, and the blur
+   was redrawn whenever anything under the bar changed. */
+body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90%, transparent); }
 .sb-mode {
   flex: none;
   display: inline-flex;
@@ -1029,7 +1031,9 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
   color: var(--text);
   box-shadow: var(--shadow);
 }
-.dlg::backdrop { background: rgb(0 0 0 / 0.45); backdrop-filter: blur(2px); }
+/* Dimmed, not blurred: a blur would be redone over the whole window on every frame of the
+   animated background behind it. */
+.dlg::backdrop { background: rgb(0 0 0 / 0.45); }
 
 .dlg-form { display: flex; flex-direction: column; gap: 18px; padding: 22px; }
 .dlg-title { margin: 0; font-size: 18px; font-weight: 600; }
@@ -1081,7 +1085,7 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 /* Laid out like Claude's settings: search and sections in a sidebar, the close button top right. */
 .prefs-dlg[open] { display: grid; grid-template-columns: 224px minmax(0, 1fr); }
 /* Nothing dims or blurs the page: it shows exactly how the settings look. */
-.prefs-dlg::backdrop { background: none; backdrop-filter: none; }
+.prefs-dlg::backdrop { background: none; }
 
 /* The strip along the top and the sidebar's empty space are handles for dragging the panel aside. */
 .prefs-side {

@@ -227,19 +227,38 @@ export function pickAdapter() {
 
 export function createStore(adapter) {
   let state = defaultState();
-  let wallpaper = '';
+  let wallpaper = null;   // the uploaded wallpaper; null until it has been read
+  let wallpaperRead = null;
   let timer = null;
   let pending = null;
   let edited = false;
   const subs = new Set();
 
-  const snapshot = () => Object.fromEntries(KEYS.map(k => [k, JSON.stringify(state[k])]));
-  const readWallpaper = () => adapter.get('wallpaper').then(v => str(v), () => '');
+  const snapshot = keys => Object.fromEntries(keys.map(k => [k, JSON.stringify(state[k])]));
 
   function notify(changed) {
     for (const sub of subs) {
       if (!sub.keys || sub.keys.some(k => changed.includes(k))) sub.fn(state, changed);
     }
+  }
+
+  // The wallpaper, a data URL of up to a few MB, is read once, in the background: the page shows
+  // without it and subscribers to 'wallpaper' hear when it's there.
+  function readWallpaper() {
+    wallpaperRead ??= adapter.get('wallpaper').then(v => str(v), () => '').then(v => {
+      if (wallpaper === null) {
+        wallpaper = v;
+        notify(['wallpaper']);
+      }
+      return wallpaper;
+    });
+    return wallpaperRead;
+  }
+
+  // Only an uploaded wallpaper that is shown is read without being asked for.
+  function readWallpaperIfShown() {
+    const b = state.prefs.background;
+    if (b.useUpload && b.showImage && wallpaper === null) readWallpaper();
   }
 
   function save() {
@@ -268,17 +287,16 @@ export function createStore(adapter) {
     if (fresh === undefined || edited) return;
     const next = normalizeState(fresh);
     if (JSON.stringify(next) === JSON.stringify(state)) return;
-    if (next.prefs.background.useUpload && !wallpaper) wallpaper = await readWallpaper();
-    if (edited) return;
     state = next;
     adapter.cache?.(state);
-    notify([...KEYS, 'wallpaper']);
+    notify([...KEYS]);
+    readWallpaperIfShown();
   }
 
   return {
     // Resolves as soon as the state is known: straight away from the localStorage copy when
-    // there is one (chrome.storage is then checked in the background). The wallpaper, a data
-    // URL of up to a few MB, is only read when it is shown.
+    // there is one (chrome.storage is then checked in the background). The wallpaper isn't
+    // waited for.
     async load() {
       const cached = adapter.cached?.();
       if (cached !== undefined) {
@@ -293,26 +311,34 @@ export function createStore(adapter) {
           state = defaultState();
         }
       }
-      wallpaper = state.prefs.background.useUpload ? await readWallpaper() : '';
+      readWallpaperIfShown();
       return state;
     },
 
     get: () => state,
 
+    // The uploaded wallpaper: null while it hasn't been read (see readWallpaper), else a data
+    // URL or ''.
     get wallpaper() {
       return wallpaper;
     },
 
+    // The uploaded wallpaper, read now if it wasn't yet (a backup needs it even when hidden).
+    loadWallpaper: () => (wallpaper !== null ? Promise.resolve(wallpaper) : readWallpaper()),
+
     // Mutate state inside fn; subscribers to the top-level keys that changed are notified.
-    update(fn) {
-      const before = snapshot();
+    // keys: the top-level keys fn changes, when known, so only those are compared (each is
+    // serialized before and after; the whole state is costly on every keystroke).
+    update(fn, keys = KEYS) {
+      const before = snapshot(keys);
       fn(state);
-      const after = snapshot();
-      const changed = KEYS.filter(k => before[k] !== after[k]);
+      const after = snapshot(keys);
+      const changed = keys.filter(k => before[k] !== after[k]);
       if (!changed.length) return;
       edited = true;
       scheduleSave();
       notify(changed);
+      if (changed.includes('prefs')) readWallpaperIfShown();
     },
 
     replace(next) {
@@ -320,11 +346,13 @@ export function createStore(adapter) {
       edited = true;
       scheduleSave();
       notify([...KEYS]);
+      readWallpaperIfShown();
     },
 
     async setWallpaper(dataUrl) {
       await adapter.set('wallpaper', dataUrl || '');
       wallpaper = dataUrl || '';
+      wallpaperRead = Promise.resolve(wallpaper);
       notify(['wallpaper']);
     },
 

@@ -31,8 +31,11 @@ export function mountTheme(store) {
     }
 
     const image = backgroundImage(p.background, store.wallpaper);
+    // An uploaded wallpaper still being read (null) already gives the page its wallpaper look,
+    // so nothing shifts when it appears a moment later.
+    const withImage = image !== '';
     // The plain background's own colour, when one is picked; the theme's background otherwise.
-    const plain = !image && p.background.pattern === 'none' ? p.background.color[mode === 'light' ? 'light' : 'dark'] : '';
+    const plain = !withImage && p.background.pattern === 'none' ? p.background.color[mode === 'light' ? 'light' : 'dark'] : '';
     if (plain !== shownPlain) {
       shownPlain = plain;
       if (plain) root.style.setProperty('--plain-bg', plain);
@@ -46,19 +49,19 @@ export function mountTheme(store) {
       '--tile-bg': p.tiles.color,
       '--tile-text': p.tiles.textColor,
       // Blur and dim are for photos; they would only muddy the plain and ASCII backgrounds.
-      '--bg-blur': (image ? p.background.blur : 0) + 'px',
-      '--bg-dim': image ? p.background.dim / 100 : 0,
+      '--bg-blur': (withImage ? p.background.blur : 0) + 'px',
+      '--bg-dim': withImage ? p.background.dim / 100 : 0,
     };
     for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, String(value));
 
     // An uploaded wallpaper is a data URL of up to a few MB: only set it when it changes.
-    if (image !== shownImage) {
-      shownImage = image;
+    if ((image || '') !== shownImage) {
+      shownImage = image || '';
       bg.style.backgroundImage = image ? cssUrl(image) : '';
     }
 
     const cl = document.body.classList;
-    cl.toggle('has-wallpaper', !!image);
+    cl.toggle('has-wallpaper', withImage);
     cl.toggle('compact', p.compact);
     cl.toggle('no-titles', !p.tiles.showTitle);
     cl.toggle('tiles-card', p.tiles.style === 'card');

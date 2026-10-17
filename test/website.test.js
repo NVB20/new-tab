@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules } from '../js/website.js';
+import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules, framePatterns, sameRules } from '../js/website.js';
 
 test('siteUrl takes a web address, adding https when there is no scheme', () => {
   assert.equal(siteUrl('pinterest.com'), 'https://pinterest.com/');
@@ -62,4 +62,18 @@ test('frameRules stops at MAX_SITES rules', () => {
   const rules = frameRules(domains, 'abcdef');
   assert.equal(rules.length, MAX_SITES);
   assert.equal(rules.at(-1).id, MAX_SITES);
+});
+
+test('framePatterns are the sites the frame script runs on, each with its subdomains', () => {
+  assert.deepEqual(framePatterns(['pinterest.com', 'en.wikipedia.org']), ['*://*.pinterest.com/*', '*://*.en.wikipedia.org/*']);
+  assert.deepEqual(framePatterns([]), []);
+});
+
+test('sameRules compares the rules by id and sites, whatever else Chrome adds', () => {
+  const want = frameRules(['pinterest.com', 'github.com'], 'abcdef');
+  const stored = structuredClone(want).reverse().map(r => ({ ...r, action: { ...r.action, extra: true } }));
+  assert.equal(sameRules(stored, want), true);
+  assert.equal(sameRules(stored.slice(1), want), false);
+  assert.equal(sameRules(frameRules(['pinterest.com', 'x.com'], 'abcdef'), want), false);
+  assert.equal(sameRules([], []), true);
 });

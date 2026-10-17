@@ -44,21 +44,23 @@ const MAX_WALLPAPER_SIDE = 2560;
 const BACKUP_FORMAT = 'new-tab-backup';
 const OFFSET_KEY = 'newtab:prefs-offset';
 const KEEP_VISIBLE = 120;   // px of the panel that stay inside the window while dragging
+const SEARCH_DELAY_MS = 120;   // a search builds every section, so it waits for a pause in typing
 
 // enterLayoutMode() opens Layout mode (the panel closes first).
 export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
   const prefs = () => store.get().prefs;
-  // One setting of a widget copy on the canvas (see layout.js).
+  // One setting of a widget copy on the canvas (see layout.js). Sliders and text fields call
+  // these on every input event, so only prefs is compared.
   const setCopy = (id, key, value) => store.update(s => {
     const own = copyById(s, id);
     if (own) own.settings[key] = value;
-  });
+  }, ['prefs']);
   const getPref = path => path.split('.').reduce((o, k) => o?.[k], prefs());
   const setPref = (path, value) => store.update(s => {
     const keys = path.split('.');
     const last = keys.pop();
     keys.reduce((o, k) => o[k], s.prefs)[last] = value;
-  });
+  }, ['prefs']);
   const redraw = () => show(current);
   // Image was picked but nothing is set yet (or it was just removed): keep its boxes up.
   let wantImage = false;
@@ -163,7 +165,8 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
 
   function page() {
     const p = prefs();
-    const image = backgroundImage(p.background, store.wallpaper);
+    // An uploaded image still being read (null) counts as there.
+    const image = backgroundImage(p.background, store.wallpaper) !== '';
     const shown = image || wantImage ? 'image' : p.background.pattern;
     const swatches = ACCENTS.map(c => el('button', {
       type: 'button', class: 'swatch', title: c, 'aria-label': `Accent ${c}`,
@@ -498,10 +501,11 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
     redraw();
   }
 
-  function exportBackup() {
+  async function exportBackup() {
     const state = structuredClone(store.get());
     state.prefs.github.token = '';   // a backup file shouldn't carry a credential
-    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper: store.wallpaper, icons: iconsFor(state.tiles) };
+    const wallpaper = state.prefs.background.useUpload ? await store.loadWallpaper() : '';
+    const payload = { format: BACKUP_FORMAT, version: 1, exportedAt: new Date().toISOString(), state, wallpaper, icons: iconsFor(state.tiles) };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `new-tab-backup-${new Date().toISOString().slice(0, 10)}.json` });
     document.body.append(a);
@@ -572,12 +576,16 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
 
   const nav = el('nav', { class: 'prefs-nav', 'aria-label': 'Preference sections' });
   const content = el('div', { class: 'prefs-content' });
+  let searchTimer = 0;
   const search = el('input', {
     type: 'search', class: 'pref-input', placeholder: 'Search', 'aria-label': 'Search preferences',
     autocomplete: 'off', spellcheck: false,
     oninput: () => {
-      setQuery(search.value);
-      redraw();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        setQuery(search.value);
+        redraw();
+      }, SEARCH_DELAY_MS);
     },
     onkeydown: e => {
       // Esc empties the box first; once it's empty, Esc closes the panel as usual.
@@ -611,6 +619,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
   document.body.append(dialog);
 
   function setQuery(text) {
+    clearTimeout(searchTimer);   // a search still waiting would undo this
     search.value = text;
     query = text.trim();
   }

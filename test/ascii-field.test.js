@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GLYPHS, hash2, valueNoise, streakField, streakBlend, streakSway, falloff, ringOffset, level } from '../js/ascii-field.js';
+import { GLYPHS, hash2, valueNoise, streakField, streakGrid, streakBlend, streakSway, falloff, ringOffset, level } from '../js/ascii-field.js';
 
 test('GLYPHS are letters and digits', () => {
   assert.match(GLYPHS, /^[A-Za-z0-9]+$/);
@@ -39,6 +39,19 @@ test('streakField gives the same value with precomputed blend and sway', () => {
   for (let i = 0; i < 300; i++) {
     const c = i % 40, r = Math.floor(i / 40), t = i * 0.07;
     assert.equal(streakField(c, r, t, 9, streakBlend(c, r, 9), streakSway(c, t)), streakField(c, r, t, 9));
+  }
+});
+
+test('streakGrid gives exactly streakField for every cell', () => {
+  for (const [cols, rows, t, seed] of [[213, 48, 0, 9], [275, 70, 3.7, 123456], [40, 9, 812.25, 1], [366, 96, 0.1, 999999]]) {
+    const blend = new Float32Array(cols * rows);
+    for (let r = 0, i = 0; r < rows; r++) for (let c = 0; c < cols; c++, i++) blend[i] = streakBlend(c, r, seed);
+    const sway = new Float32Array(cols);
+    for (let c = 0; c < cols; c++) sway[c] = streakSway(c, t);
+    const grid = streakGrid(cols, rows, t, seed, blend, sway, new Float32Array(cols * rows));
+    for (let r = 0, i = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++, i++) assert.equal(grid[i], Math.fround(streakField(c, r, t, seed, blend[i], sway[c])), `cell ${c},${r}`);
+    }
   }
 });
 

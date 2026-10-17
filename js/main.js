@@ -5,6 +5,7 @@ import { mountGroups } from './groups.js';
 import { mountCanvas } from './canvas.js';
 import { startIconCache } from './icon-cache.js';
 import { idle } from './util.js';
+import { tidyFrameScript } from './website-widget.js';
 
 const store = createStore(pickAdapter());
 await store.load();
@@ -72,5 +73,8 @@ document.body.classList.add('ready');
 requestAnimationFrame(() => setTimeout(async () => {
   const { mountAsciiBackground } = await import('./ascii-bg.js');
   mountAsciiBackground(document.getElementById('ascii'), store);
-  idle(() => [jump, prefs, sidebar].forEach(load => load()));
+  idle(() => {
+    [jump, prefs, sidebar].forEach(load => load());
+    tidyFrameScript(store);
+  });
 }));

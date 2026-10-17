@@ -169,18 +169,43 @@ export function mountClock(root, store, copy) {
     fitSoon();
   }
 
-  const unsubscribe = store.subscribe(() => renderClock(true), ['prefs']);
+  // Only this copy's own settings change what it shows (its size and fonts refit it below), so
+  // other settings, e.g. a slider dragged in Preferences, don't redraw and refit it.
+  let shownSettings = JSON.stringify(settings());
+  const unsubscribe = store.subscribe(() => {
+    const next = JSON.stringify(settings());
+    if (next === shownSettings) return;
+    shownSettings = next;
+    renderClock(true);
+  }, ['prefs']);
   renderClock(true);
   // A new tab builds its time out of a single point, then redraws it as plain text.
   playClockIntro(time, [date, greeting]).then(() => renderClock(true));
-  const timer = setInterval(renderClock, 1000);
+  // The time shows minutes: one wake a minute, just after it turns, and none while the tab is
+  // hidden (it catches up when shown).
+  let timer = 0;
+  function tick() {
+    clearTimeout(timer);
+    if (document.hidden) return;
+    timer = setTimeout(() => {
+      renderClock();
+      tick();
+    }, 60000 - (Date.now() % 60000) + 50);
+  }
+  const onVisibility = () => {
+    if (!document.hidden) renderClock();
+    tick();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  tick();
   // Refit when the frame is resized and when a face's font arrives (its digits measure differently).
   const resized = new ResizeObserver(() => fit());
   resized.observe(section);
   document.fonts.addEventListener('loadingdone', fit);
   return {
     destroy() {
-      clearInterval(timer);
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
       unsubscribe();
       resized.disconnect();
       document.fonts.removeEventListener('loadingdone', fit);

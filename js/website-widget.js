@@ -5,10 +5,10 @@
 
 import { el, icon, widgetEmpty } from './ui.js';
 import { copyById, TYPES } from './layout.js';
-import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules } from './website.js';
+import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules, framePatterns, sameRules } from './website.js';
 import {
   canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, onSiteAccessChange, setFrameRules,
-  registerFrameScript, faviconUrl, openUrl,
+  frameRulesNow, syncFrameScript, faviconUrl, openUrl,
 } from './chrome-api.js';
 
 const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a changed address
@@ -16,13 +16,33 @@ const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a change
 const SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads';
 const ALLOW = 'fullscreen; clipboard-write; autoplay; encrypted-media; picture-in-picture';
 
-// The header rules for every site the layout shows, written whole.
-async function syncRules(store) {
+// The header rules and the frame script for every site the layout shows. Each is written only
+// when Chrome doesn't hold it already, so a new tab usually just reads them.
+async function syncSites(store) {
+  const domains = siteDomains(store.get().prefs.layout.widgets).slice(0, MAX_SITES);
+  const rules = frameRules(domains, extensionId);
+  const syncRules = async () => {
+    try {
+      if (!sameRules(await frameRulesNow(MAX_SITES), rules)) await setFrameRules(rules, MAX_SITES);
+    } catch (err) {
+      console.warn('Could not update the Website rules', err);
+    }
+  };
+  await Promise.all([syncRules(), syncFrameScript(framePatterns(domains))]);
+}
+
+// The frame script used to be registered for every site. Once, even with no Website widget on
+// the page, a registration left from then is narrowed to the widgets' sites (or removed).
+const TIDIED_KEY = 'newtab:frame-script-tidied';
+export function tidyFrameScript(store) {
+  if (!canFrameSites) return;
   try {
-    await setFrameRules(frameRules(siteDomains(store.get().prefs.layout.widgets), extensionId), MAX_SITES);
-  } catch (err) {
-    console.warn('Could not update the Website rules', err);
+    if (localStorage.getItem(TIDIED_KEY)) return;
+    localStorage.setItem(TIDIED_KEY, '1');
+  } catch {
+    return;
   }
+  syncSites(store);
 }
 
 // fn(url) runs whenever the site in `iframe` reports the page it's on (content/site-frame.js). A
@@ -158,14 +178,15 @@ export function mountWebsite(root, store, copy, ctx) {
         el('button', { type: 'button', class: 'btn btn-primary', text: 'Allow access', onclick: () => requestSiteAccess(sitePattern(url)).then(show) }));
       return;
     }
-    await Promise.all([syncRules(store), registerFrameScript()]);
-    if (my === seq) showSite(url);
+    await syncSites(store);
+    if (my === seq && !gone) showSite(url);
   }
 
   // ---- wiring ----
 
   let conf = null;
   let timer = 0;
+  let gone = false;
 
   function onPrefs(state) {
     const own = copyById(state, copy.id);
@@ -175,7 +196,9 @@ export function mountWebsite(root, store, copy, ctx) {
     const first = conf === null;
     conf = own.settings.url;
     clearTimeout(timer);
-    timer = setTimeout(show, first ? 0 : RECONFIGURE_MS);
+    // A new tab's first paint doesn't wait for a whole other site: its frame starts after it.
+    if (first) requestAnimationFrame(() => { if (!gone) timer = setTimeout(show); });
+    else timer = setTimeout(show, RECONFIGURE_MS);
   }
 
   const unsubscribe = store.subscribe(onPrefs, ['prefs']);
@@ -185,11 +208,12 @@ export function mountWebsite(root, store, copy, ctx) {
   return {
     destroy() {
       seq++;   // a show still running draws nothing
+      gone = true;
       clearTimeout(timer);
       stopWatching();
       stopAccess();
       unsubscribe();
-      if (canFrameSites) syncRules(store);   // the site of a removed copy loses its rule
+      if (canFrameSites) syncSites(store);   // the site of a removed copy loses its rule and script
     },
   };
 }

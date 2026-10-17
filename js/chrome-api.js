@@ -55,6 +55,17 @@ export async function bookmarksTree() {
   return can.bookmarks ? c.bookmarks.getTree() : [];
 }
 
+// fn() whenever a bookmark or folder is added, removed, renamed or moved.
+export function onBookmarksChange(fn) {
+  if (!can.bookmarks) return;
+  for (const event of ['onCreated', 'onRemoved', 'onChanged', 'onMoved', 'onChildrenReordered', 'onImportEnded']) c.bookmarks[event]?.addListener(() => fn());
+}
+
+// fn() whenever the recently closed tabs and windows change.
+export function onClosedChange(fn) {
+  if (can.sessions) c.sessions.onChanged?.addListener(() => fn());
+}
+
 export async function historySearch(text, maxResults = 20, startTime = 0) {
   if (!can.history) return [];
   const items = await c.history.search({ text, maxResults, startTime });
@@ -161,6 +172,12 @@ export function onSiteAccessChange(fn) {
   };
 }
 
+// The dynamic rules with ids 1…maxId (see setFrameRules).
+export async function frameRulesNow(maxId) {
+  if (!canFrameSites) return [];
+  return (await c.declarativeNetRequest.getDynamicRules()).filter(r => r.id <= maxId);
+}
+
 // Replaces the dynamic rules with ids 1…maxId by `rules`. Every tab writes the whole set it
 // derives from the shared layout, so tabs racing each other agree on the result.
 export async function setFrameRules(rules, maxId) {
@@ -171,14 +188,22 @@ export async function setFrameRules(rules, maxId) {
   });
 }
 
-// content/site-frame.js, which tells a Website widget the page its frame is on. Registered once
-// for every site and kept across restarts; Chrome only injects it where the extension has access.
-export async function registerFrameScript() {
+// content/site-frame.js, which tells a Website widget the page its frame is on, runs on the
+// widgets' sites only (`matches`, see framePatterns): registered, kept across restarts, updated
+// when the sites change and removed when there are none. Nothing is written when it matches.
+export async function syncFrameScript(matches) {
   if (!canFrameSites || !c.scripting) return;
+  const id = 'site-frame';
+  const key = list => JSON.stringify([...list].sort());
   try {
-    const id = 'site-frame';
-    if ((await c.scripting.getRegisteredContentScripts({ ids: [id] })).length) return;
-    await c.scripting.registerContentScripts([{ id, matches: ['*://*/*'], js: ['content/site-frame.js'], allFrames: true, runAt: 'document_start' }]);
+    const [current] = await c.scripting.getRegisteredContentScripts({ ids: [id] });
+    if (current ? key(current.matches) === key(matches) : !matches.length) return;
+    if (!matches.length) {
+      await c.scripting.unregisterContentScripts({ ids: [id] });
+      return;
+    }
+    const script = { id, matches, js: ['content/site-frame.js'], allFrames: true, runAt: 'document_start' };
+    await (current ? c.scripting.updateContentScripts([script]) : c.scripting.registerContentScripts([script]));
   } catch (err) {
     console.warn('Could not register the Website frame script', err);   // another tab may have just done it
   }

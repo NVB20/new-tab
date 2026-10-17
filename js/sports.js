@@ -208,11 +208,19 @@ export function applyLive(events, live) {
   });
 }
 
-const dateFormats = new Map();
+const formats = new Map();
+// Building an Intl.DateTimeFormat costs far more than using one, and a draw formats every row a
+// few times: one is kept per locale and options (a time zone of undefined is the computer's).
+function formatter(locale, options) {
+  const key = locale + JSON.stringify(options);
+  let f = formats.get(key);
+  if (!f) formats.set(key, (f = new Intl.DateTimeFormat(locale, options)));
+  return f;
+}
+
 // The calendar day of a time in a time zone (undefined: the computer's), as 'YYYY-MM-DD'.
 function ymd(ms, timeZone) {
-  let f = dateFormats.get(timeZone);
-  if (!f) dateFormats.set(timeZone, (f = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })));
+  const f = formatter('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const p = Object.fromEntries(f.formatToParts(ms).map(x => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}`;
 }
@@ -362,13 +370,13 @@ export function dayLabel(key, todayKey) {
 }
 
 // '23:25', or '11:25 PM' on a 12-hour clock.
-export const formatTime = (ms, hour24, timeZone) => new Intl.DateTimeFormat(hour24 ? 'en-GB' : 'en-US', {
+export const formatTime = (ms, hour24, timeZone) => formatter(hour24 ? 'en-GB' : 'en-US', {
   timeZone, hour: hour24 ? '2-digit' : 'numeric', minute: '2-digit', hourCycle: hour24 ? 'h23' : 'h12',
 }).format(ms);
 // Starts from midnight to 6:59 in the morning get a moon.
-export const isNight = (ms, timeZone) => Number(new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(ms)) < 7;
+export const isNight = (ms, timeZone) => Number(formatter('en-GB', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(ms)) < 7;
 // 'Sunday 18 October', for screen readers.
-export const longDay = (ms, timeZone) => new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'long', day: 'numeric', month: 'long' }).format(ms);
+export const longDay = (ms, timeZone) => formatter('en-GB', { timeZone, weekday: 'long', day: 'numeric', month: 'long' }).format(ms);
 
 // The rows a copy shows, by local day: the followed teams' games and the chosen F1 sessions that
 // start within `days` or are still listed after starting; a followed team (or F1) with none of
