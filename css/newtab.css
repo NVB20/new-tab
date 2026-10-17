@@ -266,7 +266,9 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
   border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(12px); }
+/* Nearly opaque instead of a blur of the wallpaper behind it: it looks the same, and the blur
+   was redrawn whenever anything under the bar changed. */
+body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90%, transparent); }
 .sb-mode {
   flex: none;
   display: inline-flex;
