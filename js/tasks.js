@@ -116,11 +116,13 @@ export function deleteTask(s, id, now) {
   s.tasks = s.tasks.filter(t => t.id !== id);
 }
 
-// Moves every finished task to the history. Returns how many were cleared.
-export function clearDone(s, now) {
-  const done = s.tasks.filter(t => t.done);
+// Moves finished tasks to the history: every one, or only those whose id is in ids. Returns how
+// many were cleared.
+export function clearDone(s, now, ids = null) {
+  const gone = t => t.done && (!ids || ids.includes(t.id));
+  const done = s.tasks.filter(gone);
   done.forEach(t => archive(s, t, now));
-  s.tasks = s.tasks.filter(t => !t.done);
+  s.tasks = s.tasks.filter(t => !gone(t));
   return done.length;
 }
 
@@ -206,19 +208,15 @@ export function sortTasks(s) {
     || (rank(a) - rank(b)));
 }
 
-// What a view shows: unfinished tasks in display order, and finished ones (All and search only).
-// A search looks through every task's text and its subtasks', whatever the view.
+// What a view shows, in display order. A ticked task stays where it is, struck through, until
+// Clear takes it away. A search looks through every task's text and its subtasks', whatever the view.
 export function viewTasks(tasks, view, query, today) {
   const q = query.trim().toLowerCase();
-  if (q) {
-    const found = tasks.filter(t => [t.text, ...t.subtasks.map(st => st.text)].some(x => x.toLowerCase().includes(q)));
-    return { open: found.filter(t => !t.done), finished: found.filter(t => t.done) };
-  }
-  const open = tasks.filter(t => !t.done);
-  if (view === 'today') return { open: open.filter(t => t.due && t.due <= today), finished: [] };
-  if (view === 'upcoming') return { open: open.filter(t => t.due && t.due > today).sort((a, b) => a.due.localeCompare(b.due)), finished: [] };
-  if (view === 'high') return { open: open.filter(t => t.priority === 'high'), finished: [] };
-  return { open, finished: tasks.filter(t => t.done) };
+  if (q) return tasks.filter(t => [t.text, ...t.subtasks.map(st => st.text)].some(x => x.toLowerCase().includes(q)));
+  if (view === 'today') return tasks.filter(t => t.due && t.due <= today);
+  if (view === 'upcoming') return tasks.filter(t => t.due && t.due > today).sort((a, b) => a.due.localeCompare(b.due));
+  if (view === 'high') return tasks.filter(t => t.priority === 'high');
+  return tasks;
 }
 
 // Unfinished tasks due today or earlier, for the Today tab's count.

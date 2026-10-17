@@ -512,9 +512,10 @@ tiles and the rest.
   date (an overdue daily one to tomorrow) and counts it as finished today. The tabs show **All**,
   **Today** (due today or overdue, with a count), **Upcoming** (by date) and **High**; ⌕ searches
   every task and subtask. Drag to reorder (not in Upcoming); **Sort** puts them in order once
-  (by due date, then importance). Finished tasks fold under **Finished** at the bottom of All, and
-  **Clear** removes them. Finished tasks are kept in a history for 7 days, and the number completed
-  per day is kept for good (counted on the day you tick it; unticking takes it back).
+  (by due date, then importance). A ticked task stays where it is, struck through, until you press
+  **Clear** under the add bar, which removes the finished tasks in the tab you're on. Cleared
+  tasks are kept in a history for 7 days, and the number completed per day is kept for good
+  (counted on the day you tick it; unticking takes it back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set under Preferences → Layout → Clock. Hover
   the clock and click **✎** to pick a face: Classic, Stencil (hours stacked over minutes, as on a
   Samsung One UI lock screen), Rounded, Serif or Dot. Stencil, Rounded and Serif also come on one
