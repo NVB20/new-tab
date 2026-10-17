@@ -4,7 +4,7 @@ Date: 2026-10-17
 Status: approved (asked for as "a tracker to follow what I watched, in the needed order")
 
 A new widget type, **Marvel**, lists every MCU film, series, short and special in the order the
-story happens, marks what to watch next, and remembers what you've watched.
+story happens, says what to watch next, and remembers what you've watched.
 
 ## The order
 
@@ -30,17 +30,20 @@ What the article does that the list keeps:
 
 Each entry: a stable id (`aos-1a`, `iron-man-3`), title, part (season/episodes, or ''), kind,
 release year, whether it's a Marvel Television show (ABC, Netflix, Hulu, Freeform, 2013–2020: the
-ones the article says are now outside the main timeline), and an optional note.
+ones the article says are now outside the main timeline), and an optional note. Three entries also
+name the entry whose end their credits scene belongs after.
 
 ## What the widget shows
 
 - **Head:** the shield icon, "Marvel", and "37 / 115" on the right.
 - **Progress bar** under the head, in the accent colour.
-- **The list**, scrolling under them: number, a round tick (like Tasks), title, and a muted line
-  with the part (or kind) and year; the note is the row's tooltip. The next entry (the first
-  unwatched one shown) is marked. Ticking a row toggles it. Watched rows are dimmed and struck
-  through. On opening, the list scrolls to the next entry. (An Up next card with a Watched button
-  sat above the list at first; it was taken out on 2026-10-17.)
+- **Up next:** the first unwatched entry of those shown, with its number in the order, title, part
+  or kind, year and note, and a **Watched** button. When it's an entry whose end some credits
+  scenes belong after (Infinity War, Endgame), a line says "Then the credits scenes of …" — but
+  only for those films already watched. All watched: "All caught up".
+- **The list**, scrolling under it: number, a round tick (like Tasks), title, and a muted line with
+  the part (or kind) and year. The next entry is marked. Ticking a row toggles it. Watched rows are
+  dimmed and struck through. On opening, and after Watched, the list scrolls to the next entry.
 - **Right-click a row** (or the context-menu key): "Watched everything up to here" and "Not watched
   from here on", for starting the tracker midway or undoing a run of ticks. Both act on the rows
   shown.
@@ -50,7 +53,7 @@ ones the article says are now outside the main timeline), and an optional note.
 ## Settings (Preferences → Layout → Marvel)
 
 - **Show:** Everything (115) · No Marvel TV (skips the 2013–2020 shows) · Films only (38).
-  Progress and the next entry count what's shown.
+  Progress and Up next count what's shown.
 - **Hide watched:** off by default.
 - **Progress:** "Clear", after a confirm.
 
@@ -69,7 +72,7 @@ ones the article says are now outside the main timeline), and an optional note.
 ## Files
 
 - `js/marvel.js` (pure, tested in `test/marvel.test.js`): the list, `cleanWatched`, `shownEntries`,
-  `nextUp`, the kind labels and the source.
+  `nextUp`, `creditsAfter`, the kind labels and the source.
 - `js/marvel-widget.js`: the widget.
 - `js/layout.js` (type, default place, legacy list), `js/registry.js`, `js/store.js` (key,
   default, normalize), `js/prefs.js` (settings group, import keeps progress), `js/onboarding.js`

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ENTRIES, KINDS, SHOWS, cleanWatched, shownEntries, nextUp, disneyUrl, watchedUpTo, unwatchedFrom } from '../js/marvel.js';
+import { ENTRIES, KINDS, SHOWS, cleanWatched, shownEntries, nextUp, creditsAfter, disneyUrl, watchedUpTo, unwatchedFrom } from '../js/marvel.js';
 
 const ids = list => list.map(e => e.id);
 
@@ -54,6 +54,13 @@ test('nextUp is the first shown entry not watched, or null', () => {
   assert.equal(nextUp(all, ['captain-america-first-avenger']).id, 'eyes-of-wakanda');   // a skipped one comes first
   assert.equal(nextUp(shownEntries('films'), ['captain-america-first-avenger']).id, 'captain-marvel');
   assert.equal(nextUp(all, ids(all)), null);
+});
+
+test('creditsAfter names the watched films whose credits scenes belong after an entry', () => {
+  assert.deepEqual(creditsAfter('infinity-war', []), []);
+  assert.deepEqual(ids(creditsAfter('infinity-war', ['captain-marvel', 'ant-man-wasp'])), ['captain-marvel', 'ant-man-wasp']);
+  assert.deepEqual(ids(creditsAfter('endgame', ['black-widow', 'captain-marvel'])), ['black-widow']);
+  assert.deepEqual(creditsAfter('iron-man', ['black-widow']), []);
 });
 
 test('watchedUpTo ticks every shown entry up to one; unwatchedFrom unticks it and every one after', () => {

@@ -315,21 +315,24 @@ link is at the bottom of the list), including where it splits a season because s
 happens in the middle of it (Agents of SHIELD season 1 in three parts, around Thor: The Dark World
 and The Winter Soldier).
 
-- **The list** has every entry, numbered as in the article, with its kind or season and episodes,
-  and the year it came out. Click a row to tick or untick it. It opens scrolled to your next
-  entry, the first you haven't watched, which is highlighted. Hover an entry for its note, where
-  it needs care ("Watch its credits scene after Avengers: Endgame").
+- **Up next** is the first entry you haven't watched, with its number in the order, its kind or
+  season and episodes, and the year it came out. **Watched** ticks it, and the list moves on to
+  the next one. Notes say when something needs care ("Watch its credits scene after Avengers:
+  Endgame"), and when you reach Infinity War or Endgame, Up next reminds you which credits scenes
+  to watch after it.
+- **The list** has every entry, numbered as in the article. Click a row to tick or untick it.
+  It opens scrolled to your next entry.
 - **Starting midway:** right-click an entry and choose **Watched everything up to here**. **Not
   watched from here on** undoes a run of ticks.
-- **Disney+:** the ▶ at the end of a row (it shows when you hover, and always on your next entry)
-  opens that title's page on Disney+, like a tile: Ctrl+click for a new tab. Right-click → **Watch
-  on Disney+** does the same. A series' seasons and parts all open the series. Runaways (on Hulu),
+- **Disney+:** **▶ Disney+** on Up next, and the ▶ at the end of a row (it shows when you hover,
+  and always on your next entry), open that title's page on Disney+, like a tile: Ctrl+click for a
+  new tab. Right-click → **Watch on Disney+** does the same. A series' seasons and parts all open the series. Runaways (on Hulu),
   the Slingshot web series and Spider-Man: Brand New Day aren't on Disney+, so they have none.
   Which titles play depends on your country's catalog: in Israel, as of October 2026, the
   One-Shots, The Incredible Hulk and Cloak & Dagger open an empty page.
 - **Preferences → Layout → Marvel:** **Show** everything, everything but the Marvel TV shows
   (Agents of SHIELD, the Netflix shows and the rest of 2013–2020, which the MCU now places outside
-  its main timeline), or the 38 films only. Progress and the next entry count only what's shown. **Hide
+  its main timeline), or the 38 films only. Progress and Up next count only what's shown. **Hide
   watched** drops ticked entries from the list; **Clear** starts over.
 
 What you've watched belongs to the page, not the widget: removing the widget and adding it back
