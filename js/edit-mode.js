@@ -121,7 +121,7 @@ export function setupEditMode(store, canvas, ctx) {
     chips.replaceChildren(...Object.entries(TYPES).map(([type, t]) => {
       const n = countOf(l, type);
       const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
-      const chip = el('button', { type: 'button', class: 'tray-chip', dataset: { type }, 'aria-describedby': 'widget-preview', onclick: () => add(type) },
+      const chip = el('button', { type: 'button', class: 'tray-chip', dataset: { type }, 'aria-describedby': 'widget-preview', onclick: e => add(type, e.detail > 0) },
         icon('plus', 13), el('span', { text: t.label }), el('b', { text: t.max === 1 ? (n ? 'on' : 'off') : `${n}/${t.max}` }));
       // Greyed out, but still hoverable and focusable so its preview can say why.
       chip.setAttribute('aria-disabled', String(n >= t.max || !room));
@@ -141,9 +141,11 @@ export function setupEditMode(store, canvas, ctx) {
   const focusFrame = id => canvas.frames().get(id)?.focus({ preventScroll: true });
   const noRoom = () => alertDialog('No room for another widget. Shrink or remove one first.', 'No room');
 
-  function add(type) {
+  // byPointer: clicked rather than pressed with Enter or Space (a keyboard click has detail 0).
+  function add(type, byPointer = false) {
     const s = store.get();
     if (!plannedCopy(activeLayout(s), type, s.groups, s.activeGroupId)) return;   // a greyed-out chip
+    if (byPointer) quiet = type;
     hidePreview();
     let copy = null;
     store.update(st => { copy = addCopy(activeLayout(st), type, undefined, st.groups, st.activeGroupId); });
@@ -181,6 +183,9 @@ export function setupEditMode(store, canvas, ctx) {
 
   let openTimer = 0;
   let closeTimer = 0;
+  // The type of a chip just clicked: it stays closed until the pointer leaves it. The redraw
+  // after the add puts a new chip under the pointer, which gets a pointerover of its own.
+  let quiet = null;
 
   function showPreview(chip) {
     clearTimeout(openTimer);
@@ -201,7 +206,7 @@ export function setupEditMode(store, canvas, ctx) {
 
   chips.addEventListener('pointerover', e => {
     const chip = e.target.closest('.tray-chip');
-    if (!chip) return;
+    if (!chip || chip.dataset.type === quiet) return;
     clearTimeout(closeTimer);
     if (preview.type === chip.dataset.type) return;
     clearTimeout(openTimer);
@@ -211,6 +216,7 @@ export function setupEditMode(store, canvas, ctx) {
   chips.addEventListener('pointerout', e => {
     const chip = e.target.closest('.tray-chip');
     if (!chip || chip.contains(e.relatedTarget)) return;
+    quiet = null;
     clearTimeout(openTimer);
     closeTimer = setTimeout(hidePreview, CLOSE_MS);
   });
