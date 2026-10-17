@@ -1360,6 +1360,7 @@ body.layout-editing .canvas { height: calc(100vh - 56px - var(--tray-h, 64px)); 
 .canvas-cell { border: 1px dashed color-mix(in srgb, var(--text) 12%, transparent); border-radius: 8px; }
 .canvas-ghost { z-index: 5; border: 2px solid var(--accent); border-radius: 14px; background: var(--accent-soft); pointer-events: none; }
 .canvas-ghost.bad { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
+.canvas-ghost.other { border-style: dashed; background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 body.layout-editing .widget-frame {
   outline: 1.5px dashed color-mix(in srgb, var(--text) 38%, transparent);
@@ -1444,6 +1445,20 @@ body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
 .tray-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tray-chip:disabled { opacity: 0.4; cursor: default; }
 .tray-chip:disabled:hover { border-color: var(--border); }
+/* Above the tray, so it never pushes the buttons onto a second row. */
+.tray-note {
+  position: absolute;
+  left: 16px;
+  bottom: calc(100% + 8px);
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  color: var(--muted);
+  pointer-events: none;
+}
 .tray-right { margin-left: auto; display: flex; gap: 6px; }
 #btn-layout[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 

@@ -5,6 +5,7 @@
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import {
   TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, prefsSection,
+  swapPlan, swapCopy,
 } from './layout.js';
 import { gridArea } from './canvas.js';
 
@@ -18,14 +19,18 @@ export function setupEditMode(store, canvas, ctx) {
   let snapshot = null;   // the layout on entering, for Cancel
   const layout = () => store.get().prefs.layout;
 
-  // The cell outlines, and the outline of where a drag or resize will land.
+  // The cell outlines, the outline of where a drag or resize will land, and during a swap the
+  // dashed outline of where the other widget goes.
   const overlay = el('div', { class: 'canvas-cells', 'aria-hidden': 'true' },
     Array.from({ length: COLS * ROWS }, () => el('div', { class: 'canvas-cell' })));
   const ghost = el('div', { class: 'canvas-ghost', 'aria-hidden': 'true', hidden: true });
+  const other = el('div', { class: 'canvas-ghost other', 'aria-hidden': 'true', hidden: true });
   const chips = el('div', { class: 'tray-chips' });
+  const full = el('span', { class: 'tray-note', hidden: true, text: 'Page full: shrink or remove a widget to add one.' });
   const tray = el('div', { class: 'layout-tray', role: 'toolbar', 'aria-label': 'Layout mode' },
     el('span', { class: 'tray-label', text: 'Add' }),
     chips,
+    full,
     el('div', { class: 'tray-right' },
       el('button', { type: 'button', class: 'btn', text: 'Reset layout', title: 'Back to the default places', onclick: reset }),
       el('button', { type: 'button', class: 'btn', text: 'Cancel', title: 'Undo everything since you entered Layout mode', onclick: () => exit({ restore: true }) }),
@@ -85,6 +90,7 @@ export function setupEditMode(store, canvas, ctx) {
 
   function renderTray() {
     const l = layout();
+    let roomless = 0;
     chips.replaceChildren(...Object.entries(TYPES).map(([type, t]) => {
       const n = countOf(l, type);
       const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
@@ -92,8 +98,11 @@ export function setupEditMode(store, canvas, ctx) {
         icon('plus', 13), el('span', { text: t.label }), el('b', { text: t.max === 1 ? (n ? 'on' : 'off') : `${n}/${t.max}` }));
       chip.disabled = n >= t.max || !room;
       chip.title = n >= t.max ? limitTitle(t) : !room ? 'No room: shrink or remove a widget first' : `Add ${t.label}`;
+      if (n < t.max && !room) roomless++;
       return chip;
     }));
+    // Said in words, not only in tooltips: a new page fills every cell, so nothing can be added yet.
+    full.hidden = !roomless || [...chips.children].some(c => !c.disabled);
     document.body.style.setProperty('--tray-h', `${tray.offsetHeight || 64}px`);
   }
 
@@ -136,7 +145,8 @@ export function setupEditMode(store, canvas, ctx) {
   // ---- drag and resize ----
   // The frame follows the pointer (a move) or shows its new size (a resize) while the ghost shows
   // the cells it will snap to, red when they are taken or off the canvas. Letting go there puts
-  // the frame back.
+  // the frame back. A move onto one other widget that can trade places swaps the two (swapPlan):
+  // the ghost shows where this one lands and a dashed one where the other goes.
 
   root.addEventListener('pointerdown', e => {
     if (!active || e.button !== 0) return;
@@ -155,6 +165,7 @@ export function setupEditMode(store, canvas, ctx) {
     const start = { px: e.clientX, py: e.clientY, x: copy.x, y: copy.y, w: copy.w, h: copy.h };
     let target = { x: copy.x, y: copy.y, w: copy.w, h: copy.h };
     let valid = true;
+    let plan = null;
     frame.setPointerCapture(e.pointerId);
     frame.classList.add('lifted');
     ghost.hidden = false;
@@ -185,18 +196,23 @@ export function setupEditMode(store, canvas, ctx) {
         frame.style.gridArea = gridArea(target);
       }
       valid = fits(layout(), target, copy.id);
-      ghost.style.gridArea = gridArea(target);
-      ghost.classList.toggle('bad', !valid);
-      frame.classList.toggle('bad', !valid);   // the frame may sit right over the ghost
+      plan = !valid && dir === 'move' ? swapPlan(layout(), copy.id, target) : null;
+      ghost.style.gridArea = gridArea(plan ? plan.a : target);
+      ghost.classList.toggle('bad', !valid && !plan);
+      other.hidden = !plan;
+      if (plan) other.style.gridArea = gridArea(plan.b);
+      frame.classList.toggle('bad', !valid && !plan);   // the frame may sit right over the ghost
     };
     const up = () => {
       frame.removeEventListener('pointermove', move);
       frame.classList.remove('lifted', 'bad');
       frame.style.transform = '';
       ghost.hidden = true;
+      other.hidden = true;
       const changed = ['x', 'y', 'w', 'h'].some(k => target[k] !== start[k]);
       let moved = false;
       if (valid && changed) store.update(s => { moved = moveCopy(s.prefs.layout, copy.id, target); });
+      else if (plan) store.update(s => { moved = swapCopy(s.prefs.layout, copy.id, target); });
       if (!moved) frame.style.gridArea = gridArea(copyById(store.get(), copy.id) ?? start);
       focusFrame(copy.id);
     };
@@ -241,7 +257,7 @@ export function setupEditMode(store, canvas, ctx) {
     snapshot = structuredClone(layout());
     document.body.classList.add('layout-editing');
     button?.setAttribute('aria-pressed', 'true');
-    root.append(overlay, ghost);
+    root.append(overlay, ghost, other);
     document.body.append(tray);
     for (const frame of canvas.frames().values()) decorate(frame);
     refresh();
@@ -262,6 +278,7 @@ export function setupEditMode(store, canvas, ctx) {
     for (const frame of canvas.frames().values()) strip(frame);
     overlay.remove();
     ghost.remove();
+    other.remove();
     tray.remove();
     button?.focus({ preventScroll: true });
   }
@@ -270,7 +287,7 @@ export function setupEditMode(store, canvas, ctx) {
   store.subscribe(() => {
     if (!active) return;
     refresh();
-    root.append(overlay, ghost);   // after the frames the canvas may have re-added
+    root.append(overlay, ghost, other);   // after the frames the canvas may have re-added
   }, ['prefs', 'groups']);
   addEventListener('keydown', e => {
     if (!active || e.key !== 'Escape') return;
