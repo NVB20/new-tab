@@ -167,7 +167,8 @@ copies can each follow their own list (say, coins in one and currencies in anoth
   coin that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're
   done. New picks go to the bottom of the list.
 - **Coins:** BTC, SOL, XRP and ETH by default, as Bybit spot prices in USDT. Each row shows the
-  price, its 24h change and a sparkline of the last 24 hours. A coin Bybit doesn't list shows a dash.
+  price, its 24h change and a sparkline of the last 24 hours. A coin Bybit doesn't list comes from
+  Binance or OKX instead; one none of them lists shows a dash.
 - **US indexes:** SPY, QQQ and the Dow (DJIA), as CNBC quotes. Each row shows the last
   regular-session price, its change on the day and a sparkline of that session; outside market
   hours that's the last close.
@@ -178,8 +179,9 @@ copies can each follow their own list (say, coins in one and currencies in anoth
   of the last 24 hours of trading.
 - **Currency pairs:** USD/ILS by default; EUR/ILS, GBP/ILS, EUR/USD, GBP/USD, USD/JPY and USD/CHF
   are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
-- **Click a row** to open the coin's chart on Bybit (the index or commodity on CNBC, or the pair on Google
-  Finance); the candles icon at the end opens it on TradingView.
+- **Click a row** to open the coin's chart on the exchange its price came from (the index or
+  commodity on CNBC, or the pair on Google Finance); the candles icon at the end opens it on
+  TradingView. Hover a row to see where its numbers came from.
 - **Drag a row** up or down to reorder the list; a line shows where it will land.
 - **Segments:** right-click a row and choose **New segment above** to put a heading over it (say,
   *US* over SPY), type its name and press Enter (Esc cancels). The rows below a heading, up to the
@@ -189,6 +191,16 @@ copies can each follow their own list (say, coins in one and currencies in anoth
 
 Prices refresh every 30 seconds while the tab is open and visible, and all open new tabs share one
 copy, so having many tabs open doesn't multiply the requests.
+
+While a source is down the widget carries on from another, so the rows keep moving:
+
+| Rows | Usually | While that's down |
+| --- | --- | --- |
+| Coins | Bybit | Binance, then OKX (same coins in USDT) |
+| Indexes and commodities | CNBC | Yahoo Finance (the same index or front-month future) |
+| Currency pairs | Frankfurter (the ECB's rates) | the ECB itself, then currency-api's market rates for the last two days |
+
+A source that doesn't answer is skipped by every tab for 10 minutes, then asked first again.
 
 ## GitHub
 
@@ -225,7 +237,9 @@ shown. Every copy shares the same fetches, at most once an hour.
 
 The heatmap is read from `github.com/users/<you>/contributions`, which is why the extension asks
 for access to github.com. After updating from an older version, press the extension's reload
-button on `chrome://extensions` once so Chrome grants it.
+button on `chrome://extensions` once so Chrome grants it. While that page can't be read, the
+heatmap comes from [github-contributions-api](https://github-contributions-api.jogruber.de/), which
+keeps a copy of it.
 
 The heading opens your GitHub profile. GitHub is checked at most once an hour to stay well inside
 its rate limit; **Refresh** next to the heading fetches straight away.
@@ -314,7 +328,9 @@ you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's 
 
 Schedules come from ESPN's public site API and from Jolpica F1 (the successor of the Ergast API),
 both free and without a key. Team schedules are checked every 6 hours and the F1 calendar once a
-day; every copy and every open tab shares one fetch.
+day; every copy and every open tab shares one fetch. While ESPN's usual host can't be reached the
+same API answers on its web host; while Jolpica can't, [OpenF1](https://openf1.org/) gives the
+calendar and the podium (often before Jolpica has it).
 
 ## Weather
 
@@ -337,8 +353,11 @@ under the clock). It shows one city's weather:
 
 Forecasts come from [Open-Meteo](https://open-meteo.com/), free and without a key; city search
 from its geocoding API. A forecast is fetched at most every 15 minutes, and every copy and open
-tab showing the same city shares it. If Open-Meteo can't be reached the widget keeps the last
-forecast it had and says how old it is.
+tab showing the same city shares it. While Open-Meteo can't be reached the forecast comes from
+[MET Norway](https://www.met.no/en/free-meteorological-data) (at most every 30 minutes, as it asks),
+and city search from OpenStreetMap through [Photon](https://photon.komoot.io/); hover the city's
+name to see which forecast is shown. If neither answers, the widget keeps the last forecast it had
+and says how old it is.
 
 ## Countdown
 
@@ -577,17 +596,19 @@ tiles and the rest.
 ## Your data
 
 Tiles, groups, folders, tasks, notes, countdowns, Marvel progress, settings and the wallpaper are stored in this
-Chrome profile only. Nothing is sent anywhere except the requests the widgets need:
+Chrome profile only. Nothing is sent anywhere except the requests the widgets need. The backups in
+brackets are asked only while the source before them can't be reached (or, for coins, doesn't
+list the coin), and are sent the same thing:
 
 | Widget | Talks to | How often |
 | --- | --- | --- |
-| Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
-| Markets (indexes, commodities) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) | every 30 s while visible; sparklines every 5 min |
-| Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
-| GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
-| Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores); team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
-| Sports (F1) | `api.jolpi.ca` | calendar once a day; hourly after a race until the result is in |
-| Weather | `api.open-meteo.com` (the forecast for the city's coordinates); `geocoding-api.open-meteo.com` (the name you type, while choosing a city) | every 15 min while visible |
+| Markets (coins) | `api.bybit.com` (public market data) [`data-api.binance.vision`, then `www.okx.com`] | every 30 s while visible; sparklines every 5 min |
+| Markets (indexes, commodities) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) [`query1.finance.yahoo.com`] | every 30 s while visible; sparklines every 5 min |
+| Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) [`data-api.ecb.europa.eu`, then currency-api on `cdn.jsdelivr.net` or `currency-api.pages.dev`] | once an hour |
+| GitHub | `api.github.com`, and `github.com` for the heatmap [`github-contributions-api.jogruber.de`, with your username] | once an hour, or when you press Refresh |
+| Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores) [`site.web.api.espn.com`]; team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
+| Sports (F1) | `api.jolpi.ca` [`api.openf1.org`] | calendar once a day; hourly after a race until the result is in |
+| Weather | `api.open-meteo.com` (the forecast for the city's coordinates) [`api.met.no`]; `geocoding-api.open-meteo.com` (the name you type, while choosing a city) [`photon.komoot.io`] | every 15 min while visible (30 min from `api.met.no`) |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 | Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |
@@ -613,9 +634,15 @@ history and bookmarks on this computer; nothing about them is sent anywhere.
 - Countdown: a new tab left open from before doesn't see a timer started in another tab, and if
   you then change something in that old tab it saves its own list over the new one. Open a fresh
   new tab after starting a timer elsewhere.
-- Sports: ESPN's site API is public but unofficial and can change without notice. The widget then
-  keeps the last schedule it had and says ESPN is unreachable. F1 "live" follows the timetable,
-  not live timing (there is no free live timing).
+- Sports: ESPN's site API is public but unofficial and can change without notice; its web host
+  serves the same API, so a change reaches both. The widget then keeps the last schedule it had
+  and says ESPN is unreachable. F1 "live" follows the timetable, not live timing (there is no free
+  live timing).
+- Backup sources aren't exact copies. MET Norway gives chances of rain only in the Nordic
+  countries, and today's high and low from the current hour on; for a city it has never had a
+  forecast for, it takes your computer's time zone (or, far away, one guessed from the longitude).
+  Binance's and OKX's prices differ from Bybit's by cents, currency-api's market rates from the
+  ECB's daily reference rates by a little, and its sparkline covers two days.
 
 ## Development
 
