@@ -4,7 +4,9 @@
 
 import { el, icon, svgEl, widgetSub, widgetEmpty, scaleOf } from './ui.js';
 import { feed, peek, fetchJson, fetchText } from './net.js';
-import { parseCommits, latestCommits, latestRepos, parseIssues, parseStats, timeAgo, parseContributions, heatmapLayout, MONTHS } from './feeds.js';
+import {
+  parseCommits, latestCommits, latestRepos, parseIssues, parseStats, timeAgo, parseContributions, parseContributionsApi, heatmapLayout, MONTHS,
+} from './feeds.js';
 import { copyById, TYPES } from './layout.js';
 
 const GITHUB_TTL = 60 * 60e3;   // GitHub is fetched at most once an hour
@@ -253,9 +255,13 @@ export function mountGithub(root, store, copy, ctx) {
     const get = (key, loader) => (cachedOnly ? Promise.resolve(peek(key) ?? { data: null, at: 0 }) : feed(key, ttl, loader));
     const none = Promise.resolve({ data: null, at: 0 });
     // The contribution calendar is the HTML one on the profile (no API gives it without a token);
-    // the extension's github.com host permission lets it be read across origins.
+    // the extension's github.com host permission lets it be read across origins. While that page
+    // can't be read, github-contributions-api's copy of it.
     const calendar = parts.includes('heatmap')
-      ? get(`github-cal:${user}`, async () => parseContributions(await fetchText(`https://github.com/users/${encodeURIComponent(user)}/contributions`)))
+      ? get(`github-cal:${user}`, [
+        { name: 'GitHub', load: async () => parseContributions(await fetchText(`https://github.com/users/${encodeURIComponent(user)}/contributions`)) },
+        { name: 'github-contributions-api', load: async () => parseContributionsApi(await fetchJson(`https://github-contributions-api.jogruber.de/v4/${encodeURIComponent(user)}?y=last`)) },
+      ])
       : none;
     const profileStats = parts.includes('stats') ? get(`github-stats:${user}`, () => fetchStats(user, headers)) : none;
     // Pull requests, review requests, issues, repos and commits come from one fetch whichever of

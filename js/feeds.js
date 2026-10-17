@@ -369,6 +369,19 @@ export function parseContributions(html) {
   return { total: total ? Number(total[1].replace(/,/g, '')) : days.reduce((n, d) => n + d.count, 0), days };
 }
 
+// The same calendar from github-contributions-api (jogruber.de), which reads GitHub's page and
+// keeps a copy: { total: { lastYear }, contributions: [{ date, count, level }] } → as above, or null.
+export function parseContributionsApi(json) {
+  if (!Array.isArray(json?.contributions)) return null;
+  const days = json.contributions
+    .filter(d => DAY.test(d?.date ?? ''))
+    .map(d => ({ date: d.date, level: Math.min(4, Math.max(0, Number(d.level) || 0)), count: Math.max(0, Number(d.count) || 0) }))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!days.length) return null;
+  const total = json.total?.lastYear;
+  return { total: Number.isInteger(total) && total >= 0 ? total : days.reduce((n, d) => n + d.count, 0), days };
+}
+
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Grid positions for a contribution heatmap: one column per week, Sunday in row 0. A month is

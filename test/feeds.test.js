@@ -5,7 +5,7 @@ import {
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
   isPair, isSegment, segmentItem, moveMarketItem, headingDropIndex, parseContributions, heatmapLayout,
   parseBinanceTicker, parseBinanceKline, parseOkxTicker, parseOkxCandles, parseYahooChart, parseYahooSpark, yahooCloses,
-  parseEcbRates, parseCurrencyApi,
+  parseEcbRates, parseCurrencyApi, parseContributionsApi,
 } from '../js/feeds.js';
 
 test('parseTicker reads Bybit last price and 24h change', () => {
@@ -346,4 +346,19 @@ test('currency-api\'s snapshots (lower-case codes) read as the same table, for t
   // A day that failed to load is left out.
   assert.deepEqual(Object.keys(parseCurrencyApi([null, day('2026-10-17', 1.1239, 3.478)], ['USD']).rates), ['2026-10-17']);
   assert.equal(parseCurrencyApi([{ date: '2026-10-17', eur: {} }], ['USD']), null);
+});
+
+test('github-contributions-api\'s calendar reads like the one from GitHub\'s page', () => {
+  const json = { total: { lastYear: 3352 }, contributions: [
+    { date: '2026-10-17', count: 77, level: 4 },
+    { date: '2025-10-12', count: 0, level: 0 },
+    { date: 'not a day', count: 5, level: 9 },
+  ] };
+  assert.deepEqual(parseContributionsApi(json), { total: 3352, days: [
+    { date: '2025-10-12', level: 0, count: 0 },
+    { date: '2026-10-17', level: 4, count: 77 },
+  ] });
+  assert.equal(parseContributionsApi({ contributions: [{ date: '2026-10-17', count: 3, level: 1 }] }).total, 3);
+  assert.equal(parseContributionsApi({ error: 'Not found' }), null);
+  assert.equal(parseContributionsApi({ contributions: [] }), null);
 });
