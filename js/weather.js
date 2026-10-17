@@ -209,9 +209,17 @@ export function metnoCode(symbol) {
 
 const HOUR_MS = 3600e3;
 
+// A place's UTC offset in seconds when no forecast has named it: this computer's (localOffset)
+// when that's within 3 hours of the sun's at the place's longitude, so likely the same zone with
+// its summer time; else the sun's, to the hour.
+export function guessOffset(lon, localOffset) {
+  const solar = (lon / 15) * 3600;
+  return Math.abs(localOffset - solar) <= 3 * 3600 ? localOffset : Math.round(lon / 15) * 3600;
+}
+
 // MET Norway's forecast (UTC times, wind in m/s) as parseForecast's, or null when the response
-// isn't one. It names no time zone, so offset is the place's from an earlier forecast, else a
-// guess from the longitude. Hours run 2–3 days, then 6-hourly steps; days are made from both,
+// isn't one. It names no time zone, so offset is the place's from an earlier forecast or a guess
+// (guessOffset), else the longitude's. Hours run 2–3 days, then 6-hourly steps; days are made from both,
 // with sunrise and sunset worked out (sunTimes). Chances of rain only come in the Nordic countries.
 export function parseMetno(json, offset) {
   const series = json?.properties?.timeseries;

@@ -7,7 +7,7 @@ import { feed, fetchJson, peek } from './net.js';
 import { timeAgo } from './feeds.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
-  SOURCES, condition, placeLabel, placeKey, forecastUrl, parseForecast, metnoUrl, parseMetno, nextHours, nextDays,
+  SOURCES, condition, placeLabel, placeKey, forecastUrl, parseForecast, metnoUrl, parseMetno, guessOffset, nextHours, nextDays,
   degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars, nextSun,
 } from './weather.js';
 import { cityField } from './city-search.js';
@@ -25,10 +25,11 @@ const must = (value, source) => {
 };
 
 // Open-Meteo, then MET Norway, which names no time zone: the place's is taken from the forecast
-// saved before.
+// saved before, else guessed with this computer's.
+const offsetOf = place => peek(keyFor(place))?.data?.offset ?? guessOffset(place.lon, -new Date().getTimezoneOffset() * 60);
 const sources = place => [
   { name: 'Open-Meteo', load: async () => must(parseForecast(await fetchJson(forecastUrl(place))), 'Open-Meteo') },
-  { name: 'MET Norway', load: async () => must(parseMetno(await fetchJson(metnoUrl(place)), peek(keyFor(place))?.data?.offset), 'MET Norway') },
+  { name: 'MET Norway', load: async () => must(parseMetno(await fetchJson(metnoUrl(place)), offsetOf(place)), 'MET Norway') },
 ];
 
 export function mountWeather(root, store, copy) {

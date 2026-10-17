@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   condition, cleanPlace, cleanWeather, placeLabel, parsePlaces, parseForecast, nextHours, nextDays, forecastUrl, placeKey,
   searchUrl, nextSun, matchParts, toUnit, degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars,
-  metnoCode, metnoUrl, parseMetno, sunTimes, photonUrl, parsePhotonPlaces,
+  metnoCode, metnoUrl, parseMetno, guessOffset, sunTimes, photonUrl, parsePhotonPlaces,
 } from '../js/weather.js';
 
 const TEL_AVIV = { name: 'Tel Aviv', region: 'Tel Aviv', country: 'Israel', lat: 32.08088, lon: 34.78057 };
@@ -215,6 +215,12 @@ test('a MET Norway forecast reads like an Open-Meteo one: now, the hourly steps,
 
 test('without an earlier forecast the time zone is guessed from the longitude', () => {
   assert.equal(parseMetno(METNO).offset, 7200);
+});
+
+test('a better guess: this computer\'s time zone when it\'s near the place\'s, summer time and all', () => {
+  assert.equal(guessOffset(34.78, 3 * 3600), 3 * 3600);     // Tel Aviv seen from Israel in October
+  assert.equal(guessOffset(-3.7, 2 * 3600), 2 * 3600);      // Madrid seen from Spain in summer
+  assert.equal(guessOffset(-74, 3 * 3600), -5 * 3600);      // New York seen from Israel: the sun's
 });
 
 test('a MET Norway response that isn\'t a forecast reads as null', () => {
