@@ -1,27 +1,35 @@
 // Weather widget: a city's conditions now, the next hours and the week (weather.js), from
-// Open-Meteo through the request cache, shared by every copy and tab showing the same city. ✎
-// swaps the forecast for a city search and the °C / °F choice.
+// Open-Meteo, or MET Norway while it's down, through the request cache, shared by every copy and
+// tab showing the same city. ✎ swaps the forecast for a city search and the °C / °F choice.
 
 import { el, icon, widgetHead, widgetSub, widgetEmpty } from './ui.js';
 import { feed, fetchJson, peek } from './net.js';
 import { timeAgo } from './feeds.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
-  SOURCE, condition, placeLabel, placeKey, forecastUrl, parseForecast, nextHours, nextDays,
+  SOURCES, condition, placeLabel, placeKey, forecastUrl, parseForecast, metnoUrl, parseMetno, nextHours, nextDays,
   degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars, nextSun,
 } from './weather.js';
 import { cityField } from './city-search.js';
 
 const TTL = 15 * 60e3;          // Open-Meteo updates its models about hourly; current values every 15 min
+const METNO_TTL = 30 * 60e3;    // MET Norway asks not to be asked again before its forecast expires (~30 min)
 const REFRESH_MS = 5 * 60e3;    // how often an open tab asks the cache
 const KEY = 'weather-v1';
 const keyFor = place => `${KEY}:${placeKey(place)}`;
 const RAIN_SHOWN = 20;          // % chance from which an hour or a day shows it
 
-const must = value => {
-  if (value == null) throw new Error('Unexpected Open-Meteo response');
+const must = (value, source) => {
+  if (value == null) throw new Error(`Unexpected ${source} response`);
   return value;
 };
+
+// Open-Meteo, then MET Norway, which names no time zone: the place's is taken from the forecast
+// saved before.
+const sources = place => [
+  { name: 'Open-Meteo', load: async () => must(parseForecast(await fetchJson(forecastUrl(place))), 'Open-Meteo') },
+  { name: 'MET Norway', load: async () => must(parseMetno(await fetchJson(metnoUrl(place)), peek(keyFor(place))?.data?.offset), 'MET Norway') },
+];
 
 export function mountWeather(root, store, copy) {
   const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.weather.defaults();
@@ -38,7 +46,7 @@ export function mountWeather(root, store, copy) {
   const section = el('section', { class: 'widget widget-weather' }, head, body, editor);
   root.append(section);
 
-  let result = null;   // { data: forecast, at, error } for the place shown
+  let result = null;   // { data: forecast, at, via, error } for the place shown
   let loaded = false;
 
   // ---- the forecast ----
@@ -103,8 +111,12 @@ export function mountWeather(root, store, copy) {
     if (!result?.error) return null;
     if (!result.data) return el('p', { class: 'widget-note' }, 'Couldn’t load the forecast. ', el('button', { type: 'button', class: 'link-btn', text: 'Try again', onclick: () => load(true) }));
     const ago = timeAgo(result.at);
-    return el('p', { class: 'widget-note', text: ago === 'now' ? 'Open-Meteo unreachable' : `Open-Meteo unreachable · from ${ago} ago` });
+    const down = Object.keys(SOURCES).join(' and ');
+    return el('p', { class: 'widget-note', text: ago === 'now' ? `${down} unreachable` : `${down} unreachable · from ${ago} ago` });
   }
+
+  // The source the forecast shown came from: Open-Meteo unless it was down.
+  const via = () => (result?.data && SOURCES[result.via] ? result.via : 'Open-Meteo');
 
   // What the body was last drawn from: a refresh that changes nothing shown leaves it alone.
   let drawn = '';
@@ -112,7 +124,7 @@ export function mountWeather(root, store, copy) {
   function render() {
     const s = settings();
     title.textContent = s.place?.name ?? 'Weather';
-    head.title = s.place ? placeLabel(s.place, { region: true }) : '';
+    head.title = s.place ? `${placeLabel(s.place, { region: true })} · forecast from ${via()}` : '';
     const now = Date.now();
     const f = result?.data;
     // The time matters too: "Now" moves on, and so do Today and the next sunrise or sunset.
@@ -144,7 +156,8 @@ export function mountWeather(root, store, copy) {
     const { place } = settings();
     if (!place) return;
     const my = ++seq;
-    const r = await feed(keyFor(place), force ? 0 : TTL, async () => must(parseForecast(await fetchJson(forecastUrl(place)))));
+    const ttl = force ? 0 : peek(keyFor(place))?.via === 'MET Norway' ? METNO_TTL : TTL;
+    const r = await feed(keyFor(place), ttl, sources(place));
     if (my !== seq) return;
     result = r;
     loaded = true;
@@ -179,7 +192,7 @@ export function mountWeather(root, store, copy) {
         for (const b of units.children) b.setAttribute('aria-pressed', String(b === e.currentTarget));
       },
     })));
-    const link = el('a', { href: SOURCE.url, rel: 'noopener', text: SOURCE.name, ...(newTab() ? { target: '_blank' } : {}) });
+    const link = el('a', { href: SOURCES[via()], rel: 'noopener', text: via(), ...(newTab() ? { target: '_blank' } : {}) });
     editor.replaceChildren(...[
       widgetSub('City'),
       s.place ? el('p', { class: 'wx-current', text: placeLabel(s.place, { region: true }) }) : null,
@@ -220,7 +233,7 @@ export function mountWeather(root, store, copy) {
       seq++;
       // What's saved shows straight away; a fetch follows when it's old.
       const hit = place ? peek(keyFor(place)) : null;
-      result = hit ? { data: hit.data, at: hit.at } : null;
+      result = hit ? { data: hit.data, at: hit.at, via: hit.via } : null;
       loaded = !!hit;
       load();
     }

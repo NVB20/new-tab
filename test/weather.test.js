@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   condition, cleanPlace, cleanWeather, placeLabel, parsePlaces, parseForecast, nextHours, nextDays, forecastUrl, placeKey,
   searchUrl, nextSun, matchParts, toUnit, degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars,
+  metnoCode, metnoUrl, parseMetno, sunTimes, photonUrl, parsePhotonPlaces,
 } from '../js/weather.js';
 
 const TEL_AVIV = { name: 'Tel Aviv', region: 'Tel Aviv', country: 'Israel', lat: 32.08088, lon: 34.78057 };
@@ -156,4 +157,98 @@ test('the typed part of a name is marked, ignoring case and accents', () => {
   assert.deepEqual(matchParts('New York', 'york'), [{ text: 'New ', hit: false }, { text: 'York', hit: true }]);
   assert.deepEqual(matchParts('Paris', 'lyon'), [{ text: 'Paris', hit: false }]);
   assert.deepEqual(matchParts('Paris', ' '), [{ text: 'Paris', hit: false }]);
+});
+
+// ---- MET Norway, when Open-Meteo is down ----
+
+// A trimmed MET Norway response for Tel Aviv, fetched 2026-10-17 at 23:00 local (20:00 UTC):
+// hourly steps, then 6-hourly ones.
+const step = (time, temp, one, six, extra = {}) => ({
+  time,
+  data: {
+    instant: { details: { air_temperature: temp, ...extra } },
+    ...(one ? { next_1_hours: { summary: { symbol_code: one[0] }, details: { precipitation_amount: 0, ...one[1] } } } : {}),
+    next_6_hours: { summary: { symbol_code: six[0] }, details: { air_temperature_max: six[1], air_temperature_min: six[2], ...six[3] } },
+  },
+});
+const METNO = {
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [34.78, 32.08, 21] },
+  properties: {
+    timeseries: [
+      step('2026-10-17T20:00:00Z', 20.9, ['clearsky_night'], ['fair_night', 20.1, 18.5],
+        { apparent_air_temperature: 20.9, relative_humidity: 82.6, wind_speed: 1.9 }),
+      step('2026-10-17T21:00:00Z', 20.1, ['clearsky_night'], ['partlycloudy_night', 20.5, 18.1]),
+      step('2026-10-18T09:00:00Z', 25.8, ['rainshowers_day', { probability_of_precipitation: 40 }], ['rainshowers_day', 26.2, 24]),
+      step('2026-10-20T12:00:00Z', 25, null, ['partlycloudy_day', 25.5, 22]),
+      step('2026-10-20T18:00:00Z', 19, null, ['clearsky_night', 21, 16.6]),
+      step('2026-10-21T00:00:00Z', 17.3, null, ['fair_night', 18, 17]),
+    ],
+  },
+};
+
+test('MET Norway\'s symbols read as WMO codes, by day or night; thunder of any kind is a storm', () => {
+  assert.equal(metnoCode('clearsky_night'), 0);
+  assert.equal(metnoCode('partlycloudy_polartwilight'), 2);
+  assert.equal(metnoCode('lightrainshowers_day'), 80);
+  assert.equal(metnoCode('heavysnow'), 75);
+  assert.equal(metnoCode('lightssleetshowersandthunder'), 95);
+  assert.equal(metnoCode('fog'), 45);
+  assert.equal(metnoCode('martian_dust'), null);
+  assert.equal(metnoCode(undefined), null);
+});
+
+test('a MET Norway forecast reads like an Open-Meteo one: now, the hourly steps, and days made from all steps', () => {
+  const f = parseMetno(METNO, 10800);
+  assert.equal(f.offset, 10800);
+  assert.deepEqual(f.now, { at: Date.UTC(2026, 9, 17, 20), temp: 20.9, feels: 20.9, humidity: 82.6, wind: 1.9 * 3.6, code: 0, isDay: false });
+  assert.deepEqual(f.hours.map(h => [h.temp, h.code, h.rain, h.isDay]), [[20.9, 0, null, false], [20.1, 0, null, false], [25.8, 81, 40, true]]);
+  // Days follow the place's calendar; the last one, a lone step, is left out.
+  assert.deepEqual(f.days.map(d => [d.date, d.max, d.min, d.code, d.rain]), [
+    ['2026-10-17', 20.9, 18.5, 1, null],
+    ['2026-10-18', 26.2, 18.1, 81, 40],
+    ['2026-10-20', 25.5, 16.6, 2, null],
+  ]);
+  assert.equal(localDate(f.days[0].sunrise, f.offset), '2026-10-17');
+  assert.ok(f.days[0].sunset > f.days[0].sunrise);
+});
+
+test('without an earlier forecast the time zone is guessed from the longitude', () => {
+  assert.equal(parseMetno(METNO).offset, 7200);
+});
+
+test('a MET Norway response that isn\'t a forecast reads as null', () => {
+  assert.equal(parseMetno(null), null);
+  assert.equal(parseMetno({ properties: { timeseries: [] }, geometry: { coordinates: [34.78, 32.08] } }), null);
+  assert.equal(parseMetno({ properties: { timeseries: METNO.properties.timeseries } }), null);
+});
+
+test('MET Norway is asked for the same rounded spot as Open-Meteo', () => {
+  assert.equal(metnoUrl(TEL_AVIV), 'https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=32.08&lon=34.78');
+});
+
+test('sunrise and sunset are worked out to within a couple of minutes of Open-Meteo\'s', () => {
+  // Open-Meteo, Tel Aviv, 2026-10-17 (UTC+3): sunrise 06:45, sunset 18:06.
+  const { sunrise, sunset } = sunTimes('2026-10-17', 32.08, 34.78, 10800);
+  assert.ok(Math.abs(sunrise - Date.UTC(2026, 9, 17, 3, 45)) <= 3 * 60e3);
+  assert.ok(Math.abs(sunset - Date.UTC(2026, 9, 17, 15, 6)) <= 3 * 60e3);
+  // No sunrise in Tromsø's polar night.
+  assert.deepEqual(sunTimes('2026-12-15', 69.65, 18.96, 3600), { sunrise: null, sunset: null });
+});
+
+test('Photon\'s places (OpenStreetMap) read as places, each once', () => {
+  const feature = (name, state, country, lon, lat) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties: { name, state, country, osm_value: 'town' } });
+  const json = { type: 'FeatureCollection', features: [
+    feature('Herzliya', 'Tel-Aviv District', 'Israel', 34.8469, 32.1656),
+    feature('Herzliya', 'Tel-Aviv District', 'Israel', 34.8308, 32.1677),
+    feature('Portland', 'Oregon', 'United States', -122.67, 45.52),
+    feature('', 'Nowhere', 'Nowhere', 0, 0),
+  ] };
+  assert.deepEqual(parsePhotonPlaces(json), [
+    { name: 'Herzliya', region: 'Tel-Aviv District', country: 'Israel', lat: 32.1656, lon: 34.8469 },
+    { name: 'Portland', region: 'Oregon', country: 'United States', lat: 45.52, lon: -122.67 },
+  ]);
+  assert.deepEqual(parsePhotonPlaces({ type: 'FeatureCollection', features: [] }), []);
+  assert.equal(parsePhotonPlaces({ message: 'error' }), null);
+  assert.equal(photonUrl(' Herz '), 'https://photon.komoot.io/api/?q=Herz&limit=6&lang=en&layer=city');
 });

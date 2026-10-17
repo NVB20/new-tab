@@ -1,11 +1,18 @@
-// Weather: a place's conditions now, the next hours and the week, from Open-Meteo (no key, CORS
-// open). Places come from Open-Meteo's geocoding search. Forecasts are fetched in °C and km/h and
-// converted here, so switching units needs no fetch. Pure (unit-tested in Node).
+// Weather: a place's conditions now, the next hours and the week, from Open-Meteo, or MET Norway
+// when it's down (both without a key, CORS open). Places come from Open-Meteo's geocoding search,
+// or OpenStreetMap's through Photon. Forecasts are fetched in °C and km/h and converted here, so
+// switching units needs no fetch. Pure (unit-tested in Node).
 
 export const UNITS = ['c', 'f'];
 export const FORECAST_API = 'https://api.open-meteo.com/v1/forecast';
 export const SEARCH_API = 'https://geocoding-api.open-meteo.com/v1/search';
-export const SOURCE = { name: 'Open-Meteo', url: 'https://open-meteo.com/' };
+export const METNO_API = 'https://api.met.no/weatherapi/locationforecast/2.0/complete';
+export const PHOTON_API = 'https://photon.komoot.io/api/';
+// The forecast's sources by the name a fetch reports (net.js firstOf), for the credit line.
+export const SOURCES = {
+  'Open-Meteo': 'https://open-meteo.com/',
+  'MET Norway': 'https://www.met.no/en/free-meteorological-data',
+};
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -68,6 +75,18 @@ export function placeLabel(p, { region = false } = {}) {
 }
 
 export const searchUrl = query => `${SEARCH_API}?${new URLSearchParams({ name: query.trim(), count: '6', language: 'en', format: 'json' })}`;
+export const photonUrl = query => `${PHOTON_API}?${new URLSearchParams({ q: query.trim(), limit: '6', lang: 'en', layer: 'city' })}`;
+
+// Valid places only, and each name, region and country once.
+function onceEach(places) {
+  const seen = new Set();
+  return places.filter(p => {
+    const key = placeLabel(p, { region: true });
+    if (!p || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 // Geocoding results as places, or null when the response isn't what we expect. No results is [].
 // Towns and cities only (GeoNames' PPL codes: no parks, airports or regions) unless that leaves
@@ -77,15 +96,18 @@ export function parsePlaces(json) {
   if (json.results === undefined) return [];
   if (!Array.isArray(json.results)) return null;
   const towns = json.results.filter(r => typeof r?.feature_code !== 'string' || r.feature_code.startsWith('PPL'));
-  const seen = new Set();
-  return (towns.length ? towns : json.results)
-    .map(r => cleanPlace({ name: r?.name, region: r?.admin1, country: r?.country, lat: r?.latitude, lon: r?.longitude }))
-    .filter(p => {
-      const key = placeLabel(p, { region: true });
-      if (!p || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+  return onceEach((towns.length ? towns : json.results)
+    .map(r => cleanPlace({ name: r?.name, region: r?.admin1, country: r?.country, lat: r?.latitude, lon: r?.longitude })));
+}
+
+// Photon's places (OpenStreetMap; its city layer is cities, towns and villages) the same way, or
+// null when the response isn't a list of them.
+export function parsePhotonPlaces(json) {
+  if (!Array.isArray(json?.features)) return null;
+  return onceEach(json.features.map(f => cleanPlace({
+    name: f?.properties?.name, region: f?.properties?.state, country: f?.properties?.country,
+    lat: f?.geometry?.coordinates?.[1], lon: f?.geometry?.coordinates?.[0],
+  })));
 }
 
 // A name split around the first place it contains the query, ignoring case and accents, for
@@ -161,6 +183,115 @@ export function parseForecast(json) {
     sunset: instant(d.sunset?.[i], offset),
   })).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.date) && x.max != null && x.min != null);
   return { offset, now, hours, days };
+}
+
+// ---- MET Norway ----
+
+export const metnoUrl = p => `${METNO_API}?${new URLSearchParams({ lat: String(round(p.lat)), lon: String(round(p.lon)) })}`;
+
+// MET Norway's weather symbols ('lightrainshowers_day') as the WMO codes above. Sleet reads as
+// freezing rain, sleet showers as snow showers, anything with thunder as a thunderstorm.
+const METNO_CODES = {
+  clearsky: 0, fair: 1, partlycloudy: 2, cloudy: 3, fog: 45,
+  lightrain: 61, rain: 63, heavyrain: 65,
+  lightrainshowers: 80, rainshowers: 81, heavyrainshowers: 82,
+  lightsleet: 66, sleet: 67, heavysleet: 67,
+  lightsleetshowers: 85, sleetshowers: 85, heavysleetshowers: 86,
+  lightsnow: 71, snow: 73, heavysnow: 75,
+  lightsnowshowers: 85, snowshowers: 85, heavysnowshowers: 86,
+};
+
+export function metnoCode(symbol) {
+  if (typeof symbol !== 'string') return null;
+  const base = symbol.replace(/_(day|night|polartwilight)$/, '');
+  return base.includes('thunder') ? 95 : METNO_CODES[base] ?? null;
+}
+
+const HOUR_MS = 3600e3;
+
+// MET Norway's forecast (UTC times, wind in m/s) as parseForecast's, or null when the response
+// isn't one. It names no time zone, so offset is the place's from an earlier forecast, else a
+// guess from the longitude. Hours run 2–3 days, then 6-hourly steps; days are made from both,
+// with sunrise and sunset worked out (sunTimes). Chances of rain only come in the Nordic countries.
+export function parseMetno(json, offset) {
+  const series = json?.properties?.timeseries;
+  const [lon, lat] = Array.isArray(json?.geometry?.coordinates) ? json.geometry.coordinates : [];
+  if (!Array.isArray(series) || num(lat) == null || num(lon) == null) return null;
+  const off = num(offset) ?? Math.round(lon / 15) * 3600;
+  const steps = series.map(s => {
+    const d = s?.data ?? {};
+    const symbol = d.next_1_hours?.summary?.symbol_code ?? d.next_6_hours?.summary?.symbol_code;
+    const now = d.instant?.details ?? {};
+    const six = d.next_6_hours;
+    return {
+      at: Date.parse(s?.time),
+      temp: num(now.air_temperature),
+      feels: num(now.apparent_air_temperature),
+      humidity: num(now.relative_humidity),
+      wind: num(now.wind_speed) == null ? null : now.wind_speed * 3.6,
+      code: metnoCode(symbol),
+      isDay: !/_night$/.test(symbol ?? ''),
+      hourly: !!d.next_1_hours,
+      rain: num(d.next_1_hours?.details?.probability_of_precipitation ?? six?.details?.probability_of_precipitation),
+      six: six ? { code: metnoCode(six.summary?.symbol_code), max: num(six.details?.air_temperature_max), min: num(six.details?.air_temperature_min) } : null,
+    };
+  }).filter(s => Number.isFinite(s.at) && s.temp != null);
+  if (!steps.length) return null;
+  const { at, temp, feels, humidity, wind, code, isDay } = steps[0];
+  const hours = steps.filter(s => s.hourly).map(s => ({ at: s.at, temp: s.temp, code: s.code, rain: s.rain, isDay: s.isDay }));
+  const byDate = new Map();
+  for (const s of steps) {
+    const date = localDate(s.at, off);
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(s);
+  }
+  // Today however little is left of it; a later day only with more than its first step.
+  const days = [...byDate].filter(([, list], i) => i === 0 || list.length > 1).slice(0, 7).map(([date, list]) => {
+    const temps = list.flatMap(s => [s.temp, s.six?.max, s.six?.min]).filter(t => t != null);
+    const rains = list.map(s => s.rain).filter(r => r != null);
+    // The day's weather is the 6 hours closest to its middle.
+    const noon = Date.parse(`${date}T12:00:00Z`) - off * 1000;
+    const gap = s => Math.abs(s.at + 3 * HOUR_MS - noon);
+    const middle = list.filter(s => s.six).sort((a, b) => gap(a) - gap(b))[0];
+    return {
+      date,
+      code: middle?.six.code ?? list[0].code,
+      max: Math.max(...temps),
+      min: Math.min(...temps),
+      rain: rains.length ? Math.max(...rains) : null,
+      ...sunTimes(date, lat, lon, off),
+    };
+  });
+  return { offset: off, now: { at, temp, feels, humidity, wind, code, isDay }, hours, days };
+}
+
+// ---- the sun ----
+
+const RAD = Math.PI / 180;
+const J1970 = 2440588;
+const J2000 = 2451545;
+const TILT = 23.4397 * RAD;
+
+// Sunrise and sunset on a place's calendar day (offset: its UTC offset in seconds) as epoch ms,
+// from the usual low-precision solar formulas (as in suncalc): within a minute or two. Both null
+// on a day the sun doesn't rise or doesn't set.
+export function sunTimes(date, lat, lon, offset = 0) {
+  const noon = Date.parse(`${date}T12:00:00Z`) - offset * 1000;
+  const days = noon / 86400e3 - 0.5 + J1970 - J2000;
+  const lw = -lon * RAD;
+  const phi = lat * RAD;
+  const cycle = Math.round(days - 0.0009 - lw / (2 * Math.PI));
+  const transitOf = hourAngle => 0.0009 + (hourAngle + lw) / (2 * Math.PI) + cycle;
+  const mean = RAD * (357.5291 + 0.98560028 * transitOf(0));
+  const ecliptic = mean + RAD * (1.9148 * Math.sin(mean) + 0.02 * Math.sin(2 * mean) + 0.0003 * Math.sin(3 * mean)) + RAD * 102.9372 + Math.PI;
+  const dec = Math.asin(Math.sin(TILT) * Math.sin(ecliptic));
+  const julian = approx => J2000 + approx + 0.0053 * Math.sin(mean) - 0.0069 * Math.sin(2 * ecliptic);
+  const cosW = (Math.sin(-0.833 * RAD) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec));
+  if (!(Math.abs(cosW) <= 1)) return { sunrise: null, sunset: null };
+  const transit = julian(transitOf(0));
+  const set = julian(transitOf(Math.acos(cosW)));
+  const ms = j => Math.round((j + 0.5 - J1970) * 86400e3);
+  return { sunrise: ms(transit - (set - transit)), sunset: ms(set) };
 }
 
 // The hours from the one under way, at most n.

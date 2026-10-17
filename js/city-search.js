@@ -1,23 +1,33 @@
-// A city box that lists matching places as you type (Open-Meteo's geocoding, weather.js), for the
-// Weather widget's editor, setup's Connect step and Preferences. A combobox: ↓/↑ move through the
-// list, Enter picks the highlighted one (the first to start with), Esc closes the list.
+// A city box that lists matching places as you type (Open-Meteo's geocoding, or OpenStreetMap's
+// through Photon while it's down; weather.js), for the Weather widget's editor, setup's Connect
+// step and Preferences. A combobox: ↓/↑ move through the list, Enter picks the highlighted one
+// (the first to start with), Esc closes the list.
 
 import { el } from './ui.js';
-import { fetchJson } from './net.js';
+import { fetchJson, firstOf } from './net.js';
 import { uid } from './util.js';
-import { searchUrl, parsePlaces, matchParts } from './weather.js';
+import { searchUrl, parsePlaces, photonUrl, parsePhotonPlaces, matchParts } from './weather.js';
 
-const PAUSE_MS = 120;   // between keystrokes before asking; a query asked before shows at once
-const MIN_CHARS = 2;    // Open-Meteo answers nothing for one character
-const found = new Map();   // query (lower case) → places, for as long as the page is open
+const PAUSE_MS = 120;      // between keystrokes before asking; a query asked before shows at once
+const MIN_CHARS = 2;       // Open-Meteo answers nothing for one character
+const HANDOVER_MS = 2500;  // a list that comes this late is no use while typing: ask Photon
+const found = new Map();   // query (lower case) → { places, via }, for as long as the page is open
+
+const must = (value, source) => {
+  if (value == null) throw new Error(`Unexpected ${source} response`);
+  return value;
+};
 
 async function lookUp(q) {
   const key = q.toLowerCase();
   if (found.has(key)) return found.get(key);
-  const places = parsePlaces(await fetchJson(searchUrl(q), {}, 6000));
-  if (places == null) throw new Error('Unexpected Open-Meteo response');
-  found.set(key, places);
-  return places;
+  const { data, via } = await firstOf([
+    { name: 'Open-Meteo geocoding', load: async () => must(parsePlaces(await fetchJson(searchUrl(q), {}, 6000)), 'Open-Meteo') },
+    { name: 'Photon', load: async () => must(parsePhotonPlaces(await fetchJson(photonUrl(q), {}, 6000)), 'Photon') },
+  ], { handoverMs: HANDOVER_MS });
+  const hit = { places: data, via };
+  found.set(key, hit);
+  return hit;
 }
 
 const where = p => [p.region !== p.name ? p.region : '', p.country].filter(Boolean).join(', ');
@@ -95,9 +105,11 @@ export function cityField({ value = '', placeholder = 'Search a city', label = '
       say('Couldn’t search. Check the connection and try again.');
       return;
     }
-    places = result;
+    places = result.places;
     draw(q);
-    say(places.length ? '' : `Nothing found for “${q}”`);
+    // OpenStreetMap's data asks to be credited where it shows.
+    const credit = result.via === 'Photon' ? 'Places © OpenStreetMap contributors' : '';
+    say(places.length ? credit : `Nothing found for “${q}”`);
   }
 
   function pick(i) {
