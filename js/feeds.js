@@ -18,6 +18,115 @@ export function parseKline(json) {
   return list.map(row => Number(row?.[4])).filter(Number.isFinite).reverse();
 }
 
+// Binance /api/v3/ticker/24hr → { price, change } like parseTicker's (Binance's change is in %).
+export function parseBinanceTicker(json) {
+  const price = finite(Number(json?.lastPrice));
+  if (price == null) return null;
+  return { price, change: (finite(Number(json.priceChangePercent)) ?? 0) / 100 };
+}
+
+// Binance /api/v3/klines (oldest first) → closing prices.
+export function parseBinanceKline(json) {
+  if (!Array.isArray(json)) return [];
+  return json.map(row => Number(row?.[4])).filter(Number.isFinite);
+}
+
+// OKX /api/v5/market/ticker → { price, change }, the change since the price 24 hours ago.
+export function parseOkxTicker(json) {
+  const t = json?.code === '0' ? json.data?.[0] : null;
+  const price = finite(Number(t?.last));
+  if (price == null) return null;
+  const open = finite(Number(t.open24h));
+  return { price, change: open ? price / open - 1 : 0 };
+}
+
+// OKX /api/v5/market/candles (newest first) → closing prices, oldest first.
+export function parseOkxCandles(json) {
+  const list = json?.code === '0' ? json.data : null;
+  if (!Array.isArray(list)) return [];
+  return list.map(row => Number(row?.[4])).filter(Number.isFinite).reverse();
+}
+
+const NEW_YORK = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+
+// One Yahoo Finance chart (the result of /v8/finance/chart, or one response of /v7/finance/spark)
+// → { quote, bars }: the quote like parseCnbcQuotes' (change as a fraction, time on New York's
+// clock), the bars { at, close } oldest first. null without a price.
+export function parseYahooChart(r) {
+  const meta = r?.meta;
+  const price = finite(meta?.regularMarketPrice);
+  if (price == null) return null;
+  const pct = finite(meta.regularMarketChangePercent);
+  const prev = finite(meta.previousClose) ?? finite(meta.chartPreviousClose);
+  const time = finite(meta.regularMarketTime);
+  const closes = r.indicators?.quote?.[0]?.close;
+  const bars = (Array.isArray(r.timestamp) ? r.timestamp : [])
+    .map((t, i) => ({ at: t * 1000, close: Array.isArray(closes) ? closes[i] : null }))
+    .filter(b => Number.isFinite(b.at) && finite(b.close) != null);
+  return {
+    quote: {
+      price,
+      change: pct != null ? pct / 100 : prev ? price / prev - 1 : 0,
+      name: String(meta.longName ?? meta.shortName ?? meta.symbol ?? ''),
+      time: time != null ? NEW_YORK.format(time * 1000) : '',
+    },
+    bars,
+  };
+}
+
+// Yahoo Finance's spark for several symbols (/v7/finance/spark) → { [symbol]: parseYahooChart }
+// for the ones it has a price for.
+export function parseYahooSpark(json) {
+  const list = json?.spark?.result;
+  const charts = Object.create(null);
+  for (const r of Array.isArray(list) ? list : []) {
+    const chart = parseYahooChart(r?.response?.[0]);
+    if (chart && typeof r.symbol === 'string') charts[r.symbol] = chart;
+  }
+  return charts;
+}
+
+// A chart's closes: all of them (an index's latest session), or with lastDay those in the 24
+// hours up to its last bar (a commodity's last day of trading, as parseCnbcDay).
+export function yahooCloses(bars, lastDay = false) {
+  const last = bars.at(-1)?.at;
+  return bars.filter(b => !lastDay || b.at > last - 86400e3).map(b => b.close);
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const CURRENCY = /^[A-Z]{3}$/;
+
+// The ECB's own reference rates (its data API as CSV: a row per currency and day) → the table
+// Frankfurter gives, { base: 'EUR', rates: { day: { USD: 1.12, … } } }; null without rates.
+export function parseEcbRates(csv) {
+  const [head = '', ...rows] = String(csv ?? '').trim().split(/\r?\n/);
+  const cols = head.split(',');
+  const [cur, day, value] = ['CURRENCY', 'TIME_PERIOD', 'OBS_VALUE'].map(c => cols.indexOf(c));
+  if (cur < 0 || day < 0 || value < 0) return null;
+  const rates = {};
+  for (const row of rows) {
+    const cells = row.split(',');
+    const rate = Number(cells[value]);
+    if (!CURRENCY.test(cells[cur]) || !DAY.test(cells[day]) || !(rate > 0)) continue;
+    (rates[cells[day]] ??= {})[cells[cur]] = rate;
+  }
+  return Object.keys(rates).length ? { base: 'EUR', rates } : null;
+}
+
+// currency-api's daily snapshots of market rates (EUR-based, codes in lower case: { date, eur:
+// { usd: 1.12, … } }) → the same table, for the currencies asked; null when none has them.
+export function parseCurrencyApi(snapshots, currencies) {
+  const rates = {};
+  for (const s of snapshots) {
+    if (!DAY.test(s?.date ?? '') || !s.eur) continue;
+    const day = Object.fromEntries(currencies.filter(c => CURRENCY.test(c))
+      .map(c => [c, s.eur[c.toLowerCase()]])
+      .filter(([, rate]) => typeof rate === 'number' && rate > 0));
+    if (Object.keys(day).length) rates[s.date] = day;
+  }
+  return Object.keys(rates).length ? { base: 'EUR', rates } : null;
+}
+
 // Frankfurter time series (one base, several currencies) → a pair's latest rate, its change from
 // the previous day and the series. 'USD/ILS' is ILS per USD, so it's rate[ILS] / rate[USD].
 export function parseFxPair(json, pair) {

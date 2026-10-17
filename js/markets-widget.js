@@ -1,12 +1,16 @@
 // Markets widget: live crypto prices from Bybit, US index and commodity quotes from CNBC and ECB
 // exchange rates with sparklines, for the coins, indexes and currency pairs chosen in its ✎ editor, under segment
 // headings added from its right-click menu, in the order they're dragged into. Each copy on the
-// page has its own list; the prices are fetched once and shared through the request cache.
+// page has its own list; the prices are fetched once and shared through the request cache. Each
+// kind has sources to fall back on while its own is down: Binance and OKX, Yahoo Finance, the
+// ECB itself and currency-api.
 
 import { el, icon, svgEl, widgetHead, widgetSub, widgetEmpty, showMenu } from './ui.js';
-import { feed, fetchJson, peek } from './net.js';
+import { feed, fetchJson, fetchText, peek } from './net.js';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCnbcDay, isPair,
+  parseTicker, parseKline, parseBinanceTicker, parseBinanceKline, parseOkxTicker, parseOkxCandles,
+  parseFxPair, fxCurrencies, parseEcbRates, parseCurrencyApi, parseCnbcQuotes, parseCnbcSession, parseCnbcDay,
+  parseYahooChart, parseYahooSpark, yahooCloses, isPair,
   isSegment, segmentItem, blockEnd, moveMarketItem, headingDropIndex, SEGMENT_MAX,
   formatPrice, formatRate, formatChange, sparkPoints, parseCoins,
 } from './feeds.js';
@@ -19,34 +23,66 @@ const REFRESH_MS = 30e3;
 const RECONFIGURE_MS = 800;   // wait for typing to stop before refetching after a settings change
 const SPARK = { w: 64, h: 18 };
 const BYBIT = 'https://api.bybit.com/v5/market';
+const BINANCE = 'https://data-api.binance.vision/api/v3';   // Binance's market data host
+const OKX = 'https://www.okx.com/api/v5/market';
 const FRANKFURTER = 'https://api.frankfurter.dev/v1';
+const ECB = 'https://data-api.ecb.europa.eu/service/data/EXR';
 const CNBC_QUOTES = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
 const CNBC_BARS = 'https://ts-api.cnbc.com/harmony/app/bars';
+const YAHOO = 'https://query1.finance.yahoo.com';
 // Products offered by the editor (any other coin can be typed in). Coins are Bybit spot pairs
-// against USDT; indexes and commodities are CNBC quotes, by their symbol there and on
-// TradingView (commodities are front-month futures, priced in their unit); currency pairs use the
-// ECB's daily reference rates.
+// against USDT; indexes and commodities are CNBC quotes, by their symbol there, on Yahoo Finance
+// and on TradingView (commodities are front-month futures, priced in their unit); currency pairs
+// use the ECB's daily reference rates.
 const COINS = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'DOGE', 'ADA', 'TRX', 'AVAX', 'LINK', 'DOT', 'LTC', 'SUI', 'HYPE'];
 const STOCKS = {
-  SPY: { cnbc: 'SPY', tv: 'AMEX:SPY' },
-  QQQ: { cnbc: 'QQQ', tv: 'NASDAQ:QQQ' },
-  DJIA: { cnbc: '.DJI', tv: 'DJ:DJI' },
+  SPY: { cnbc: 'SPY', yahoo: 'SPY', tv: 'AMEX:SPY' },
+  QQQ: { cnbc: 'QQQ', yahoo: 'QQQ', tv: 'NASDAQ:QQQ' },
+  DJIA: { cnbc: '.DJI', yahoo: '^DJI', tv: 'DJ:DJI' },
 };
 const COMMODITIES = {
-  GOLD: { cnbc: '@GC.1', tv: 'COMEX:GC1!', unit: 'USD per troy ounce' },
-  SILVER: { cnbc: '@SI.1', tv: 'COMEX:SI1!', unit: 'USD per troy ounce' },
-  PLAT: { cnbc: '@PL.1', tv: 'NYMEX:PL1!', unit: 'USD per troy ounce' },
-  COPPER: { cnbc: '@HG.1', tv: 'COMEX:HG1!', unit: 'USD per pound' },
-  OIL: { cnbc: '@CL.1', tv: 'NYMEX:CL1!', unit: 'USD per barrel' },
-  BRENT: { cnbc: '@LCO.1', tv: 'ICEEUR:BRN1!', unit: 'USD per barrel' },
-  NATGAS: { cnbc: '@NG.1', tv: 'NYMEX:NG1!', unit: 'USD per MMBtu' },
-  CORN: { cnbc: '@C.1', tv: 'CBOT:ZC1!', unit: 'US cents per bushel' },
-  WHEAT: { cnbc: '@W.1', tv: 'CBOT:ZW1!', unit: 'US cents per bushel' },
-  SOY: { cnbc: '@S.1', tv: 'CBOT:ZS1!', unit: 'US cents per bushel' },
-  COFFEE: { cnbc: '@KC.1', tv: 'ICEUS:KC1!', unit: 'US cents per pound' },
-  SUGAR: { cnbc: '@SB.1', tv: 'ICEUS:SB1!', unit: 'US cents per pound' },
-  COCOA: { cnbc: '@CC.1', tv: 'ICEUS:CC1!', unit: 'USD per tonne' },
+  GOLD: { cnbc: '@GC.1', yahoo: 'GC=F', tv: 'COMEX:GC1!', unit: 'USD per troy ounce' },
+  SILVER: { cnbc: '@SI.1', yahoo: 'SI=F', tv: 'COMEX:SI1!', unit: 'USD per troy ounce' },
+  PLAT: { cnbc: '@PL.1', yahoo: 'PL=F', tv: 'NYMEX:PL1!', unit: 'USD per troy ounce' },
+  COPPER: { cnbc: '@HG.1', yahoo: 'HG=F', tv: 'COMEX:HG1!', unit: 'USD per pound' },
+  OIL: { cnbc: '@CL.1', yahoo: 'CL=F', tv: 'NYMEX:CL1!', unit: 'USD per barrel' },
+  BRENT: { cnbc: '@LCO.1', yahoo: 'BZ=F', tv: 'ICEEUR:BRN1!', unit: 'USD per barrel' },
+  NATGAS: { cnbc: '@NG.1', yahoo: 'NG=F', tv: 'NYMEX:NG1!', unit: 'USD per MMBtu' },
+  CORN: { cnbc: '@C.1', yahoo: 'ZC=F', tv: 'CBOT:ZC1!', unit: 'US cents per bushel' },
+  WHEAT: { cnbc: '@W.1', yahoo: 'ZW=F', tv: 'CBOT:ZW1!', unit: 'US cents per bushel' },
+  SOY: { cnbc: '@S.1', yahoo: 'ZS=F', tv: 'CBOT:ZS1!', unit: 'US cents per bushel' },
+  COFFEE: { cnbc: '@KC.1', yahoo: 'KC=F', tv: 'ICEUS:KC1!', unit: 'US cents per pound' },
+  SUGAR: { cnbc: '@SB.1', yahoo: 'SB=F', tv: 'ICEUS:SB1!', unit: 'US cents per pound' },
+  COCOA: { cnbc: '@CC.1', yahoo: 'CC=F', tv: 'ICEUS:CC1!', unit: 'USD per tonne' },
 };
+// The exchanges a coin's price and 24h chart come from, in turn: another answers while Bybit is
+// down or doesn't list the coin. Each with its trading page and its name on TradingView.
+const EXCHANGES = [
+  {
+    name: 'Bybit',
+    priceUrl: coin => `${BYBIT}/tickers?category=spot&symbol=${coin}USDT`, readPrice: parseTicker,
+    chartUrl: coin => `${BYBIT}/kline?category=spot&symbol=${coin}USDT&interval=60&limit=24`, readChart: parseKline,
+    trade: coin => `https://www.bybit.com/en/trade/spot/${coin}/USDT`, tv: 'BYBIT',
+  },
+  {
+    name: 'Binance',
+    priceUrl: coin => `${BINANCE}/ticker/24hr?symbol=${coin}USDT`, readPrice: parseBinanceTicker,
+    chartUrl: coin => `${BINANCE}/klines?symbol=${coin}USDT&interval=1h&limit=24`, readChart: parseBinanceKline,
+    trade: coin => `https://www.binance.com/en/trade/${coin}_USDT`, tv: 'BINANCE',
+  },
+  {
+    name: 'OKX',
+    priceUrl: coin => `${OKX}/ticker?instId=${coin}-USDT`, readPrice: parseOkxTicker,
+    chartUrl: coin => `${OKX}/candles?instId=${coin}-USDT&bar=1H&limit=24`, readChart: parseOkxCandles,
+    trade: coin => `https://www.okx.com/trade-spot/${coin.toLowerCase()}-usdt`, tv: 'OKX',
+  },
+];
+const exchangeNamed = name => EXCHANGES.find(x => x.name === name) ?? EXCHANGES[0];
+// currency-api (market rates, a snapshot a day) on its CDN and on its mirror.
+const CURRENCY_API = [
+  ['currency-api', day => `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${day === 'latest' ? 'latest' : day.replaceAll('-', '.')}/v1/currencies/eur.min.json`],
+  ['currency-api mirror', day => `https://${day}.currency-api.pages.dev/v1/currencies/eur.min.json`],
+];
 const CNBC = { ...STOCKS, ...COMMODITIES };
 const PAIRS = ['USD/ILS', 'EUR/ILS', 'GBP/ILS', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF'];
 
@@ -89,31 +125,40 @@ export function mountMarkets(root, store, copy) {
       chart ? el('a', { class: 'mk-tv', title: chart.title, 'aria-label': chart.title, draggable: false, ...linkProps(chart.href) }, icon('candles', 15)) : el('span'));
   }
 
-  const coinRow = ({ id, ticker, closes }) => marketRow({
-    label: id,
-    href: `https://www.bybit.com/en/trade/spot/${id}/USDT`,
-    title: ticker ? `${id}/USDT on Bybit · 24h chart` : `No Bybit spot price for ${id}/USDT`,
-    value: ticker ? formatPrice(ticker.price) : '—',
-    change: ticker?.change ?? null,
-    closes,
-    chart: { href: `https://www.tradingview.com/chart/?symbol=BYBIT:${id}USDT`, title: `${id}/USDT chart on TradingView` },
-  });
+  // A row links to the exchange its price came from.
+  const coinRow = ({ id, ticker, closes, via }) => {
+    const x = exchangeNamed(via);
+    return marketRow({
+      label: id,
+      href: x.trade(id),
+      title: ticker ? `${id}/USDT on ${x.name} · 24h chart` : `No spot price for ${id}/USDT on Bybit, Binance or OKX`,
+      value: ticker ? formatPrice(ticker.price) : '—',
+      change: ticker?.change ?? null,
+      closes,
+      chart: { href: `https://www.tradingview.com/chart/?symbol=${x.tv}:${id}USDT`, title: `${id}/USDT chart on TradingView` },
+    });
+  };
 
-  const cnbcRow = ({ id, quote, closes }) => marketRow({
-    label: id,
-    href: `https://www.cnbc.com/quotes/${CNBC[id].cnbc}`,
-    title: !quote ? `No CNBC quote for ${id} yet`
-      : `${quote.name}${CNBC[id].unit ? ` in ${CNBC[id].unit}` : ''} on CNBC · as of ${quote.time}`,
-    value: quote ? formatPrice(quote.price) : '—',
-    change: quote?.change ?? null,
-    closes,
-    chart: { href: `https://www.tradingview.com/chart/?symbol=${CNBC[id].tv}`, title: `${id} chart on TradingView` },
-  });
+  const cnbcRow = ({ id, quote, closes, via }) => {
+    const yahoo = via === 'Yahoo Finance';
+    return marketRow({
+      label: id,
+      href: yahoo ? `https://finance.yahoo.com/quote/${encodeURIComponent(CNBC[id].yahoo)}` : `https://www.cnbc.com/quotes/${CNBC[id].cnbc}`,
+      title: !quote ? `No quote for ${id} yet`
+        : `${quote.name}${CNBC[id].unit ? ` in ${CNBC[id].unit}` : ''} on ${yahoo ? 'Yahoo Finance' : 'CNBC'} · as of ${quote.time}`,
+      value: quote ? formatPrice(quote.price) : '—',
+      change: quote?.change ?? null,
+      closes,
+      chart: { href: `https://www.tradingview.com/chart/?symbol=${CNBC[id].tv}`, title: `${id} chart on TradingView` },
+    });
+  };
 
-  const pairRow = ({ id, fx }) => marketRow({
+  const pairRow = ({ id, fx, via }) => marketRow({
     label: id,
     href: `https://www.google.com/finance/quote/${id.replace('/', '-')}`,
-    title: fx ? `ECB reference rate for ${fx.date} · last ${fx.series.length} days` : `No ECB rate for ${id} yet`,
+    title: !fx ? `No rate for ${id} yet`
+      : via?.startsWith('currency-api') ? `Market rate for ${fx.date} (currency-api, while the ECB's can't be reached)`
+        : `ECB reference rate for ${fx.date} · last ${fx.series.length} days`,
     value: fx ? formatRate(fx.rate) : '—',
     change: fx?.change ?? null,
     closes: fx?.series ?? [],
@@ -165,87 +210,140 @@ export function mountMarkets(root, store, copy) {
   const quotesKey = ids => `cnbc:quotes:${ids.join(',')}`;
   const sessionKey = id => `cnbc:session:${id}`;
 
-  // Rows in the chosen order, headings among them; coin(id) gives a coin's { ticker, closes },
-  // cnbc(id) an index's or commodity's { quote, closes }.
-  const marketRows = (list, coin, cnbc, fxTable) => list.map(id => (isSegment(id) ? { id }
-    : isPair(id) ? { id, fx: fxTable ? parseFxPair(fxTable, id) : null }
+  // Rows in the chosen order, headings among them; coin(id) gives a coin's { ticker, closes, via },
+  // cnbc(id) an index's or commodity's { quote, closes, via }, fx the pairs' { table, via }.
+  const marketRows = (list, coin, cnbc, fx) => list.map(id => (isSegment(id) ? { id }
+    : isPair(id) ? { id, fx: fx.table ? parseFxPair(fx.table, id) : null, via: fx.via }
     : { id, ...(isCnbc(id) ? cnbc(id) : coin(id)) }));
 
   function renderCachedMarkets() {
     const list = items();
     const currencies = fxCurrencies(list);
-    const fxTable = currencies.length ? peek(fxKey(currencies))?.data ?? null : null;
+    const fx = currencies.length ? peek(fxKey(currencies)) : null;
     const ids = cnbcOf(list);
-    const quotes = ids.length ? peek(quotesKey(ids))?.data ?? {} : {};
-    renderMarkets(marketRows(list, id => ({
-      ticker: peek(marketKeys(id).ticker)?.data ?? null,
-      closes: peek(marketKeys(id).kline)?.data ?? [],
-    }), id => ({
-      quote: quotes[CNBC[id].cnbc] ?? null,
+    const quotes = ids.length ? peek(quotesKey(ids)) : null;
+    renderMarkets(marketRows(list, id => {
+      const ticker = peek(marketKeys(id).ticker);
+      return { ticker: ticker?.data ?? null, closes: peek(marketKeys(id).kline)?.data ?? [], via: ticker?.via };
+    }, id => ({
+      quote: quotes?.data?.[CNBC[id].cnbc] ?? null,
       closes: peek(sessionKey(id))?.data ?? [],
-    }), fxTable));
+      via: quotes?.via,
+    }), { table: fx?.data ?? null, via: fx?.via }));
   }
 
+  // Price and chart each from the first exchange that has the coin.
   async function loadCoin(coin) {
     const keys = marketKeys(coin);
-    const symbol = `${coin}USDT`;
     const [ticker, kline] = await Promise.all([
-      feed(keys.ticker, PRICE_TTL, async () => parseTicker(await fetchJson(`${BYBIT}/tickers?category=spot&symbol=${symbol}`))),
-      feed(keys.kline, KLINE_TTL, async () => {
-        const closes = parseKline(await fetchJson(`${BYBIT}/kline?category=spot&symbol=${symbol}&interval=60&limit=24`));
-        return closes.length ? closes : null;
-      }),
+      feed(keys.ticker, PRICE_TTL, EXCHANGES.map(x => ({ name: x.name, load: async () => x.readPrice(await fetchJson(x.priceUrl(coin))) }))),
+      feed(keys.kline, KLINE_TTL, EXCHANGES.map(x => ({
+        name: x.name,
+        load: async () => {
+          const closes = x.readChart(await fetchJson(x.chartUrl(coin)));
+          return closes.length ? closes : null;
+        },
+      }))),
     ]);
-    return [coin, { ticker: ticker.data, closes: kline.data ?? [] }];
+    return [coin, { ticker: ticker.data, closes: kline.data ?? [], via: ticker.via }];
   }
 
+  // Quotes keyed by CNBC's symbols, whichever source gave them.
   async function loadCnbc(ids) {
     if (!ids.length) return new Map();
     const symbols = ids.map(id => CNBC[id].cnbc).join('|');
     const [quotes, sessions] = await Promise.all([
-      feed(quotesKey(ids), PRICE_TTL, async () => {
-        const table = parseCnbcQuotes(await fetchJson(`${CNBC_QUOTES}?symbols=${encodeURIComponent(symbols)}&requestMethod=itv&output=json`));
-        return Object.keys(table).length ? table : null;
-      }),
+      feed(quotesKey(ids), PRICE_TTL, [
+        {
+          name: 'CNBC',
+          load: async () => {
+            const table = parseCnbcQuotes(await fetchJson(`${CNBC_QUOTES}?symbols=${encodeURIComponent(symbols)}&requestMethod=itv&output=json`));
+            return Object.keys(table).length ? table : null;
+          },
+        },
+        {
+          name: 'Yahoo Finance',
+          load: async () => {
+            const charts = parseYahooSpark(await fetchJson(`${YAHOO}/v7/finance/spark?symbols=${encodeURIComponent(ids.map(id => CNBC[id].yahoo).join(','))}&range=1d&interval=5m`));
+            const found = ids.filter(id => charts[CNBC[id].yahoo]);
+            return found.length ? Object.fromEntries(found.map(id => [CNBC[id].cnbc, charts[CNBC[id].yahoo].quote])) : null;
+          },
+        },
+      ]),
       Promise.all(ids.map(loadSession)),
     ]);
-    return new Map(ids.map((id, i) => [id, { quote: quotes.data?.[CNBC[id].cnbc] ?? null, closes: sessions[i] }]));
+    return new Map(ids.map((id, i) => [id, { quote: quotes.data?.[CNBC[id].cnbc] ?? null, closes: sessions[i], via: quotes.via }]));
   }
 
   // 10-minute bars of the last five days, which reach back over a long weekend: an index charts
   // its latest session, a commodity its last 24 hours of trading. CNBC reads the times in New
-  // York; a day either side of UTC's is close enough here.
+  // York; a day either side of UTC's is close enough here. Yahoo Finance gives an index's latest
+  // session (5-minute bars) and two days of a commodity's (15-minute bars) to take 24 hours of.
   async function loadSession(id) {
     const stamp = ms => isoDay(ms).replaceAll('-', '') + '000000';
-    const parse = isCommodity(id) ? parseCnbcDay : parseCnbcSession;
-    const result = await feed(sessionKey(id), KLINE_TTL, async () => {
-      const span = `${stamp(Date.now() - 5 * 86400e3)}/${stamp(Date.now() + 86400e3)}`;
-      const closes = parse(await fetchJson(`${CNBC_BARS}/${encodeURIComponent(CNBC[id].cnbc)}/10M/${span}/adjusted/EST5EDT.json`));
-      return closes.length ? closes : null;
-    });
+    const commodity = isCommodity(id);
+    const parse = commodity ? parseCnbcDay : parseCnbcSession;
+    const result = await feed(sessionKey(id), KLINE_TTL, [
+      {
+        name: 'CNBC',
+        load: async () => {
+          const span = `${stamp(Date.now() - 5 * 86400e3)}/${stamp(Date.now() + 86400e3)}`;
+          const closes = parse(await fetchJson(`${CNBC_BARS}/${encodeURIComponent(CNBC[id].cnbc)}/10M/${span}/adjusted/EST5EDT.json`));
+          return closes.length ? closes : null;
+        },
+      },
+      {
+        name: 'Yahoo Finance',
+        load: async () => {
+          const range = commodity ? 'range=2d&interval=15m' : 'range=1d&interval=5m';
+          const chart = parseYahooChart((await fetchJson(`${YAHOO}/v8/finance/chart/${encodeURIComponent(CNBC[id].yahoo)}?${range}`))?.chart?.result?.[0]);
+          const closes = chart ? yahooCloses(chart.bars, commodity) : [];
+          return closes.length ? closes : null;
+        },
+      },
+    ]);
     return result.data ?? [];
   }
 
+  // Market rates for a day and the day before, from one host of currency-api.
+  async function currencyApi(url, currencies) {
+    const latest = await fetchJson(url('latest'));
+    const before = Date.parse(latest?.date) - 86400e3;
+    const previous = Number.isFinite(before) ? await fetchJson(url(isoDay(before))).catch(() => null) : null;
+    return parseCurrencyApi([previous, latest], currencies);
+  }
+
+  // Frankfurter's copy of the ECB's rates, else the ECB's own, else currency-api's market rates.
   async function loadFx(currencies) {
-    if (!currencies.length) return null;
+    if (!currencies.length) return { table: null };
     const from = isoDay(Date.now() - 12 * 86400e3);
-    const result = await feed(fxKey(currencies), FX_TTL, async () => {
-      const json = await fetchJson(`${FRANKFURTER}/${from}..?from=EUR&to=${currencies.join(',')}`);
-      return json?.rates ? { base: json.base, rates: json.rates } : null;
-    });
-    return result.data;
+    const result = await feed(fxKey(currencies), FX_TTL, [
+      {
+        name: 'Frankfurter',
+        load: async () => {
+          const json = await fetchJson(`${FRANKFURTER}/${from}..?from=EUR&to=${currencies.join(',')}`);
+          return json?.rates ? { base: json.base, rates: json.rates } : null;
+        },
+      },
+      {
+        name: 'ECB',
+        load: async () => parseEcbRates(await fetchText(`${ECB}/D.${currencies.join('+')}.EUR.SP00.A?startPeriod=${from}&detail=dataonly&format=csvdata`)),
+      },
+      ...CURRENCY_API.map(([name, url]) => ({ name, load: () => currencyApi(url, currencies) })),
+    ]);
+    return { table: result.data, via: result.via };
   }
 
   let seq = 0;
   async function loadMarkets() {
     const list = items();
     const my = ++seq;
-    const [coins, cnbc, fxTable] = await Promise.all([
+    const [coins, cnbc, fx] = await Promise.all([
       Promise.all(list.filter(isCoin).map(loadCoin)).then(entries => new Map(entries)),
       loadCnbc(cnbcOf(list)),
       loadFx(fxCurrencies(list)),
     ]);
-    if (my === seq) renderMarkets(marketRows(list, id => coins.get(id), id => cnbc.get(id), fxTable));
+    if (my === seq) renderMarkets(marketRows(list, id => coins.get(id), id => cnbc.get(id), fx));
   }
 
   // ---- editor: ✎ swaps the rows for checkboxes; changes apply as they're made ----

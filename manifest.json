@@ -33,7 +33,8 @@
   "host_permissions": [
     "https://github.com/*",
     "https://api.github.com/*",
-    "https://*.speeddial2.com/*"
+    "https://*.speeddial2.com/*",
+    "https://query1.finance.yahoo.com/*"
   ],
   "optional_host_permissions": [
     "*://*/*"

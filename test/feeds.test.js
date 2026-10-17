@@ -4,6 +4,8 @@ import {
   parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCnbcDay, parseCommits, latestCommits, latestRepos, parseStats, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
   isPair, isSegment, segmentItem, moveMarketItem, headingDropIndex, parseContributions, heatmapLayout,
+  parseBinanceTicker, parseBinanceKline, parseOkxTicker, parseOkxCandles, parseYahooChart, parseYahooSpark, yahooCloses,
+  parseEcbRates, parseCurrencyApi,
 } from '../js/feeds.js';
 
 test('parseTicker reads Bybit last price and 24h change', () => {
@@ -260,4 +262,88 @@ test('parseStats counts followers, public repos and the stars on repos that aren
   assert.deepEqual(parseStats({ followers: 128, public_repos: 42 }, repos), { followers: 128, repos: 42, stars: 12 });
   assert.deepEqual(parseStats({}, {}), { followers: 0, repos: 0, stars: 0 });
   assert.deepEqual(parseStats(null, null), { followers: 0, repos: 0, stars: 0 });
+});
+
+// ---- the sources Markets falls back on ----
+
+test('Binance reads like Bybit: last price, 24h change as a fraction, closes oldest first', () => {
+  assert.deepEqual(parseBinanceTicker({ symbol: 'BTCUSDT', lastPrice: '81636.84000000', priceChangePercent: '-0.080' }), { price: 81636.84, change: -0.0008 });
+  assert.equal(parseBinanceTicker({ code: -1121, msg: 'Invalid symbol.' }), null);
+  assert.deepEqual(parseBinanceKline([[1, '1', '1', '1', '106.33'], [2, '1', '1', '1', '106.38']]), [106.33, 106.38]);
+  assert.deepEqual(parseBinanceKline({ code: -1121 }), []);
+});
+
+test('OKX reads like Bybit: its change is since the price 24 hours ago; unknown coins read as null', () => {
+  const ticker = { code: '0', data: [{ instId: 'BTC-USDT', last: '81632.2', open24h: '81683.1' }] };
+  const t = parseOkxTicker(ticker);
+  assert.equal(t.price, 81632.2);
+  assert.ok(Math.abs(t.change - (81632.2 / 81683.1 - 1)) < 1e-12);
+  assert.equal(parseOkxTicker({ code: '51001', data: [], msg: 'Instrument ID … doesn\'t exist.' }), null);
+  assert.deepEqual(parseOkxCandles({ code: '0', data: [['3', '1', '1', '1', '106.87'], ['2', '1', '1', '1', '106.38']] }), [106.38, 106.87]);
+  assert.deepEqual(parseOkxCandles({ code: '51001', data: [] }), []);
+});
+
+// A trimmed Yahoo Finance chart for SPY, the session of 2026-10-16.
+const YAHOO_SPY = {
+  meta: {
+    symbol: 'SPY', longName: 'State Street SPDR S&P 500 ETF Trust', regularMarketPrice: 763.25,
+    regularMarketChangePercent: -1.107, previousClose: 771.79, regularMarketTime: 1792180800,
+  },
+  timestamp: [1792157400, 1792157700, 1792158000],
+  indicators: { quote: [{ close: [762.67, null, 763.25] }] },
+};
+
+test('a Yahoo Finance chart reads as a CNBC-style quote (New York time) and its bars', () => {
+  assert.deepEqual(parseYahooChart(YAHOO_SPY), {
+    quote: { price: 763.25, change: -0.01107, name: 'State Street SPDR S&P 500 ETF Trust', time: '4:00 PM EDT' },
+    bars: [{ at: 1792157400e3, close: 762.67 }, { at: 1792158000e3, close: 763.25 }],
+  });
+  // Without Yahoo's own change it's worked out from the previous close.
+  const { regularMarketChangePercent, ...meta } = YAHOO_SPY.meta;
+  assert.ok(Math.abs(parseYahooChart({ ...YAHOO_SPY, meta }).quote.change - (763.25 / 771.79 - 1)) < 1e-12);
+  assert.equal(parseYahooChart({ meta: { symbol: 'NOPE' } }), null);
+  assert.equal(parseYahooChart(undefined), null);
+});
+
+test('Yahoo Finance\'s spark gives a chart per symbol it has a price for', () => {
+  const json = { spark: { result: [
+    { symbol: 'SPY', response: [YAHOO_SPY] },
+    { symbol: 'NOPE', response: [{ meta: { symbol: 'NOPE' } }] },
+  ] } };
+  const charts = parseYahooSpark(json);
+  assert.deepEqual(Object.keys(charts), ['SPY']);
+  assert.equal(charts.SPY.quote.price, 763.25);
+  assert.deepEqual(Object.keys(parseYahooSpark({ finance: { error: {} } })), []);
+});
+
+test('yahooCloses: every bar for an index\'s session, the last 24 hours for a commodity', () => {
+  const bars = [{ at: 0, close: 1 }, { at: 2 * 3600e3, close: 2 }, { at: 25 * 3600e3, close: 3 }];
+  assert.deepEqual(yahooCloses(bars), [1, 2, 3]);
+  assert.deepEqual(yahooCloses(bars, true), [2, 3]);
+  assert.deepEqual(yahooCloses([], true), []);
+});
+
+test('the ECB\'s own rates (CSV) read as the table Frankfurter gives', () => {
+  const csv = [
+    'KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE',
+    'EXR.D.ILS.EUR.SP00.A,D,ILS,EUR,SP00,A,2026-10-15,3.4769',
+    'EXR.D.ILS.EUR.SP00.A,D,ILS,EUR,SP00,A,2026-10-16,3.4822',
+    'EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-10-15,1.1208',
+    'EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-10-16,1.1253',
+    'EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2026-10-17,',
+  ].join('\r\n');
+  const table = parseEcbRates(csv);
+  assert.deepEqual(table, { base: 'EUR', rates: { '2026-10-15': { ILS: 3.4769, USD: 1.1208 }, '2026-10-16': { ILS: 3.4822, USD: 1.1253 } } });
+  assert.equal(parseFxPair(table, 'USD/ILS').rate, 3.4822 / 1.1253);
+  assert.equal(parseEcbRates('No results found.'), null);
+  assert.equal(parseEcbRates(''), null);
+});
+
+test('currency-api\'s snapshots (lower-case codes) read as the same table, for the currencies asked', () => {
+  const day = (date, usd, ils) => ({ date, eur: { usd, ils, gbp: 0.84, '1inch': 10.7 } });
+  const table = parseCurrencyApi([day('2026-10-16', 1.1209, 3.4642), day('2026-10-17', 1.1239, 3.4780)], ['ILS', 'USD']);
+  assert.deepEqual(table, { base: 'EUR', rates: { '2026-10-16': { ILS: 3.4642, USD: 1.1209 }, '2026-10-17': { ILS: 3.478, USD: 1.1239 } } });
+  // A day that failed to load is left out.
+  assert.deepEqual(Object.keys(parseCurrencyApi([null, day('2026-10-17', 1.1239, 3.478)], ['USD']).rates), ['2026-10-17']);
+  assert.equal(parseCurrencyApi([{ date: '2026-10-17', eur: {} }], ['USD']), null);
 });
