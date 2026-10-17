@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   COLS, ROWS, TYPES, GITHUB_PARTS, fits, firstFree, countOf, stackOrder, defaultLayout, normalizeLayout,
   addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle, prefsSection,
+  cleanGithubParts, moveGithubPart, showGithubPart,
 } from '../js/layout.js';
 
 const legacy = over => ({
@@ -40,7 +41,7 @@ test('the default conversion mirrors today\'s page', () => {
   assert.deepEqual(t.search.settings, {});
   assert.deepEqual(t.tasks.settings, { view: 'all', showDone: false });
   assert.deepEqual(t.markets.settings, { items: ['BTC', 'USD/ILS'] });
-  assert.deepEqual(t.github.settings, { parts: GITHUB_PARTS });
+  assert.deepEqual(t.github.settings, { order: GITHUB_PARTS, parts: ['heatmap', 'pulls', 'issues', 'commits'] });
   assert.ok(l.widgets.every(c => typeof c.id === 'string' && c.id));
   assert.equal(new Set(l.widgets.map(c => c.id)).size, l.widgets.length);
 });
@@ -78,7 +79,7 @@ test('the bar and GitHub Show convert', () => {
   const parts = show => t({ widgets: { ...legacy().widgets, github: { enabled: true, user: 'o', show } } }).github.settings.parts;
   assert.deepEqual(parts('commits'), ['heatmap', 'pulls', 'commits']);
   assert.deepEqual(parts('issues'), ['heatmap', 'pulls', 'issues']);
-  assert.deepEqual(parts('both'), GITHUB_PARTS);
+  assert.deepEqual(parts('both'), ['heatmap', 'pulls', 'issues', 'commits']);
 });
 
 test('fits and firstFree respect the canvas and other copies', () => {
@@ -119,7 +120,7 @@ test('normalizeLayout drops junk, clamps, resolves overlaps and enforces limits'
   assert.deepEqual(t.markets.settings.items, ['ETH']);
   assert.deepEqual(rect(t.tiles), [9, 9, 3, 3]);
   assert.deepEqual(t.tiles.settings, { group: null, columns: 10 });
-  assert.deepEqual(t.github.settings, { parts: ['heatmap', 'commits'] });
+  assert.deepEqual(t.github.settings, { order: GITHUB_PARTS, parts: ['heatmap', 'commits'] });
   assert.ok(t.github.id);
   assert.equal(l.cols, COLS);
   assert.equal(l.rows, ROWS);
@@ -233,6 +234,8 @@ test('copyTitle names a copy for labels and Preferences', () => {
   assert.equal(copyTitle({ type: 'tiles', settings: { group: null } }, groups), 'Tiles · follows the tabs');
   assert.equal(copyTitle({ type: 'github', settings: { parts: ['heatmap', 'commits'] } }, groups), 'GitHub · Map + Commits');
   assert.equal(copyTitle({ type: 'github', settings: { parts: [] } }, groups), 'GitHub · nothing chosen');
+  assert.equal(copyTitle({ type: 'github', settings: { parts: ['stats', 'heatmap', 'repos'] } }, groups), 'GitHub · Stats + Map + Repos');
+  assert.equal(copyTitle({ type: 'github', settings: { parts: ['commits', 'heatmap', 'pulls', 'reviews', 'issues'] } }, groups), 'GitHub · Commits + Map + 3 more');
   assert.equal(copyTitle({ type: 'clock', settings: {} }, groups), 'Clock');
   assert.equal(copyTitle({ type: 'website', settings: { url: 'https://www.pinterest.com/ideas/' } }, groups), 'Website · pinterest.com');
   assert.equal(copyTitle({ type: 'website', settings: { url: '' } }, groups), 'Website · no address');
@@ -254,8 +257,9 @@ test('a Website copy keeps its address and a zoom from 50 to 100 percent', () =>
 });
 
 test('prefsSection says where Preferences keeps a type’s settings', () => {
-  for (const type of ['clock', 'markets', 'github', 'tiles', 'website']) assert.equal(prefsSection(type), 'layout', type);
+  for (const type of ['clock', 'markets', 'tiles', 'website']) assert.equal(prefsSection(type), 'layout', type);
   assert.equal(prefsSection('search'), 'search');
+  assert.equal(prefsSection('github'), 'github');
   for (const type of ['tasks', 'notes', 'claude']) assert.equal(prefsSection(type), null, type);
   assert.equal(prefsSection('weather'), 'layout');   // an unknown type falls back to its own group
 });
@@ -283,4 +287,45 @@ test('Sports: its own settings, never added to an old page, kept by Reset layout
   assert.deepEqual(rect(t.github), [9, 4, 3, 4]);
   assert.deepEqual(rect(t.sports), [9, 8, 3, 4]);
   assert.equal(t.sports.id, sports.id);
+});
+
+test('a GitHub copy keeps every part in its own order, and which of them it shows', () => {
+  const all = ['stats', 'heatmap', 'pulls', 'reviews', 'issues', 'repos', 'commits'];
+  assert.deepEqual(GITHUB_PARTS, all);
+  // A new copy: the default order, the four parts the widget always had.
+  assert.deepEqual(TYPES.github.defaults(), { order: all, parts: ['heatmap', 'pulls', 'issues', 'commits'] });
+  // Saved before there was an order: the shown parts stay, in the default order.
+  assert.deepEqual(cleanGithubParts({ parts: ['commits', 'heatmap'] }), { order: all, parts: ['heatmap', 'commits'] });
+  // A saved order is kept; shown parts follow it; unknown and repeated parts go.
+  const order = ['commits', 'repos', 'heatmap', 'stats', 'pulls', 'reviews', 'issues'];
+  assert.deepEqual(cleanGithubParts({ order: [...order, 'junk', 'commits'], parts: ['heatmap', 'commits', 'junk', 'heatmap'] }),
+    { order, parts: ['commits', 'heatmap'] });
+  assert.deepEqual(cleanGithubParts({ order, parts: [] }), { order, parts: [] });
+  assert.deepEqual(cleanGithubParts({ order, parts: 'heatmap' }).parts, ['commits', 'heatmap', 'pulls', 'issues']);
+  // Parts missing from a saved order go in after their nearest predecessor in the default order.
+  assert.deepEqual(cleanGithubParts({ order: ['commits', 'heatmap', 'issues', 'pulls'] }).order,
+    ['stats', 'commits', 'heatmap', 'issues', 'repos', 'pulls', 'reviews']);
+});
+
+test('moveGithubPart moves a part one place, shown or not, and stops at the ends', () => {
+  const s = cleanGithubParts({});
+  const up = moveGithubPart(s, 'commits', -1);
+  assert.deepEqual(up.order, ['stats', 'heatmap', 'pulls', 'reviews', 'issues', 'commits', 'repos']);
+  assert.deepEqual(up.parts, ['heatmap', 'pulls', 'issues', 'commits']);
+  const down = moveGithubPart(s, 'heatmap', 1);
+  assert.deepEqual(down.parts, ['pulls', 'heatmap', 'issues', 'commits']);
+  assert.deepEqual(moveGithubPart(s, 'stats', -1), s);
+  assert.deepEqual(moveGithubPart(s, 'commits', 1), s);
+  assert.deepEqual(moveGithubPart(s, 'junk', 1), s);
+  assert.deepEqual(s, cleanGithubParts({}));   // the settings passed in are left as they were
+});
+
+test('showGithubPart switches a part on in its place, or off', () => {
+  const s = cleanGithubParts({});
+  assert.deepEqual(showGithubPart(s, 'repos', true).parts, ['heatmap', 'pulls', 'issues', 'repos', 'commits']);
+  assert.deepEqual(showGithubPart(s, 'stats', true).parts, ['stats', 'heatmap', 'pulls', 'issues', 'commits']);
+  assert.deepEqual(showGithubPart(s, 'heatmap', false).parts, ['pulls', 'issues', 'commits']);
+  assert.deepEqual(showGithubPart(s, 'heatmap', true), s);
+  assert.deepEqual(showGithubPart(s, 'junk', true), s);
+  assert.deepEqual(showGithubPart(s, 'repos', false).order, s.order);
 });

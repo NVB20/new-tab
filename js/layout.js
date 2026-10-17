@@ -10,9 +10,11 @@ import { VIEWS as TASK_VIEWS } from './tasks.js';
 
 export const COLS = 12;
 export const ROWS = 12;
-// What a GitHub copy can show, in the order the widget draws them.
-export const GITHUB_PARTS = ['heatmap', 'pulls', 'issues', 'commits'];
-export const PART_LABELS = { heatmap: 'Map', pulls: 'PRs', issues: 'Issues', commits: 'Commits' };
+// What a GitHub copy can show, in the default order; each copy keeps its own order.
+export const GITHUB_PARTS = ['stats', 'heatmap', 'pulls', 'reviews', 'issues', 'repos', 'commits'];
+// The parts a new copy shows (and a copy saved before the others existed).
+const GITHUB_SHOWN = ['heatmap', 'pulls', 'issues', 'commits'];
+export const PART_LABELS = { stats: 'Stats', heatmap: 'Map', pulls: 'PRs', reviews: 'Reviews', issues: 'Issues', repos: 'Repos', commits: 'Commits' };
 const CLOCK_FACES = ['classic', 'stencil', 'rounded', 'serif', 'dot', 'stencil-line', 'rounded-line', 'serif-line'];
 const MARKET_ITEMS = ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'];
 
@@ -23,8 +25,8 @@ const str = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
 
 // size and min are [w, h] in cells; max is how many copies the page may hold. clean(settings,
 // state) returns a full, valid settings object for the type. A type's settings are the copy's own
-// group under Preferences → Layout, unless prefs names another section (shared by every copy) or
-// is null (nothing to set).
+// group under Preferences → Layout, unless prefs names another section (which holds the settings
+// every copy shares, and for GitHub each copy's own group too) or is null (nothing to set).
 export const TYPES = {
   clock: {
     label: 'Clock', icon: 'clock', size: [3, 4], min: [2, 2], max: 1,
@@ -49,10 +51,11 @@ export const TYPES = {
     defaults: () => ({ items: [...MARKET_ITEMS] }),
     clean: s => ({ items: cleanMarketItems(s.items) ?? [...MARKET_ITEMS] }),
   },
+  // order: every part, as the copy lists them; parts: the ones shown, in that order.
   github: {
-    label: 'GitHub', icon: 'branch', size: [3, 6], min: [3, 3], max: 5,
-    defaults: () => ({ parts: [...GITHUB_PARTS] }),
-    clean: s => ({ parts: Array.isArray(s.parts) ? GITHUB_PARTS.filter(p => s.parts.includes(p)) : [...GITHUB_PARTS] }),
+    label: 'GitHub', icon: 'branch', size: [3, 6], min: [3, 3], max: 5, prefs: 'github',
+    defaults: () => cleanGithubParts({}),
+    clean: s => cleanGithubParts(s),
   },
   sports: {
     label: 'Sports', icon: 'trophy', size: [3, 5], min: [2, 3], max: 5,
@@ -77,6 +80,41 @@ export const TYPES = {
     clean: s => ({ url: str(s.url).slice(0, 2000), zoom: clamp(int(s.zoom, 100), 50, 100) }),
   },
 };
+
+// ---- GitHub parts ----
+
+const knownParts = list => (Array.isArray(list) ? [...new Set(list)].filter(p => GITHUB_PARTS.includes(p)) : []);
+
+// A copy's order and shown parts, whole and valid. A part the saved order lacks (it came later)
+// goes in after its nearest predecessor in the default order.
+export function cleanGithubParts(s) {
+  const order = knownParts(s.order);
+  GITHUB_PARTS.forEach((part, i) => {
+    if (order.includes(part)) return;
+    const before = GITHUB_PARTS.slice(0, i).findLast(p => order.includes(p));
+    order.splice(before ? order.indexOf(before) + 1 : 0, 0, part);
+  });
+  const shown = Array.isArray(s.parts) ? knownParts(s.parts) : GITHUB_SHOWN;
+  return { order, parts: order.filter(p => shown.includes(p)) };
+}
+
+// The settings with `part` one place up (-1) or down (1) the list; at an end, unchanged.
+export function moveGithubPart(s, part, step) {
+  const order = [...s.order];
+  const i = order.indexOf(part);
+  const j = i + step;
+  if (i < 0 || j < 0 || j >= order.length) return cleanGithubParts(s);
+  [order[i], order[j]] = [order[j], order[i]];
+  return cleanGithubParts({ order, parts: s.parts });
+}
+
+// "Map + Commits", "Map + PRs + 3 more", "nothing chosen".
+export function partsSummary(parts) {
+  const names = parts.map(p => PART_LABELS[p]);
+  return (names.length > 3 ? [...names.slice(0, 2), `${names.length - 2} more`] : names).join(' + ') || 'nothing chosen';
+}
+
+export const showGithubPart = (s, part, on) => cleanGithubParts({ order: s.order, parts: on ? [...s.parts, part] : s.parts.filter(p => p !== part) });
 
 // The Preferences section that holds a type's settings: 'layout' (the copy's own group), another
 // section's id, or null.
@@ -153,7 +191,7 @@ export function defaultPositions(types, side = 'left', barAt = 'top') {
 }
 
 // The old GitHub Show choice as parts: the map and open PRs always came first.
-export const partsFromShow = show => (show === 'commits' ? ['heatmap', 'pulls', 'commits'] : show === 'issues' ? ['heatmap', 'pulls', 'issues'] : [...GITHUB_PARTS]);
+export const partsFromShow = show => (show === 'commits' ? ['heatmap', 'pulls', 'commits'] : show === 'issues' ? ['heatmap', 'pulls', 'issues'] : [...GITHUB_SHOWN]);
 
 // The layout a state from before Layout mode gets: the page it showed. `old` is the legacy prefs
 // shape (widgets.*, search.enabled/row, columns) with every field present.
@@ -165,7 +203,7 @@ export function defaultLayout(old) {
   const settings = {
     clock: () => ({ hour24: w.clock.hour24, name: w.clock.name, greeting: w.clock.greeting, face: w.clock.face, colon: w.clock.colon }),
     markets: () => ({ items: [...w.markets.items] }),
-    github: () => ({ parts: partsFromShow(w.github.show) }),
+    github: () => cleanGithubParts({ parts: partsFromShow(w.github.show) }),
     tiles: () => ({ group: null, columns: clamp(int(old.columns, 5), 2, 10) }),
   };
   // The bar used to sit among the tiles; a bar under them all (-1) stays at the bottom.
@@ -286,7 +324,7 @@ export function copyTitle(copy, groups = []) {
     const group = groups.find(g => g.id === copy.settings.group);
     return `${label} · ${group ? group.title : 'follows the tabs'}`;
   }
-  if (copy.type === 'github') return `${label} · ${copy.settings.parts.map(p => PART_LABELS[p]).join(' + ') || 'nothing chosen'}`;
+  if (copy.type === 'github') return `${label} · ${partsSummary(copy.settings.parts)}`;
   if (copy.type === 'website') {
     const url = siteUrl(copy.settings.url);
     return `${label} · ${url ? siteDomain(url) : 'no address'}`;

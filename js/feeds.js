@@ -91,6 +91,27 @@ export function latestCommits(commits, limit) {
     .slice(0, limit);
 }
 
+// The repos with the newest commits, newest first, one row each: when the last commit was, and
+// whether the repo is private.
+export function latestRepos(commits, limit) {
+  const byRepo = new Map();
+  for (const c of [...commits].sort((a, b) => b.at - a.at)) {
+    if (c.repo && !byRepo.has(c.repo)) byRepo.set(c.repo, { repo: c.repo, url: `https://github.com/${c.repo}`, at: c.at, private: c.private });
+  }
+  return [...byRepo.values()].slice(0, limit);
+}
+
+// A GitHub user (/users/<user>) and their repos (/users/<user>/repos) → followers, public repos,
+// and the stars on the repos that aren't forks.
+export function parseStats(user, repos) {
+  const count = v => (Number.isInteger(v) && v > 0 ? v : 0);
+  return {
+    followers: count(user?.followers),
+    repos: count(user?.public_repos),
+    stars: (Array.isArray(repos) ? repos : []).filter(r => !r?.fork).reduce((sum, r) => sum + count(r?.stargazers_count), 0),
+  };
+}
+
 // GitHub issue search results (is:pr or is:issue) → PR or issue rows.
 export function parseIssues(json) {
   if (!Array.isArray(json?.items)) return [];

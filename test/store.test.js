@@ -59,7 +59,8 @@ test('a saved state from before Layout mode converts to the same page, and loses
   assert.deepEqual([c.clock.x, c.clock.settings.name, c.clock.settings.face, c.clock.settings.hour24], [9, 'Niv', 'dot', true]);
   assert.equal(c.notes, undefined);
   assert.deepEqual(c.markets.settings.items, ['BTC', 'DOGE']);
-  assert.deepEqual(c.github.settings, { parts: ['heatmap', 'pulls', 'issues'] });
+  assert.deepEqual(c.github.settings.parts, ['heatmap', 'pulls', 'issues']);
+  assert.equal(c.github.settings.order.length, 7);
   assert.equal(s.prefs.github.user, 'octo');
   assert.deepEqual(c.tiles.settings, { group: null, columns: 7 });
   assert.deepEqual([c.search.x, c.search.y, c.search.w, c.search.h], [3, 0, 6, 1]);
