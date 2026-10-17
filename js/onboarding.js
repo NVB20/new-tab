@@ -362,7 +362,7 @@ export function setupOnboarding(store, canvas, ctx) {
       const full = !Object.values(TYPES).some(t => firstFree(layout(), ...t.min));
       return [
         title('Arrange it your way'),
-        el('ul', { class: 'ob-tips' }, [['Drag', ' to move'], ['Edges and corners', ' resize'], ['×', ' removes'], ['The tray', ' adds']]
+        el('ul', { class: 'ob-tips' }, [['Drag', ' to move'], ['Edges and corners', ' resize'], ['×', ' removes'], ['The tray', ' adds; hover a widget there to preview it']]
           .map(([b, text]) => el('li', {}, el('b', { text: b }), text))),
         hint(full
           ? 'Every cell is taken on a new page. Drop a widget on its neighbour to swap them, or drag an edge in to make room.'

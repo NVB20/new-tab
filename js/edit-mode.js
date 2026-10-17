@@ -5,12 +5,29 @@
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import {
   TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, prefsSection,
-  swapPlan, swapCopy, activeLayout, ownLayout,
+  swapPlan, swapCopy, activeLayout, ownLayout, plannedCopy,
 } from './layout.js';
 import { gridArea } from './canvas.js';
+import { createPreview } from './widget-preview.js';
 
 const MIN_WIDTH = 900;   // px; under this the page stacks and there is nothing to lay out
 const DIRS = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
+const OPEN_MS = 300;    // hover before a chip's preview opens
+const CLOSE_MS = 150;   // after leaving the chips before it closes, so cutting across doesn't flicker
+
+// The canvas's cell pitch (a cell plus a gap) and gaps in px, from its size, padding and gaps.
+function cellPitch(root) {
+  const cs = getComputedStyle(root);
+  const r = root.getBoundingClientRect();
+  const gx = parseFloat(cs.columnGap);
+  const gy = parseFloat(cs.rowGap);
+  return {
+    x: (r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + gx) / COLS,
+    y: (r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + gy) / ROWS,
+    gx,
+    gy,
+  };
+}
 
 export function setupEditMode(store, canvas, ctx) {
   const root = canvas.root;
@@ -39,6 +56,7 @@ export function setupEditMode(store, canvas, ctx) {
       el('button', { type: 'button', class: 'btn', text: 'Reset layout', title: 'Back to the default places', onclick: reset }),
       el('button', { type: 'button', class: 'btn', text: 'Cancel', title: 'Undo everything since you entered Layout mode', onclick: () => exit({ restore: true }) }),
       el('button', { type: 'button', class: 'btn btn-primary', text: 'Done', title: 'Keep this layout (Esc)', onclick: () => exit() })));
+  const preview = createPreview(store, ctx, { pitch: () => cellPitch(root) });
 
   // ---- frames: a label, a toolbar and eight handles while editing ----
 
@@ -103,16 +121,19 @@ export function setupEditMode(store, canvas, ctx) {
     chips.replaceChildren(...Object.entries(TYPES).map(([type, t]) => {
       const n = countOf(l, type);
       const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
-      const chip = el('button', { type: 'button', class: 'tray-chip', dataset: { type }, onclick: () => add(type) },
+      const chip = el('button', { type: 'button', class: 'tray-chip', dataset: { type }, 'aria-describedby': 'widget-preview', onclick: () => add(type) },
         icon('plus', 13), el('span', { text: t.label }), el('b', { text: t.max === 1 ? (n ? 'on' : 'off') : `${n}/${t.max}` }));
-      chip.disabled = n >= t.max || !room;
-      chip.title = n >= t.max ? limitTitle(t) : !room ? 'No room: shrink or remove a widget first' : `Add ${t.label}`;
+      // Greyed out, but still hoverable and focusable so its preview can say why.
+      chip.setAttribute('aria-disabled', String(n >= t.max || !room));
       if (n < t.max && !room) roomless++;
       return chip;
     }));
-    // Said in words, not only in tooltips: a new page fills every cell, so nothing can be added yet.
-    full.hidden = !roomless || [...chips.children].some(c => !c.disabled);
+    // Said in words on the tray too: a new page fills every cell, so nothing can be added yet.
+    full.hidden = !roomless || [...chips.children].some(c => c.getAttribute('aria-disabled') !== 'true');
     document.body.style.setProperty('--tray-h', `${tray.offsetHeight || 64}px`);
+    // A redraw while the card is open: it follows its type to the new chip.
+    const open = preview.type && chips.querySelector(`.tray-chip[data-type="${preview.type}"]`);
+    if (open) showPreview(open);
   }
 
   // ---- changes ----
@@ -121,10 +142,12 @@ export function setupEditMode(store, canvas, ctx) {
   const noRoom = () => alertDialog('No room for another widget. Shrink or remove one first.', 'No room');
 
   function add(type) {
+    const s = store.get();
+    if (!plannedCopy(activeLayout(s), type, s.groups, s.activeGroupId)) return;   // a greyed-out chip
+    hidePreview();
     let copy = null;
-    store.update(s => { copy = addCopy(activeLayout(s), type, undefined, s.groups, s.activeGroupId); });
+    store.update(st => { copy = addCopy(activeLayout(st), type, undefined, st.groups, st.activeGroupId); });
     if (copy) focusFrame(copy.id);
-    else noRoom();
   }
 
   function duplicate(id) {
@@ -151,6 +174,53 @@ export function setupEditMode(store, canvas, ctx) {
     if (ok) store.update(st => { resetLayout(activeLayout(st)); });
   }
 
+  // ---- the preview: hovering or focusing a chip shows its widget and where it would go ----
+  // Delegated on the chips' container, which keeps its listeners when renderTray replaces the
+  // chips. The card opens after a short hover, switches at once between chips while open, and
+  // closes a moment after the pointer leaves them.
+
+  let openTimer = 0;
+  let closeTimer = 0;
+
+  function showPreview(chip) {
+    clearTimeout(openTimer);
+    clearTimeout(closeTimer);
+    const plan = preview.show(chip, chip.dataset.type);
+    ghost.classList.remove('bad');
+    ghost.hidden = !plan;
+    if (plan) ghost.style.gridArea = gridArea(plan);
+  }
+
+  function hidePreview() {
+    clearTimeout(openTimer);
+    clearTimeout(closeTimer);
+    if (preview.type === null) return;
+    preview.hide();
+    ghost.hidden = true;
+  }
+
+  chips.addEventListener('pointerover', e => {
+    const chip = e.target.closest('.tray-chip');
+    if (!chip) return;
+    clearTimeout(closeTimer);
+    if (preview.type === chip.dataset.type) return;
+    clearTimeout(openTimer);
+    if (preview.type !== null) showPreview(chip);
+    else openTimer = setTimeout(() => showPreview(chip), OPEN_MS);
+  });
+  chips.addEventListener('pointerout', e => {
+    const chip = e.target.closest('.tray-chip');
+    if (!chip || chip.contains(e.relatedTarget)) return;
+    clearTimeout(openTimer);
+    closeTimer = setTimeout(hidePreview, CLOSE_MS);
+  });
+  // Keyboard focus only: the focus a click leaves on a chip doesn't open it.
+  chips.addEventListener('focusin', e => {
+    const chip = e.target.closest('.tray-chip');
+    if (chip?.matches(':focus-visible')) showPreview(chip);
+  });
+  chips.addEventListener('focusout', hidePreview);
+
   // ---- drag and resize ----
   // The frame follows the pointer (a move) or shows its new size (a resize) while the ghost shows
   // the cells it will snap to, red when they are taken or off the canvas. Letting go there puts
@@ -159,6 +229,7 @@ export function setupEditMode(store, canvas, ctx) {
 
   root.addEventListener('pointerdown', e => {
     if (!active || e.button !== 0) return;
+    hidePreview();   // before the drag takes the ghost over
     const frame = e.target.closest('.widget-frame');
     if (!frame || e.target.closest('.frame-tools')) return;
     const copy = copyById(store.get(), frame.dataset.id);
@@ -167,10 +238,7 @@ export function setupEditMode(store, canvas, ctx) {
     frame.focus({ preventScroll: true });
     const dir = e.target.closest('.frame-handle')?.dataset.dir ?? 'move';
     const min = TYPES[copy.type].min;
-    const cs = getComputedStyle(root);
-    const r = root.getBoundingClientRect();
-    const pitchX = (r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + parseFloat(cs.columnGap)) / COLS;
-    const pitchY = (r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + parseFloat(cs.rowGap)) / ROWS;
+    const { x: pitchX, y: pitchY } = cellPitch(root);
     const start = { px: e.clientX, py: e.clientY, x: copy.x, y: copy.y, w: copy.w, h: copy.h };
     let target = { x: copy.x, y: copy.y, w: copy.w, h: copy.h };
     let valid = true;
@@ -288,6 +356,7 @@ export function setupEditMode(store, canvas, ctx) {
     document.body.style.removeProperty('--tray-h');
     button?.setAttribute('aria-pressed', 'false');
     for (const frame of canvas.frames().values()) strip(frame);
+    hidePreview();
     overlay.remove();
     ghost.remove();
     other.remove();

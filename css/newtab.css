@@ -1501,8 +1501,8 @@ body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
 .tray-chip b { font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .tray-chip:hover { border-color: var(--muted); }
 .tray-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.tray-chip:disabled { opacity: 0.4; cursor: default; }
-.tray-chip:disabled:hover { border-color: var(--border); }
+.tray-chip[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.tray-chip[aria-disabled="true"]:hover { border-color: var(--border); }
 /* Above the tray, so it never pushes the buttons onto a second row. */
 .tray-note {
   position: absolute;
@@ -1520,8 +1520,63 @@ body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
 .tray-right { margin-left: auto; display: flex; gap: 6px; }
 #btn-layout[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 
+/* The tray's preview card (widget-preview.js): above the chip, the real widget shrunk inside. */
+.widget-preview {
+  position: fixed;
+  z-index: 47;   /* over the tray, setup's card docked above it, and setup's toast */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  animation: wp-rise 0.12s ease-out;
+}
+.widget-preview::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: var(--arrow-x, 50%);
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  translate: -50% -50%;
+  rotate: 45deg;
+}
+@keyframes wp-rise { from { opacity: 0; translate: 0 4px; } }
+.wp-head { display: flex; align-items: center; gap: 7px; font-size: 13.5px; }
+.wp-head .icon { flex: none; color: var(--accent); }
+.wp-size { margin-left: auto; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wp-tagline { margin: 2px 0 0; font-size: 13px; font-weight: 600; }
+.wp-about { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.wp-box { position: relative; align-self: center; margin-top: 4px; overflow: hidden; border-radius: 10px; outline: 1px solid var(--border); background: var(--bg); }
+.wp-foot { margin: 2px 0 0; color: var(--muted); font-size: 11.5px; }
+/* Over Layout mode's, the wallpaper's and setup's frame rules: the widget as it sits on the page. */
+.widget-preview .widget-frame.preview-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  outline: none;
+  border-radius: 0;
+  background: var(--bg);
+  cursor: default;
+  opacity: 1;
+  text-shadow: none;
+  transition: none;
+}
+.widget-preview .preview-frame .widget-root { opacity: 1; }
+
 @media (prefers-reduced-motion: reduce) {
   body.layout-editing .widget-frame { transition: none; }
+  .widget-preview { animation: none; }
 }
 
 /* ---------- First-run setup (onboarding.js) ---------- */
