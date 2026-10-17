@@ -19,6 +19,31 @@ imageio-ffmpeg (ffmpeg 7.1, already installed), Playwright's Chromium
 
 Spec: `docs/superpowers/specs/2026-10-18-promo-video-design.md`.
 
+> **Revision 2 (2026-10-18, after the user chose the SaaS-film style in the GitHub theme with the
+> blue accent).** The spec supersedes the numbers below: 22 s, 660 frames, and the shot list in its
+> Timeline. This plan is being run inline by the same session, so the revised code goes straight
+> into the files. These tasks change:
+> - **Task 1.** The scenes become the spec's nine shots, with `stage`, `camera` keyframes,
+>   `float`, `brackets`, `logo`, `curves` and typed cues.
+>   - `timeline.mjs` also exports `CHAR_FRAMES` and `musicCues()` → `{ length, bpm, kickFrom,
+>     breakAt, drop, cuts, typing }`.
+>   - Tests: 660 frames, cues on beats except the typed line, and the cues match the shots.
+> - **Task 2.** `buildState` also seeds `prefs.theme = 'github'` and `prefs.accent = '#2563eb'`.
+> - **Task 3.**
+>   - `music.py` becomes `render(cues)` with the airy arrangement in the spec, reading
+>     `--cues <json>`.
+>   - The tests get their cues from `musicCues()` through `node`, and check the kicks on the beat
+>     grid, the drop on the end card, a tick on each typed character, and the length.
+> - **Task 4.** `vclock` gets `step(ms)`, and animations are set by the virtual time elapsed since
+>   first seen (any step size). Tested.
+> - **Task 5.**
+>   - `overlay.js` is rewritten for the new look.
+>   - `record.mjs` captures `PROMO_SUB` (default 4) sub-frames per frame and blends each scene
+>     with ffmpeg `tmix`.
+>   - ffmpeg helpers move to `lib/ffmpeg.mjs`.
+>   - Cursor keys may `hide`, and the drawn cursor is an arrow.
+> - **Task 6.** `build.mjs` passes `musicCues()` to `music.py` and checks for 660 frames and 22 s.
+
 ## Global Constraints
 
 **Output**

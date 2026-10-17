@@ -3,3 +3,5 @@ node_modules/
 .claude/worktrees/
 # local secrets (e.g. the GitHub token) never belong in git
 .env*
+# the promo video's frames, music and render (promo/build.mjs)
+promo/out/
