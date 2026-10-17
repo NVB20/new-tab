@@ -1,6 +1,7 @@
 // Sports widget: the followed NBA and NFL teams' games, Messi's (Inter Miami, Argentina) and the
 // chosen F1 sessions in one list by day, with live scores and a day of results. Schedules come
-// from ESPN's site API and Jolpica F1 through the request cache, shared by every copy and tab.
+// from ESPN's site API (its web host while the first is down) and Jolpica F1 (OpenF1 while it's
+// down) through the request cache, shared by every copy and tab.
 
 import { el, icon, widgetHead, widgetSub, widgetEmpty } from './ui.js';
 import { feed, fetchJson, peek, sweep } from './net.js';
@@ -9,11 +10,16 @@ import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, F1_SESSIONS, F1_SESSION_LABELS, teamOf, schedulePath, parseSchedule, nextPhases, joinParts,
   parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl, etDay, parseF1Season, parseF1Last, raceAwaitingResult,
-  timeline, resultFor, formatTime, isNight, longDay,
+  parseOpenF1Season, openF1RaceKey, parseOpenF1Podium, timeline, resultFor, formatTime, isNight, longDay,
 } from './sports.js';
 
-const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
+// ESPN's site API answers the same on its web host.
+const ESPN = [
+  ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports'],
+  ['ESPN web', 'https://site.web.api.espn.com/apis/site/v2/sports'],
+];
 const JOLPICA = 'https://api.jolpi.ca/ergast/f1';
+const OPENF1 = 'https://api.openf1.org/v1';
 const HOUR = 3600e3;
 const DAY = 24 * HOUR;
 const SCHEDULE_TTL = 6 * HOUR;
@@ -41,25 +47,42 @@ const must = (value, source) => {
   return value;
 };
 
+// The same request to each ESPN host in turn: load(base) asks one.
+const espn = load => ESPN.map(([name, base]) => ({ name, load: () => load(base) }));
+
+// The F1 season from Jolpica, else from OpenF1's meetings and sessions of the year.
+const f1Season = [
+  { name: 'Jolpica', load: async () => must(parseF1Season(await fetchJson(`${JOLPICA}/current.json`)), 'Jolpica') },
+  {
+    name: 'OpenF1',
+    load: async () => {
+      const year = new Date().getUTCFullYear();
+      const [meetings, sessions] = await Promise.all([fetchJson(`${OPENF1}/meetings?year=${year}`), fetchJson(`${OPENF1}/sessions?year=${year}`)]);
+      return must(parseOpenF1Season(meetings, sessions), 'OpenF1');
+    },
+  },
+];
+
 async function loadSource(id) {
-  if (id === 'f1') return feed(F1_SEASON, F1_TTL, async () => must(parseF1Season(await fetchJson(`${JOLPICA}/current.json`)), 'Jolpica'));
+  if (id === 'f1') return feed(F1_SEASON, F1_TTL, f1Season);
   const { sport, id: team } = teamOf(id);
   const [key, lastKey] = sourceKeys(id);
-  const url = `${ESPN}/${schedulePath(sport, team)}`;
+  const path = schedulePath(sport, team);
   const schedule = async from => must(parseSchedule(await fetchJson(from), sport), 'ESPN');
   if (sport === 'soccer') {
     return joinParts(await Promise.all([
-      feed(key, SCHEDULE_TTL, async () => trimmed((await schedule(`${url}?fixture=true`)).events)),
-      feed(lastKey, SCHEDULE_TTL, async () => trimmed((await schedule(url)).events)),
+      feed(key, SCHEDULE_TTL, espn(async base => trimmed((await schedule(`${base}/${path}?fixture=true`)).events))),
+      feed(lastKey, SCHEDULE_TTL, espn(async base => trimmed((await schedule(`${base}/${path}`)).events))),
     ]));
   }
-  return feed(key, SCHEDULE_TTL, async () => {
+  return feed(key, SCHEDULE_TTL, espn(async base => {
+    const url = `${base}/${path}`;
     const first = await schedule(url);
     // The later parts of the season: one that fails or isn't what we expect counts as empty.
     const more = await Promise.all(nextPhases(first, sport, Date.now()).map(
       phase => schedule(`${url}?seasontype=${phase}`).then(x => x.events, () => [])));
     return trimmed([...first.events, ...more.flat()]);
-  });
+  }));
 }
 
 const cachedSource = id => joinParts(sourceKeys(id).map(key => peek(key) ?? { data: null, at: 0 }));
@@ -72,7 +95,7 @@ async function loadLive(events) {
     const ttl = boardTtl(b, events, saved, now);
     if (ttl == null) return saved;
     const { data } = await feed(liveKey(b), ttl,
-      async () => must(parseScoreboard(await fetchJson(`${ESPN}/${b.path}/scoreboard?dates=${b.day}`), b.sport, b.league), 'ESPN'));
+      espn(async base => must(parseScoreboard(await fetchJson(`${base}/${b.path}/scoreboard?dates=${b.day}`), b.sport, b.league), 'ESPN')));
     return data ?? saved;
   }));
   return boards.flat();
@@ -80,7 +103,8 @@ async function loadLive(events) {
 
 const cachedLive = events => scoreboards(events, Date.now()).flatMap(b => peek(liveKey(b))?.data ?? []);
 
-// The podium of the race awaiting its result, once Jolpica has it.
+// The podium of the race awaiting its result, once Jolpica or OpenF1 has it. Each answers only
+// with that race's: Jolpica's last race may still be the one before.
 async function loadPodium(events, f1Sessions) {
   if (!f1Sessions.includes('race')) return null;
   const race = raceAwaitingResult(events, Date.now());
@@ -88,7 +112,28 @@ async function loadPodium(events, f1Sessions) {
   const isRace = r => r?.season === race.season && r.round === race.round;
   const saved = peek(F1_LAST)?.data;
   if (isRace(saved)) return saved;
-  const { data } = await feed(F1_LAST, F1_LAST_TTL, async () => must(parseF1Last(await fetchJson(`${JOLPICA}/current/last/results.json`)), 'Jolpica'));
+  const { data } = await feed(F1_LAST, F1_LAST_TTL, [
+    {
+      name: 'Jolpica',
+      load: async () => {
+        const last = parseF1Last(await fetchJson(`${JOLPICA}/current/last/results.json`));
+        return isRace(last) ? last : null;
+      },
+    },
+    {
+      name: 'OpenF1',
+      load: async () => {
+        const key = openF1RaceKey(await fetchJson(`${OPENF1}/sessions?year=${race.season}&session_name=Race`), race);
+        if (key == null) return null;
+        const [results, drivers] = await Promise.all([
+          fetchJson(`${OPENF1}/session_result?session_key=${key}&position%3C%3D3`),
+          fetchJson(`${OPENF1}/drivers?session_key=${key}`),
+        ]);
+        const podium = parseOpenF1Podium(results, drivers);
+        return podium ? { season: race.season, round: race.round, podium } : null;
+      },
+    },
+  ]);
   return isRace(data) ? data : null;
 }
 
@@ -176,7 +221,7 @@ export function mountSports(root, store, copy) {
   // A line per source that failed: how old the data shown is, or what couldn't load.
   function problems(follow) {
     const lines = [];
-    for (const [host, ids] of [['ESPN', follow.filter(id => id !== 'f1')], ['Jolpica', follow.filter(id => id === 'f1')]]) {
+    for (const [host, ids] of [['ESPN', follow.filter(id => id !== 'f1')], ['Jolpica and OpenF1', follow.filter(id => id === 'f1')]]) {
       const failed = ids.filter(id => sources.get(id)?.error);
       const stale = failed.filter(id => sources.get(id).data);
       if (stale.length) {

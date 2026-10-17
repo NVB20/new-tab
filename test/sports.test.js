@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
   parseEspnEvent, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
-  parseF1Season, parseF1Last, raceAwaitingResult,
+  parseF1Season, parseF1Last, raceAwaitingResult, parseOpenF1Season, openF1RaceKey, parseOpenF1Podium,
   rowState, resultFor, followedSide, dayKey, dayLabel, formatTime, isNight, longDay, timeline,
 } from '../js/sports.js';
 
@@ -308,6 +308,52 @@ test('parseF1Last reads the podium of the latest race', () => {
     ] }] } } };
   assert.deepEqual(parseF1Last(json), { season: '2026', round: 17, podium: ['VER', 'LEC', 'ANT'] });
   assert.equal(parseF1Last({ MRData: { RaceTable: { Races: [] } } }), null);
+});
+
+// OpenF1's 2026 season, trimmed: testing, the Australian and Chinese GPs, a cancelled Bahrain GP
+// and the US GP. Rounds count the meetings with a race, so China is round 2 as on Jolpica.
+const meeting = (key, name, start, cancelled = false) => ({ meeting_key: key, meeting_name: name, year: 2026, date_start: start, is_cancelled: cancelled });
+const session = (key, name, start, cancelled = false) => ({ meeting_key: key, session_name: name, date_start: start, year: 2026, is_cancelled: cancelled, session_key: Date.parse(start) / 1000 });
+const OPENF1_MEETINGS = [
+  meeting(1304, 'Pre-Season Testing', '2026-02-11T07:00:00+00:00'),
+  meeting(1279, 'Australian Grand Prix', '2026-03-06T01:30:00+00:00'),
+  meeting(1280, 'Chinese Grand Prix', '2026-03-13T03:30:00+00:00'),
+  meeting(1282, 'Bahrain Grand Prix', '2026-04-10T11:30:00+00:00', true),
+  meeting(1297, 'United States Grand Prix', '2026-10-23T17:30:00+00:00'),
+];
+const OPENF1_SESSIONS = [
+  session(1304, 'Day 1', '2026-02-11T07:00:00+00:00'),
+  session(1279, 'Race', '2026-03-08T04:00:00+00:00'),
+  session(1280, 'Practice 1', '2026-03-13T03:30:00+00:00'),
+  session(1280, 'Sprint Qualifying', '2026-03-13T07:30:00+00:00'),
+  session(1280, 'Sprint', '2026-03-14T03:00:00+00:00'),
+  session(1280, 'Qualifying', '2026-03-14T07:00:00+00:00'),
+  session(1280, 'Race', '2026-03-15T07:00:00+00:00'),
+  session(1282, 'Race', '2026-04-12T15:00:00+00:00', true),
+  session(1297, 'Practice 1', '2026-10-23T17:30:00+00:00'),
+  session(1297, 'Race', '2026-10-25T20:00:00+00:00'),
+];
+
+test('OpenF1\'s season reads as Jolpica\'s: the same ids, titles and times; testing and cancelled races left out', () => {
+  const events = parseOpenF1Season(OPENF1_MEETINGS, OPENF1_SESSIONS);
+  const china = events.filter(e => e.round === 2);
+  assert.deepEqual(china, parseF1Season(season).filter(e => e.round === 2));
+  assert.deepEqual([...new Set(events.map(e => e.title.split(' · ')[0]))], ['Australian GP', 'Chinese GP', 'US GP']);
+  assert.deepEqual(events.filter(e => e.round === 3).map(e => e.id), ['f1:2026-3-FirstPractice', 'f1:2026-3-Race']);
+  assert.deepEqual(parseOpenF1Season([], []), []);
+  assert.equal(parseOpenF1Season({ detail: 'error' }, OPENF1_SESSIONS), null);
+});
+
+test('OpenF1\'s podium: the race found by its start, its top three by driver code', () => {
+  const [race] = parseF1Season(season).filter(e => e.round === 18 && e.session === 'race');
+  assert.equal(openF1RaceKey(OPENF1_SESSIONS.filter(s => s.session_name === 'Race'), race), Date.parse('2026-10-25T20:00:00Z') / 1000);
+  assert.equal(openF1RaceKey([], race), null);
+  assert.equal(openF1RaceKey({ detail: 'error' }, race), null);
+  const results = [{ position: 2, driver_number: 16 }, { position: 1, driver_number: 3 }, { position: 3, driver_number: 12 }, { position: 4, driver_number: 1 }];
+  const drivers = [{ driver_number: 1, name_acronym: 'NOR' }, { driver_number: 3, name_acronym: 'VER' }, { driver_number: 16, name_acronym: 'LEC' }, { driver_number: 12, name_acronym: 'ANT' }];
+  assert.deepEqual(parseOpenF1Podium(results, drivers), ['VER', 'LEC', 'ANT']);
+  assert.equal(parseOpenF1Podium([], drivers), null);
+  assert.equal(parseOpenF1Podium(null, drivers), null);
 });
 
 test('raceAwaitingResult is the latest race past its usual end, for a day', () => {

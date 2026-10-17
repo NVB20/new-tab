@@ -264,6 +264,14 @@ const F1_PARTS = [
   ['Sprint', 'sprint', 'Sprint', 60],
   ['Qualifying', 'qualifying', 'Qualifying', 60],
 ];
+const F1_RACE = ['Race', 'race', 'Race', 120];
+
+// One session of a race weekend as an event; its id is the same whichever source lists it.
+const f1Event = (season, round, raceName, [key, session, label, minutes], start, timeValid) => ({
+  id: `f1:${season}-${round}-${key}`, sport: 'f1', tag: 'F1', session, season, round,
+  title: `${raceShort(raceName)} · ${label}`, start, timeValid, minutes, state: 'pre',
+  url: `https://www.formula1.com/en/racing/${season}`,
+});
 
 // The season (/current.json) → every session as an event, oldest first; null when it isn't one.
 // A session without a time yet sits at noon UTC with timeValid false.
@@ -273,21 +281,57 @@ export function parseF1Season(json) {
   const out = [];
   for (const r of table.Races) {
     const season = String(r.season ?? table.season ?? '');
-    const round = Number(r.round);
-    const race = raceShort(r.raceName);
-    const add = (when, key, session, label, minutes) => {
+    const add = (when, part) => {
       const start = Date.parse(`${when.date}T${when.time ?? '12:00:00Z'}`);
-      if (!Number.isFinite(start)) return;
-      out.push({
-        id: `f1:${season}-${round}-${key}`, sport: 'f1', tag: 'F1', session, season, round,
-        title: `${race} · ${label}`, start, timeValid: !!when.time, minutes, state: 'pre',
-        url: `https://www.formula1.com/en/racing/${season}`,
-      });
+      if (Number.isFinite(start)) out.push(f1Event(season, Number(r.round), r.raceName, part, start, !!when.time));
     };
-    for (const [key, session, label, minutes] of F1_PARTS) if (r[key]) add(r[key], key, session, label, minutes);
-    add({ date: r.date, time: r.time }, 'Race', 'race', 'Race', 120);
+    for (const part of F1_PARTS) if (r[part[0]]) add(r[part[0]], part);
+    add({ date: r.date, time: r.time }, F1_RACE);
   }
   return out.sort(byStart);
+}
+
+// ---- OpenF1, while Jolpica is down ----
+
+// OpenF1's session names → Jolpica's parts (its testing days have none).
+const OPENF1_PARTS = new Map([
+  ['Practice 1', F1_PARTS[0]], ['Practice 2', F1_PARTS[1]], ['Practice 3', F1_PARTS[2]],
+  ['Sprint Qualifying', F1_PARTS[3]], ['Sprint Shootout', F1_PARTS[3]], ['Sprint', F1_PARTS[4]],
+  ['Qualifying', F1_PARTS[5]], ['Race', F1_RACE],
+]);
+
+// A season's meetings and sessions (/v1/meetings and /v1/sessions, by year) → the events
+// parseF1Season gives, or null when they aren't lists. Rounds count the meetings that hold a race
+// and weren't cancelled, oldest first, as Jolpica numbers them, so the ids agree.
+export function parseOpenF1Season(meetings, sessions) {
+  if (!Array.isArray(meetings) || !Array.isArray(sessions)) return null;
+  const parts = sessions.filter(s => !s?.is_cancelled && OPENF1_PARTS.has(s?.session_name) && Number.isFinite(Date.parse(s.date_start)));
+  const holdsRace = m => parts.some(s => s.meeting_key === m.meeting_key && s.session_name === 'Race');
+  const rounds = meetings.filter(m => m && !m.is_cancelled && holdsRace(m))
+    .sort((a, b) => Date.parse(a.date_start) - Date.parse(b.date_start));
+  return rounds.flatMap((m, i) => parts.filter(s => s.meeting_key === m.meeting_key)
+    .map(s => f1Event(String(m.year ?? s.year ?? ''), i + 1, m.meeting_name, OPENF1_PARTS.get(s.session_name), Date.parse(s.date_start), true)))
+    .sort(byStart);
+}
+
+// The session key of the race event among a season's races (/v1/sessions?session_name=Race),
+// matched by its start; null when none is.
+export function openF1RaceKey(sessions, race) {
+  const s = Array.isArray(sessions)
+    ? sessions.find(x => !x?.is_cancelled && Math.abs(Date.parse(x?.date_start) - race.start) < 6 * 60 * MIN)
+    : null;
+  return s?.session_key ?? null;
+}
+
+// A race's top three (/v1/session_result) by the drivers' codes (/v1/drivers): ['VER', …] or null.
+export function parseOpenF1Podium(results, drivers) {
+  if (!Array.isArray(results) || !Array.isArray(drivers)) return null;
+  const code = new Map(drivers.map(d => [d?.driver_number, String(d?.name_acronym ?? d?.last_name ?? '')]));
+  const podium = results.filter(r => [1, 2, 3].includes(r?.position))
+    .sort((a, b) => a.position - b.position)
+    .map(r => code.get(r.driver_number))
+    .filter(Boolean);
+  return podium.length ? podium : null;
 }
 
 // The last race's result (/current/last/results.json) → { season, round, podium: ['VER', …] }, or null.
