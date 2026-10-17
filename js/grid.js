@@ -231,6 +231,9 @@ export function mountTiles(root, store, copy, ctx) {
     if (!id) return;
     e.preventDefault();
     const mark = marked;
+    // Read the mark before clearMarks takes its classes off.
+    const into = mark?.classList.contains('drop-into');
+    const after = mark?.classList.contains('drop-after');
     const gid = groupId();
     clearMarks();
     const fromOtherGroup = store.get().tiles.find(t => t.id === id)?.groupId !== gid;
@@ -240,8 +243,6 @@ export function mountTiles(root, store, copy, ctx) {
       return;
     }
     const targetId = mark.dataset.id;
-    const into = mark.classList.contains('drop-into');
-    const after = mark.classList.contains('drop-after');
     if (into) {
       if (mark.classList.contains('tile-folder')) {
         store.update(s => addToFolder(s, id, targetId));
