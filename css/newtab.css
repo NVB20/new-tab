@@ -168,6 +168,9 @@ body:not(.ready) .canvas { opacity: 0; }
   white-space: nowrap;
 }
 .group-tab:hover { color: var(--text); }
+/* A tab with a layout of its own: a small layout mark after its name. */
+.group-tab.own-layout { display: inline-flex; align-items: center; gap: 6px; }
+.group-tab.own-layout .icon { opacity: 0.7; }
 .group-tab.active { color: var(--text); font-weight: 600; }
 .group-tab.active::after {
   content: "";
@@ -844,6 +847,10 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .mv-source a { color: inherit; }
 /* Under 3 cells wide: no numbers or years. */
 .widget-marvel.narrow .mv-num, .widget-marvel.narrow .mv-year { display: none; }
+/* Wide (say, a tab of its own): the order fills the width in columns, read row by row. */
+@container (min-width: 640px) {
+  .mv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); column-gap: 20px; }
+}
 
 /* ---------- Tiles ---------- */
 
@@ -1477,6 +1484,8 @@ body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
   box-shadow: var(--shadow);
 }
 .tray-label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tray-scope { padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.tray-scope[hidden] { display: none; }
 .tray-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .tray-chip {
   display: inline-flex;

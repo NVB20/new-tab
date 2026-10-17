@@ -5,7 +5,8 @@ import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
 import { CLOCK_FACES } from './clock-widget.js';
 import { setTheme } from './store.js';
-import { copyById, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary } from './layout.js';
+import { copyById, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary, activeLayout, ownLayout } from './layout.js';
+import { askOwnLayout, askMainLayout } from './groups.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 // The GitHub widget's parts as Preferences → GitHub lists them.
@@ -317,12 +318,21 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     ];
   }
 
-  // Layout mode, and one group per widget copy on the canvas that has settings of its own. A
-  // widget's ✎ opens its group (the anchor is the copy's id).
+  // Which layout the tab you're on shows, Layout mode, and one group per widget copy on that layout
+  // that has settings of its own. A widget's ✎ opens its group (the anchor is the copy's id).
   function layout() {
     const s = store.get();
-    const own = s.prefs.layout.widgets.filter(copy => prefsSection(copy.type) === 'layout');
+    const tab = s.groups.find(g => g.id === s.activeGroupId);
+    const ownTab = !!ownLayout(s, tab.id);
+    const own = activeLayout(s).widgets.filter(copy => prefsSection(copy.type) === 'layout');
+    const toggleOwn = async () => {
+      if (ownTab) await askMainLayout(store, tab);
+      else await askOwnLayout(store, tab, () => { dialog.close(); enterLayoutMode(); });
+      redraw();
+    };
     return [
+      row(`This tab: ${tab.title}`, el('button', { type: 'button', class: 'btn', text: ownTab ? 'Use the main layout' : 'Own layout…', onclick: toggleOwn }),
+        ownTab ? 'Has a layout of its own. Everything below is on it' : 'Shows the main layout, like every tab without one of its own'),
       row('Layout', el('button', { type: 'button', class: 'btn', onclick: () => { dialog.close(); enterLayoutMode(); } }, icon('layout', 16), 'Edit layout'),
         'Drag, resize, add, duplicate and remove the widgets on the page'),
       row('Reset layout', el('button', { type: 'button', class: 'btn', text: 'Reset', onclick: resetAllLayout }),
@@ -395,13 +405,13 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
 
   async function resetAllLayout() {
     const s = store.get();
-    const names = resetLayout(structuredClone(s.prefs.layout)).map(c => copyTitle(c, s.groups)).join(', ');
+    const names = resetLayout(structuredClone(activeLayout(s))).map(c => copyTitle(c, s.groups)).join(', ');
     const ok = await confirmDialog(
       names ? `Put every widget back in its default place? ${names} will be removed.` : 'Put every widget back in its default place?',
       { title: 'Reset layout', confirmLabel: 'Reset' },
     );
     if (!ok) return;
-    store.update(st => { resetLayout(st.prefs.layout); });
+    store.update(st => { resetLayout(activeLayout(st)); });
     redraw();
   }
 
@@ -409,7 +419,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
   // open('github', <copy id>) to that widget's parts.
   function github() {
     const s = store.get();
-    const copies = s.prefs.layout.widgets.filter(copy => copy.type === 'github');
+    const copies = activeLayout(s).widgets.filter(copy => copy.type === 'github');
     return [
       title('Account'),
       group('account', textInput('Username', 'github.user', 'NVB20', { hint: 'Whose activity every GitHub widget shows' })),

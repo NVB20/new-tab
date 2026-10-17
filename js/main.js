@@ -39,7 +39,7 @@ const firstRun = !store.get().onboarding.done;
 if (firstRun) document.body.classList.add('ob-setup', 'ob-fresh');
 
 mountTheme(store);
-mountGroups(document.getElementById('groups'), store);
+mountGroups(document.getElementById('groups'), store, { enterLayout: () => layout().then(l => l.enter()) });
 const canvasRoot = document.getElementById('canvas');
 const canvas = mountCanvas(canvasRoot, store, ctx);
 if (firstRun) {

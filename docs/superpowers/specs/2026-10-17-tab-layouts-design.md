@@ -49,5 +49,5 @@ tab's layout into another).
 ## Marvel, full size
 
 On a tab of its own the Marvel widget is likely the whole page. From 640px wide (a container query
-on the frame) it goes two-pane: the head and progress bar across the top, Up next and a count by
-kind (Films 12 / 38 …) on the left, and the list on the right in columns (row by row, numbered).
+on the frame) its list fills the width in columns of at least 250px, read row by row (the numbers
+keep the order plain). Nothing else changes: the head and progress bar stay across the top.

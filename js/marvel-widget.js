@@ -46,8 +46,8 @@ export function mountMarvel(root, store, copy) {
     scroller.scrollTop = item ? Math.max(0, item.offsetTop - (item.previousElementSibling?.offsetHeight ?? 0)) : 0;
   }
 
-  // The list scrolls to the next entry when it's first drawn and when what it shows changes; a
-  // tick leaves it where it is.
+  // The list scrolls to the next entry when it's first drawn, when what it shows changes and when
+  // the widget is resized (a wide one lays the list out in columns); a tick leaves it where it is.
   let reveal = true;
   let drawn = '';
   let showing = '';
@@ -58,11 +58,12 @@ export function mountMarvel(root, store, copy) {
     const s = own.settings;
     const w = state.marvel.watched;
     const narrow = own.w < 3;
-    const sig = JSON.stringify([s, w, narrow, state.prefs.openInNewTab]);
+    const view = JSON.stringify([s, own.w, own.h]);
+    const sig = JSON.stringify([view, w, state.prefs.openInNewTab]);
     if (sig === drawn) return;
     drawn = sig;
-    if (JSON.stringify(s) !== showing) {
-      showing = JSON.stringify(s);
+    if (view !== showing) {
+      showing = view;
       reveal = true;
     }
 
