@@ -57,6 +57,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to five copies can split them up. |
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
+| **Marvel** | Every MCU film, series, short and special in the order the story happens, what to watch next, and what you've watched. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
 | **Tasks and notes** | A to-do list with importance flags, due dates, repeats, subtasks, Today / Upcoming / High views, search, quick-add shorthand and a week of finished-task history, and a notes pad. |
 | **Search bar and AI chats** | Search Google, or type a message that runs in a new chat on Claude, ChatGPT or Gemini. Ctrl+Space to type; a widget of its own that you place in Layout mode. Also a Claude box widget. |
@@ -305,6 +306,32 @@ Schedules come from ESPN's public site API and from Jolpica F1 (the successor of
 both free and without a key. Team schedules are checked every 6 hours and the F1 calendar once a
 day; every copy and every open tab shares one fetch.
 
+## Marvel
+
+Add the **Marvel** widget in [Layout mode](#layout-mode) (or in setup's Widgets step). It lists
+all 115 entries of the MCU in chronological order, the order the story happens in rather than the
+order they came out, from Eyes of Wakanda to VisionQuest. The order is Digital Spy's (updated 14 Oct 2026; the
+link is at the bottom of the list), including where it splits a season because something else
+happens in the middle of it (Agents of SHIELD season 1 in three parts, around Thor: The Dark World
+and The Winter Soldier).
+
+- **Up next** is the first entry you haven't watched, with its number in the order, its kind or
+  season and episodes, and the year it came out. **Watched** ticks it, and the list moves on to
+  the next one. Notes say when something needs care ("Watch its credits scene after Avengers:
+  Endgame"), and when you reach Infinity War or Endgame, Up next reminds you which credits scenes
+  to watch after it.
+- **The list** has every entry, numbered as in the article. Click a row to tick or untick it.
+  It opens scrolled to your next entry.
+- **Starting midway:** right-click an entry and choose **Watched everything up to here**. **Not
+  watched from here on** undoes a run of ticks.
+- **Preferences → Layout → Marvel:** **Show** everything, everything but the Marvel TV shows
+  (Agents of SHIELD, the Netflix shows and the rest of 2013–2020, which the MCU now places outside
+  its main timeline), or the 38 films only. Progress and Up next count only what's shown. **Hide
+  watched** drops ticked entries from the list; **Clear** starts over.
+
+What you've watched belongs to the page, not the widget: removing the widget and adding it back
+keeps it, and backups include it. The order is part of the extension, so nothing is fetched.
+
 ## Website
 
 The Website widget shows a page from any site, live, the way it looks in a tab: your Pinterest
@@ -436,8 +463,8 @@ rearrange them.
 
 ## Your data
 
-Tiles, groups, folders, tasks, notes, settings and the wallpaper are stored in this Chrome profile
-only. Nothing is sent anywhere except the requests the widgets need:
+Tiles, groups, folders, tasks, notes, Marvel progress, settings and the wallpaper are stored in this
+Chrome profile only. Nothing is sent anywhere except the requests the widgets need:
 
 | Widget | Talks to | How often |
 | --- | --- | --- |
