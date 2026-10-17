@@ -51,7 +51,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | Feature | What it does |
 | --- | --- |
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
-| **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
+| **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles, and stack up to three widgets in one spot. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to five copies can split them up. |
@@ -127,7 +127,8 @@ Preferences.
    an empty group), your bookmarks bar (its folders stay folders), or a file: a Speed Dial 2 export,
    or a backup from this page, which restores everything and ends setup.
 4. **Widgets:** which go on the page; they take their default places as you tick them.
-5. **Arrange:** Layout mode, inside setup. Skipped in a window under 900px wide.
+5. **Arrange:** Layout mode, inside setup, with its moves listed (stacking among them). Skipped in
+   a window under 900px wide.
 6. **Connect:** only what your widgets need: search engines, your GitHub username, coins and pairs,
    teams, a Website address.
 7. **Moves:** Ctrl+K, Ctrl+Space and a right-click, ticked off as you try them.
@@ -394,8 +395,9 @@ rearrange them.
   everything since you entered. It needs a window at least 900px wide.
 - **Drag** a widget anywhere on it; an outline shows the cells it will snap to. Nothing else moves.
   A spot that is taken, or off the canvas, shows red, and letting go there puts the widget back.
-- **Swap** by dropping a widget on another one: when both fit after the trade, they swap places
-  (neighbours in a column or a row trade order), and a dashed outline shows where the other goes.
+- **Swap** by dropping a widget near another one's edge: when both fit after the trade, they swap
+  places (neighbours in a column or a row trade order), and a dashed outline shows where the other
+  goes. Dropped on its middle instead, the two stack (see [Stacks](#stacks)).
 - **Resize** from any corner or edge. Lists scroll inside their widget; the clock grows with it.
 - **Each widget's toolbar:** settings (its group in Preferences, or for the search bar its own
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
@@ -411,6 +413,25 @@ rearrange them.
 - **Keyboard:** Tab moves between widgets; arrows move the focused one by a cell, Shift+arrows
   resize it, D duplicates, Delete removes.
 - Under 900px the widgets stack in one column, top to bottom then left to right.
+
+### Stacks
+
+Two or three widgets can share one spot and take turns: Markets, Sports and GitHub in the space of
+one, say.
+
+- **Make one** in Layout mode: drag a widget onto the **middle** of another (near an edge still
+  swaps them); the outline says "Stack with Markets". Or use **Stack onto…** (the layers button) in
+  the widget's toolbar, which also says why a spot can't take it: a stack holds three at most, the
+  spot must be at least each widget's minimum size, and the search bar never stacks.
+- **Switch** with the dots along the bottom; pointing at the stack turns them into the widgets'
+  icons. The wheel over them, a sideways swipe over the stack, or ←/→ on a focused one switch too.
+  A new tab opens on the widget you looked at last.
+- The widgets behind keep running (a Website stays loaded, Markets keeps its prices), so switching
+  is instant.
+- **A stack's toolbar acts on the widget showing:** its settings, duplicate (to a free spot),
+  **Take out** (back to a spot of its own) and remove. With one widget left, it's a plain widget
+  again. Limits count stacked widgets too, and Reset layout takes stacks apart.
+- Under 900px a stack shows the widget in front, at its height.
 
 ### A tab with its own layout
 

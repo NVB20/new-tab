@@ -235,6 +235,30 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
 .frame-search .widget-root { justify-content: center; }
 .widget-root > .widget-search { flex: none; overflow: visible; }
 
+/* A stack (canvas.js, stack-bar.js): its widgets share one cell, each a size container of its own,
+   and only the one in front shows; the others keep running at their real size. The switcher runs
+   along the bottom: dots, which turn into the widgets' icons when you point at the stack. */
+.frame-stack { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; touch-action: pan-y; }
+.frame-stack > .widget-root { grid-area: 1 / 1; container-type: size; }
+.frame-stack > .widget-root:not(.front) { visibility: hidden; }
+.stack-bar { grid-area: 2 / 1; justify-self: center; display: flex; gap: 2px; margin-top: 4px; padding: 2px; border-radius: 9px; transition: background-color 0.15s; }
+.stack-btn { display: grid; place-items: center; width: 22px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); transition: width 0.15s; }
+.stack-btn .icon { display: none; }
+.stack-btn::after { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--muted); opacity: 0.45; transition: width 0.2s, opacity 0.2s; }
+.stack-btn[aria-current="true"]::after { width: 18px; background: var(--accent); opacity: 1; }
+.stack-btn:hover { color: var(--text); }
+.stack-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:is(.frame-stack:hover, .frame-stack:focus-within, .frame-stack.reveal, body.layout-editing .frame-stack) .stack-bar { background: var(--surface-2); }
+:is(.frame-stack:hover, .frame-stack:focus-within, .frame-stack.reveal, body.layout-editing .frame-stack) .stack-btn { width: 30px; }
+:is(.frame-stack:hover, .frame-stack:focus-within, .frame-stack.reveal, body.layout-editing .frame-stack) .stack-btn .icon { display: block; }
+:is(.frame-stack:hover, .frame-stack:focus-within, .frame-stack.reveal, body.layout-editing .frame-stack) .stack-btn::after { display: none; }
+:is(.frame-stack:hover, .frame-stack:focus-within, .frame-stack.reveal, body.layout-editing .frame-stack) .stack-btn[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+@media (max-width: 900px) {
+  /* Each frame is as tall as its content: a stack is as tall as the widget in front. */
+  .frame-stack > .widget-root { container-type: normal; }
+  .frame-stack > .widget-root:not(.front) { display: none; }
+}
+
 /* A tiles block: an optional heading (the pinned group), then the tiles (#grid is display: contents
    inside .grid-wrap). --cols is the block's own column count. */
 .widget-tiles { display: flex; flex-direction: column; }
@@ -1068,6 +1092,10 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .menu-heading { padding: 6px 10px 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .menu-sep { height: 1px; margin: 5px 4px; background: var(--border); }
 .menu-check { display: inline-flex; margin-left: auto; }
+.menu-item:disabled { color: var(--muted); cursor: default; }
+.menu-item:disabled:hover { background: none; }
+.menu-note { margin-left: auto; padding-left: 12px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.menu-item:disabled .menu-note { color: var(--danger); }
 .menu-item .menu-check .icon { color: var(--accent); }
 
 /* ---------- Dialogs and form controls ---------- */
@@ -1417,6 +1445,23 @@ body.layout-editing .canvas { height: calc(100vh - 56px - var(--tray-h, 64px)); 
 .canvas-ghost { z-index: 5; border: 2px solid var(--accent); border-radius: 14px; background: var(--accent-soft); pointer-events: none; }
 .canvas-ghost.bad { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
 .canvas-ghost.other { border-style: dashed; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+/* Over the middle of a widget: stacking onto it, or in red why it can't. Above the dragged widget
+   (which sits right over the target), so the note can be read. */
+.canvas-ghost.stack { border-width: 3px; background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.canvas-ghost[data-note] { z-index: 7; display: grid; place-items: center; padding: 8px; }
+.canvas-ghost[data-note]::after {
+  content: attr(data-note);
+  max-width: 100%;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+}
+.canvas-ghost.bad[data-note]::after { color: var(--danger); }
 
 body.layout-editing .widget-frame {
   outline: 1.5px dashed color-mix(in srgb, var(--text) 38%, transparent);
@@ -1454,6 +1499,8 @@ body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
 .frame-tools .icon-btn:disabled { opacity: 0.35; cursor: default; }
 .frame-tools .icon-btn:disabled:hover { background: none; color: var(--muted); }
 .frame-tools .frame-remove:hover { color: var(--danger); }
+/* A stack's label sits above its switcher. */
+.frame-stack > .frame-label { bottom: 40px; }
 
 .frame-handle { position: absolute; z-index: 3; touch-action: none; }
 .frame-handle.n, .frame-handle.s { left: 14px; right: 14px; height: 8px; cursor: ns-resize; }
@@ -1521,7 +1568,7 @@ body.layout-editing .widget-root { pointer-events: none; opacity: 0.72; }
 #btn-layout[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 
 @media (prefers-reduced-motion: reduce) {
-  body.layout-editing .widget-frame { transition: none; }
+  body.layout-editing .widget-frame, .stack-bar, .stack-btn, .stack-btn::after { transition: none; }
 }
 
 /* ---------- First-run setup (onboarding.js) ---------- */

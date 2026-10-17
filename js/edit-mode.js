@@ -1,16 +1,19 @@
-// Layout mode: drag, resize, add, duplicate and remove the widget copies on the canvas. Every
-// change goes through the store with layout.js's helpers, and nothing is written while the
+// Layout mode: drag, resize, add, duplicate, stack and remove the widget copies on the canvas.
+// Every change goes through the store with layout.js's helpers, and nothing is written while the
 // pointer is down. Loaded on first use.
 
-import { el, icon, confirmDialog, alertDialog } from './ui.js';
+import { el, icon, confirmDialog, alertDialog, showMenu } from './ui.js';
 import {
   TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, prefsSection,
-  swapPlan, swapCopy, activeLayout, ownLayout,
+  swapPlan, swapCopy, activeLayout, ownLayout, isStack, minOf, stackOrder, stackProblem, stackCopy, unstackCopy,
 } from './layout.js';
 import { gridArea } from './canvas.js';
 
 const MIN_WIDTH = 900;   // px; under this the page stacks and there is nothing to lay out
 const DIRS = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
+// Why a drop or a Stack onto… target can't take the widget (stackProblem's answers).
+const DROP_NOTES = { search: 'The search bar can’t be stacked', full: 'Full: a stack holds three at most', small: 'Too small for it: make this one bigger first' };
+const MENU_NOTES = { search: 'can’t be stacked', full: 'full', small: 'too small' };
 
 export function setupEditMode(store, canvas, ctx) {
   const root = canvas.root;
@@ -42,19 +45,30 @@ export function setupEditMode(store, canvas, ctx) {
 
   // ---- frames: a label, a toolbar and eight handles while editing ----
 
+  // What a frame's toolbar acts on: a stack's widget showing, else the copy itself.
+  const actingOn = id => {
+    const c = copyById(store.get(), id);
+    return isStack(c) ? c.items.find(it => it.id === c.front) ?? null : c;
+  };
+
   function decorate(frame) {
     if (frame.querySelector(':scope > .frame-tools')) return;
     const id = frame.dataset.id;
+    const stack = frame.dataset.type === 'stack';
     // Settings: the copy's group (under Layout, or GitHub for a GitHub copy), or the section every
     // copy shares; none for a type with nothing to set. A section without the copy's group just
-    // opens at the top.
-    const section = prefsSection(copyById(store.get(), id)?.type);
+    // opens at the top. A stack's buttons act on the widget showing; it has Take out where a
+    // widget has Stack onto….
+    const section = !stack && prefsSection(frame.dataset.type);
     frame.tabIndex = 0;
     frame.append(
       el('div', { class: 'frame-label' }),
       el('div', { class: 'frame-tools' },
-        section && el('button', { type: 'button', class: 'icon-btn', title: 'Settings', 'aria-label': 'Settings', onclick: () => ctx.openPrefs(section, id) }, icon('settings', 15)),
+        (stack || section) && el('button', { type: 'button', class: 'icon-btn frame-settings', title: 'Settings', 'aria-label': 'Settings', onclick: () => openSettings(id) }, icon('settings', 15)),
         el('button', { type: 'button', class: 'icon-btn frame-dup', 'aria-label': 'Duplicate', onclick: () => duplicate(id) }, icon('copy', 15)),
+        stack
+          ? el('button', { type: 'button', class: 'icon-btn frame-out', onclick: () => takeOut(id) }, icon('unstack', 15))
+          : el('button', { type: 'button', class: 'icon-btn frame-onto', 'aria-haspopup': 'menu', onclick: e => stackMenu(id, e.currentTarget) }, icon('stack', 15)),
         el('button', { type: 'button', class: 'icon-btn frame-remove', title: 'Remove (Delete)', 'aria-label': 'Remove', onclick: () => remove(id) }, icon('x', 15))),
       ...DIRS.map(dir => el('div', { class: `frame-handle ${dir}`, dataset: { dir }, 'aria-hidden': 'true' })));
     refreshFrame(frame);
@@ -70,19 +84,38 @@ export function setupEditMode(store, canvas, ctx) {
 
   function refreshFrame(frame) {
     const state = store.get();
-    const copy = copyById(state, frame.dataset.id);
-    if (!copy) return;
-    const title = copyTitle(copy, state.groups);
+    const entry = copyById(state, frame.dataset.id);
+    if (!entry) return;
+    const l = activeLayout(state);
+    const stack = isStack(entry);
+    const title = copyTitle(entry, state.groups);
     const label = frame.querySelector(':scope > .frame-label');
     if (label) label.textContent = title;
+    const copy = stack ? entry.items.find(it => it.id === entry.front) : entry;
+    const name = copyTitle(copy, state.groups);
     const t = TYPES[copy.type];
-    const dup = frame.querySelector('.frame-dup');
-    if (dup) {
-      const full = countOf(activeLayout(state), copy.type) >= t.max;
-      dup.disabled = full;
-      dup.title = full ? limitTitle(t) : 'Duplicate (D)';
+    // A button's state, tooltip and (when given) name.
+    const tool = (cls, disabled, title, name = null) => {
+      const b = frame.querySelector(`:scope > .frame-tools > .${cls}`);
+      if (!b) return;
+      b.disabled = disabled;
+      b.title = title;
+      if (name) b.setAttribute('aria-label', name);
+    };
+    const full = countOf(l, copy.type) >= t.max;
+    tool('frame-dup', full, full ? limitTitle(t) : stack ? `Duplicate ${name} (D)` : 'Duplicate (D)');
+    if (stack) {
+      const section = prefsSection(copy.type);
+      tool('frame-settings', !section, section ? `Settings: ${name}` : `${name} has no settings`);
+      const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
+      tool('frame-out', !room, room ? `Take ${name} out` : `No room to take ${name} out`, `Take ${name} out`);
+      tool('frame-remove', false, `Remove ${name} (Delete)`, `Remove ${name}`);
+    } else {
+      const search = copy.type === 'search';
+      tool('frame-onto', search || l.widgets.length < 2, search ? 'The search bar can’t be stacked' : 'Stack onto…', 'Stack onto…');
     }
-    frame.setAttribute('aria-label', `${title}, ${copy.w} by ${copy.h} cells at column ${copy.x + 1}, row ${copy.y + 1}`);
+    const where = `${entry.w} by ${entry.h} cells at column ${entry.x + 1}, row ${entry.y + 1}`;
+    frame.setAttribute('aria-label', stack ? `${title}, showing ${name}, ${where}` : `${title}, ${where}`);
   }
 
   function refresh() {
@@ -127,18 +160,70 @@ export function setupEditMode(store, canvas, ctx) {
     else noRoom();
   }
 
+  // id: a frame's (a copy's or a stack's); a stack duplicates the widget showing.
   function duplicate(id) {
-    const own = copyById(store.get(), id);
+    const own = actingOn(id);
     if (!own || countOf(layout(), own.type) >= TYPES[own.type].max) return;
     let copy = null;
-    store.update(s => { copy = duplicateCopy(activeLayout(s), id, s.groups, s.activeGroupId); });
+    store.update(s => { copy = duplicateCopy(activeLayout(s), own.id, s.groups, s.activeGroupId); });
     if (copy) focusFrame(copy.id);
     else noRoom();
   }
 
+  // A stack loses the widget showing and keeps the focus (with one left, as a plain widget).
   function remove(id) {
-    store.update(s => { removeCopy(activeLayout(s), id); });
-    canvas.frames().values().next().value?.focus({ preventScroll: true });
+    const entry = copyById(store.get(), id);
+    const copy = actingOn(id);
+    if (!copy) return;
+    const stays = !isStack(entry) ? null : entry.items.length > 2 ? id : entry.items.find(it => it.id !== copy.id).id;
+    store.update(s => { removeCopy(activeLayout(s), copy.id); });
+    ((stays && canvas.frames().get(stays)) || canvas.frames().values().next().value)?.focus({ preventScroll: true });
+  }
+
+  function openSettings(id) {
+    const copy = actingOn(id);
+    const section = copy && prefsSection(copy.type);
+    if (section) ctx.openPrefs(section, copy.id);
+  }
+
+  // The widget showing in a stack goes to a spot of its own.
+  function takeOut(id) {
+    const copy = actingOn(id);
+    if (!copy) return;
+    let out = null;
+    store.update(s => { out = unstackCopy(activeLayout(s), copy.id); });
+    if (out) focusFrame(out.id);
+    else noRoom();
+  }
+
+  function stackOnto(id, targetId) {
+    let stack = null;
+    store.update(s => { stack = stackCopy(activeLayout(s), id, targetId); });
+    if (stack) focusFrame(stack.id);
+  }
+
+  // Stack onto…: every other widget and stack in reading order, greyed out with the reason when it
+  // can't take this one. The way to stack from the keyboard.
+  function stackMenu(id, anchor) {
+    const state = store.get();
+    const l = activeLayout(state);
+    const entry = l.widgets.find(c => c.id === id);
+    if (!entry) return;
+    const others = stackOrder(l.widgets).filter(o => o !== id).map(o => l.widgets.find(c => c.id === o));
+    const r = anchor.getBoundingClientRect();
+    showMenu(r.left, r.bottom + 4, [
+      { heading: `Stack ${copyTitle(entry, state.groups)} onto` },
+      ...others.map(c => {
+        const problem = stackProblem(l, id, c.id);
+        return {
+          label: copyTitle(c, state.groups),
+          icon: isStack(c) ? 'stack' : TYPES[c.type].icon,
+          disabled: !!problem,
+          note: problem && MENU_NOTES[problem],
+          action: () => stackOnto(id, c.id),
+        };
+      }),
+    ]);
   }
 
   async function reset() {
@@ -155,18 +240,35 @@ export function setupEditMode(store, canvas, ctx) {
   // The frame follows the pointer (a move) or shows its new size (a resize) while the ghost shows
   // the cells it will snap to, red when they are taken or off the canvas. Letting go there puts
   // the frame back. A move onto one other widget that can trade places swaps the two (swapPlan):
-  // the ghost shows where this one lands and a dashed one where the other goes.
+  // the ghost shows where this one lands and a dashed one where the other goes. A move with the
+  // pointer over the middle of another widget or stack stacks them (stackCopy): the ghost covers
+  // the target and says so, or says in red why it can't.
+
+  // The frame whose middle half (each way) is under the pointer, other than the one dragged.
+  function middleOf(x, y, self) {
+    const under = document.elementsFromPoint(x, y).find(n => n !== self && n.classList?.contains('widget-frame'));
+    if (!under) return null;
+    const r = under.getBoundingClientRect();
+    const fx = (x - r.left) / r.width;
+    const fy = (y - r.top) / r.height;
+    return fx > 0.25 && fx < 0.75 && fy > 0.25 && fy < 0.75 ? under.dataset.id : null;
+  }
+
+  const clearNote = () => {
+    ghost.classList.remove('stack');
+    delete ghost.dataset.note;
+  };
 
   root.addEventListener('pointerdown', e => {
     if (!active || e.button !== 0) return;
     const frame = e.target.closest('.widget-frame');
-    if (!frame || e.target.closest('.frame-tools')) return;
+    if (!frame || e.target.closest('.frame-tools, .stack-bar')) return;
     const copy = copyById(store.get(), frame.dataset.id);
     if (!copy) return;
     e.preventDefault();
     frame.focus({ preventScroll: true });
     const dir = e.target.closest('.frame-handle')?.dataset.dir ?? 'move';
-    const min = TYPES[copy.type].min;
+    const min = minOf(copy);
     const cs = getComputedStyle(root);
     const r = root.getBoundingClientRect();
     const pitchX = (r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + parseFloat(cs.columnGap)) / COLS;
@@ -175,10 +277,12 @@ export function setupEditMode(store, canvas, ctx) {
     let target = { x: copy.x, y: copy.y, w: copy.w, h: copy.h };
     let valid = true;
     let plan = null;
+    let stackOn = null;   // the widget or stack a drop here would stack onto
     frame.setPointerCapture(e.pointerId);
     frame.classList.add('lifted');
     ghost.hidden = false;
     ghost.classList.remove('bad');
+    clearNote();
     ghost.style.gridArea = gridArea(target);
 
     const move = ev => {
@@ -189,6 +293,23 @@ export function setupEditMode(store, canvas, ctx) {
       if (dir === 'move') {
         target = { x: start.x + dc, y: start.y + dr, w: start.w, h: start.h };
         frame.style.transform = `translate(${dx}px, ${dy}px)`;
+        const onto = middleOf(ev.clientX, ev.clientY, frame);
+        const over = onto && copyById(store.get(), onto);
+        if (over) {
+          const problem = stackProblem(layout(), copy.id, onto);
+          stackOn = problem ? null : onto;
+          valid = false;
+          plan = null;
+          ghost.style.gridArea = gridArea(over);
+          ghost.classList.toggle('bad', !!problem);
+          ghost.classList.toggle('stack', !problem);
+          ghost.dataset.note = problem ? DROP_NOTES[problem] : isStack(over) ? 'Add to the stack' : `Stack with ${copyTitle(over, store.get().groups)}`;
+          other.hidden = true;
+          frame.classList.toggle('bad', !!problem);
+          return;
+        }
+        stackOn = null;
+        clearNote();
       } else {
         let { x, y, w, h } = start;
         if (dir.includes('e')) w = Math.min(Math.max(start.w + dc, min[0]), COLS - start.x);
@@ -217,11 +338,18 @@ export function setupEditMode(store, canvas, ctx) {
       frame.classList.remove('lifted', 'bad');
       frame.style.transform = '';
       ghost.hidden = true;
+      clearNote();
       other.hidden = true;
       const changed = ['x', 'y', 'w', 'h'].some(k => target[k] !== start[k]);
       let moved = false;
-      if (valid && changed) store.update(s => { moved = moveCopy(activeLayout(s), copy.id, target); });
+      let stacked = null;
+      if (stackOn) store.update(s => { stacked = stackCopy(activeLayout(s), copy.id, stackOn); });
+      else if (valid && changed) store.update(s => { moved = moveCopy(activeLayout(s), copy.id, target); });
       else if (plan) store.update(s => { moved = swapCopy(activeLayout(s), copy.id, target); });
+      if (stacked) {
+        focusFrame(stacked.id);
+        return;
+      }
       if (!moved) frame.style.gridArea = gridArea(copyById(store.get(), copy.id) ?? start);
       focusFrame(copy.id);
     };
@@ -309,7 +437,8 @@ export function setupEditMode(store, canvas, ctx) {
   }, ['prefs', 'groups', 'activeGroupId']);
   addEventListener('keydown', e => {
     if (!active || e.key !== 'Escape') return;
-    if (document.querySelector('dialog[open]') || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    // Esc in a menu (Stack onto…) only closes the menu.
+    if (document.querySelector('dialog[open]') || e.target.closest?.('input, textarea, select, [contenteditable], .menu')) return;
     exit();
   });
   addEventListener('resize', () => {

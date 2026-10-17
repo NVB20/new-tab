@@ -9,7 +9,7 @@
 
 import { el, icon, tileIcon } from './ui.js';
 import { setTheme } from './store.js';
-import { TYPES, firstFree, addCopy, placeDefaults, atDefaultPlaces, activeLayout, copyById } from './layout.js';
+import { TYPES, firstFree, addCopy, removeCopy, placeDefaults, atDefaultPlaces, activeLayout, copyById, copiesOf } from './layout.js';
 import { addTile, isFolder } from './actions.js';
 import { hasChrome, historySearch, bookmarksTree, requestSiteAccess } from './chrome-api.js';
 import { rankSites, barItems } from './suggest.js';
@@ -58,7 +58,7 @@ const SAMPLES = [
 export function setupOnboarding(store, canvas, ctx) {
   const prefs = () => store.get().prefs;
   const layout = () => activeLayout(store.get());   // setup sets up the page you're on
-  const copyOf = type => layout().widgets.find(c => c.type === type) ?? null;
+  const copyOf = type => copiesOf(layout()).find(c => c.type === type) ?? null;
   const has = type => !!copyOf(type);
   const layoutOn = () => document.body.classList.contains('layout-editing');
   const narrow = () => innerWidth < LAYOUT_MIN_WIDTH;
@@ -359,11 +359,11 @@ export function setupOnboarding(store, canvas, ctx) {
       const full = !Object.values(TYPES).some(t => firstFree(layout(), ...t.min));
       return [
         title('Arrange it your way'),
-        el('ul', { class: 'ob-tips' }, [['Drag', ' to move'], ['Edges and corners', ' resize'], ['×', ' removes'], ['The tray', ' adds']]
+        el('ul', { class: 'ob-tips' }, [['Drag', ' to move'], ['Edges and corners', ' resize'], ['×', ' removes'], ['The tray', ' adds'], ['Onto another’s middle', ' stacks them']]
           .map(([b, text]) => el('li', {}, el('b', { text: b }), text))),
         hint(full
-          ? 'Every cell is taken on a new page. Drop a widget on its neighbour to swap them, or drag an edge in to make room.'
-          : 'Drop a widget on its neighbour to swap them.'),
+          ? 'Every cell is taken on a new page. Drop a widget near a neighbour’s edge to swap them, or drag an edge in to make room.'
+          : 'Drop a widget near a neighbour’s edge to swap them.'),
       ];
     },
 
@@ -553,7 +553,7 @@ export function setupOnboarding(store, canvas, ctx) {
     // token, tasks and notes stay. Setup carries on at Widgets.
     const apply = () => {
       const { tasks, taskHistory, taskStats, notes, marvel, prefs: { layout: kept, github } } = structuredClone(store.get());
-      const block = kept.widgets.find(c => c.type === 'tiles' && c.settings.group === null);
+      const block = copiesOf(kept).find(c => c.type === 'tiles' && c.settings.group === null);
       if (block) block.settings.columns = imported.prefs.columns;
       store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, onboarding: { done: false, step: 'widgets' }, prefs: { ...imported.prefs, layout: kept, github } });
       sources = null;
@@ -583,12 +583,12 @@ export function setupOnboarding(store, canvas, ctx) {
     let noRoom = false;
     store.update(s => {
       const l = activeLayout(s);
-      const on = l.widgets.some(c => c.type === type);
+      const on = copiesOf(l).some(c => c.type === type);
       if (atDefaultPlaces(l)) {
         const types = [...new Set(l.widgets.map(c => c.type))].filter(t => t !== type);
         l.widgets = placeDefaults(l, on ? types : [...types, type]);
       } else if (on) {
-        l.widgets = l.widgets.filter(c => c.type !== type);
+        for (const c of copiesOf(l).filter(c => c.type === type)) removeCopy(l, c.id);
       } else {
         noRoom = !addCopy(l, type, undefined, s.groups, s.activeGroupId);
       }

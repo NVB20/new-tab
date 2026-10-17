@@ -92,6 +92,8 @@ const ICONS = {
   settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>',
   caret: '<path d="m8 10 4 4 4-4"/>',
   grip: '<circle cx="9" cy="6" r="1.2"/><circle cx="15" cy="6" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="18" r="1.2"/><circle cx="15" cy="18" r="1.2"/>',
+  stack: '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  unstack: '<rect x="3" y="9" width="12" height="12" rx="2"/><path d="M13 11l8-8M15 3h6v6"/>',
 };
 
 const iconCache = new Map();
@@ -180,19 +182,22 @@ export function showMenu(x, y, items) {
     if (item.separator) return el('div', { class: 'menu-sep', role: 'separator' });
     if (item.heading) return el('div', { class: 'menu-heading', text: item.heading });
     const choice = typeof item.checked === 'boolean';
+    // A disabled item stays in the list, greyed out, with a note saying why.
     return el('button', {
       class: 'menu-item' + (item.danger ? ' danger' : '') + (item.className ? ' ' + item.className : ''),
       type: 'button',
       role: choice ? 'menuitemradio' : 'menuitem',
       'aria-checked': choice ? String(item.checked) : null,
+      disabled: !!item.disabled,
       onclick: () => { closeMenu(); item.action(); },
     }, item.icon && icon(item.icon, 16), el('span', { dir: 'auto', text: item.label }),
+    item.note && el('span', { class: 'menu-note', text: item.note }),
     item.checked && el('span', { class: 'menu-check' }, icon('check', 14)));
   }));
   menu.addEventListener('keydown', e => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
-    const buttons = [...menu.querySelectorAll('.menu-item')];
+    const buttons = [...menu.querySelectorAll('.menu-item:not(:disabled)')];
     const i = buttons.indexOf(document.activeElement);
     buttons[(i + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
   });
@@ -203,7 +208,7 @@ export function showMenu(x, y, items) {
   menu.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
   menu.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
   menuEl = menu;
-  menu.querySelector('.menu-item')?.focus({ preventScroll: true });
+  menu.querySelector('.menu-item:not(:disabled)')?.focus({ preventScroll: true });
 }
 
 addEventListener('pointerdown', e => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
