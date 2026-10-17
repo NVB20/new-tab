@@ -55,8 +55,8 @@ Details per step:
   they go in the other column (Countdown first), and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits (or
   where the biggest widget makes room by shrinking, as the Layout mode tray does) and an untick
   removes it; nothing else moves. Setup works on the layout of the tab you're on.
-- **Connect:** search engines (one always stays on), the Weather city (a search: results are chips,
-  picking one puts it in the widget) and °C or °F, GitHub username (saved when typing pauses),
+- **Connect:** search engines (one always stays on), the Weather city (a type-ahead box: matches list
+  under it as you type, picking one puts it in the widget) and °C or °F, GitHub username (saved when typing pauses),
   Markets coins, indexes, commodities and pairs, Sports (Messi's teams, F1, NBA and NFL teams from a list), a
   Website address (Show asks Chrome for access to the site).
 - **Moves:** noticed by watching the page (Jump's dialog opening, the search bar's input getting

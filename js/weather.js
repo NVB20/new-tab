@@ -70,13 +70,37 @@ export function placeLabel(p, { region = false } = {}) {
 export const searchUrl = query => `${SEARCH_API}?${new URLSearchParams({ name: query.trim(), count: '6', language: 'en', format: 'json' })}`;
 
 // Geocoding results as places, or null when the response isn't what we expect. No results is [].
+// Towns and cities only (GeoNames' PPL codes: no parks, airports or regions) unless that leaves
+// nothing, and each name, region and country once.
 export function parsePlaces(json) {
   if (!isObj(json)) return null;
   if (json.results === undefined) return [];
   if (!Array.isArray(json.results)) return null;
-  return json.results
+  const towns = json.results.filter(r => typeof r?.feature_code !== 'string' || r.feature_code.startsWith('PPL'));
+  const seen = new Set();
+  return (towns.length ? towns : json.results)
     .map(r => cleanPlace({ name: r?.name, region: r?.admin1, country: r?.country, lat: r?.latitude, lon: r?.longitude }))
-    .filter(Boolean);
+    .filter(p => {
+      const key = placeLabel(p, { region: true });
+      if (!p || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+// A name split around the first place it contains the query, ignoring case and accents, for
+// showing the typed part in bold: [{ text, hit }].
+export function matchParts(name, query) {
+  const fold = s => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+  const q = fold(query.trim());
+  // Folding keeps one character per character only when nothing was combined: else no bold.
+  const at = q && fold(name).length === name.length ? fold(name).indexOf(q) : -1;
+  if (at < 0) return [{ text: name, hit: false }];
+  return [
+    { text: name.slice(0, at), hit: false },
+    { text: name.slice(at, at + q.length), hit: true },
+    { text: name.slice(at + q.length), hit: false },
+  ].filter(part => part.text);
 }
 
 // ---- the forecast ----

@@ -7,13 +7,13 @@ import { feed, fetchJson, peek } from './net.js';
 import { timeAgo } from './feeds.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
-  SOURCE, condition, placeLabel, placeKey, forecastUrl, searchUrl, parseForecast, parsePlaces, nextHours, nextDays,
+  SOURCE, condition, placeLabel, placeKey, forecastUrl, parseForecast, nextHours, nextDays,
   degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars, nextSun,
 } from './weather.js';
+import { cityField } from './city-search.js';
 
 const TTL = 15 * 60e3;          // Open-Meteo updates its models about hourly; current values every 15 min
 const REFRESH_MS = 5 * 60e3;    // how often an open tab asks the cache
-const SEARCH_PAUSE_MS = 350;    // wait for typing to stop before searching
 const KEY = 'weather-v1';
 const keyFor = place => `${KEY}:${placeKey(place)}`;
 const RAIN_SHOWN = 20;          // % chance from which an hour or a day shows it
@@ -154,8 +154,6 @@ export function mountWeather(root, store, copy) {
   // ---- editor: a city search and the unit ----
 
   let editing = false;
-  let searchTimer = 0;
-  let searchSeq = 0;
 
   function update(fn) {
     store.update(s => {
@@ -166,80 +164,31 @@ export function mountWeather(root, store, copy) {
 
   function renderEditor() {
     const s = settings();
-    const results = el('ul', { class: 'wx-results', 'aria-label': 'Cities found' });
-    const status = el('p', { class: 'widget-note wx-status' });
-    const input = el('input', {
-      type: 'search', class: 'pref-input wx-search', placeholder: 'Search a city', 'aria-label': 'Search a city',
-      autocomplete: 'off', spellcheck: false, maxLength: 100,
-      oninput: () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => search(input, results, status), SEARCH_PAUSE_MS);
-      },
-      onkeydown: e => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          clearTimeout(searchTimer);
-          const first = results.querySelector('button');
-          if (first && input.value.trim() === input.dataset.searched) first.click();
-          else search(input, results, status);
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          results.querySelector('button')?.focus();
-        }
+    const city = cityField({
+      label: 'Search a city',
+      onPick: p => {
+        update(own => { own.place = p; });
+        setEditing(false);
       },
     });
-    const unitChip = (value, text) => el('button', {
+    // The typed city stays when the unit changes: the chips flip in place.
+    const units = el('div', { class: 'sp-chips' }, [['c', '°C, km/h'], ['f', '°F, mph']].map(([value, text]) => el('button', {
       type: 'button', class: 'sp-chip', text, 'aria-pressed': String(s.unit === value),
-      onclick: () => {
+      onclick: e => {
         update(own => { own.unit = value; });
-        renderEditor();
+        for (const b of units.children) b.setAttribute('aria-pressed', String(b === e.currentTarget));
       },
-    });
+    })));
     const link = el('a', { href: SOURCE.url, rel: 'noopener', text: SOURCE.name, ...(newTab() ? { target: '_blank' } : {}) });
     editor.replaceChildren(...[
       widgetSub('City'),
       s.place ? el('p', { class: 'wx-current', text: placeLabel(s.place, { region: true }) }) : null,
-      input, results, status,
+      city.root,
       widgetSub('Units'),
-      el('div', { class: 'sp-chips' }, unitChip('c', '°C, km/h'), unitChip('f', '°F, mph')),
+      units,
       el('p', { class: 'widget-note' }, 'Forecast: ', link),
     ].filter(Boolean));
-    requestAnimationFrame(() => input.focus());
-  }
-
-  async function search(input, results, status) {
-    const q = input.value.trim();
-    const my = ++searchSeq;
-    input.dataset.searched = q;
-    if (q.length < 2) {
-      results.replaceChildren();
-      status.textContent = '';
-      return;
-    }
-    status.textContent = 'Searching…';
-    let places;
-    try {
-      places = parsePlaces(await fetchJson(searchUrl(q)));
-    } catch {
-      places = null;
-    }
-    if (my !== searchSeq) return;
-    status.textContent = places == null ? 'Couldn’t search. Check the connection and try again.' : places.length ? '' : `Nothing found for “${q}”`;
-    results.replaceChildren(...(places ?? []).map(p => el('li', {},
-      el('button', {
-        type: 'button', class: 'wx-result',
-        onclick: () => {
-          update(own => { own.place = p; });
-          setEditing(false);
-        },
-        onkeydown: e => {
-          const li = e.currentTarget.parentElement;
-          if (e.key === 'ArrowDown') li.nextElementSibling?.querySelector('button')?.focus();
-          else if (e.key === 'ArrowUp') (li.previousElementSibling?.querySelector('button') ?? input).focus();
-          else return;
-          e.preventDefault();
-        },
-      }, el('b', { text: p.name }), el('span', { text: [p.region !== p.name ? p.region : '', p.country].filter(Boolean).join(', ') })))));
+    requestAnimationFrame(() => city.input.focus());
   }
 
   function setEditing(on) {
@@ -251,8 +200,6 @@ export function mountWeather(root, store, copy) {
     editButton.setAttribute('aria-pressed', String(on));
     body.hidden = on;
     editor.hidden = !on;
-    clearTimeout(searchTimer);
-    searchSeq++;
     if (on) renderEditor();
     else editor.replaceChildren();
   }
@@ -292,9 +239,7 @@ export function mountWeather(root, store, copy) {
   return {
     destroy() {
       seq++;
-      searchSeq++;
       clearInterval(interval);
-      clearTimeout(searchTimer);
       document.removeEventListener('visibilitychange', refresh);
       unsubscribe();
     },

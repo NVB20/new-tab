@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   condition, cleanPlace, cleanWeather, placeLabel, parsePlaces, parseForecast, nextHours, nextDays, forecastUrl, placeKey,
-  searchUrl, nextSun, toUnit, degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars,
+  searchUrl, nextSun, matchParts, toUnit, degrees, windSpeed, hourLabel, timeLabel, dayLabel, localDate, rangeBars,
 } from '../js/weather.js';
 
 const TEL_AVIV = { name: 'Tel Aviv', region: 'Tel Aviv', country: 'Israel', lat: 32.08088, lon: 34.78057 };
@@ -141,4 +141,19 @@ test('the next sunrise or sunset: tomorrow’s sunrise once today’s sunset has
   assert.deepEqual(nextSun(f, AT_1830), { kind: 'Sunrise', at: Date.UTC(2026, 9, 18, 3, 12) });
   assert.deepEqual(nextSun(f, Date.UTC(2026, 9, 17, 12)), { kind: 'Sunset', at: Date.UTC(2026, 9, 17, 14, 39) });
   assert.equal(nextSun(f, Date.UTC(2026, 9, 19)), null);
+});
+
+test('a search lists towns and cities, each once; a park or an airport only when nothing else matches', () => {
+  const town = { name: 'Tel Aviv', latitude: 32.08088, longitude: 34.78057, admin1: 'Tel Aviv', country: 'Israel', feature_code: 'PPLA' };
+  const park = { name: 'Tel Aviv Luna Park', latitude: 32.1, longitude: 34.81, admin1: 'Tel Aviv', country: 'Israel', feature_code: 'AMUS' };
+  assert.deepEqual(parsePlaces({ results: [town, park, { ...town, latitude: 32.09 }] }), [TEL_AVIV]);
+  assert.deepEqual(parsePlaces({ results: [park] }).map(p => p.name), ['Tel Aviv Luna Park']);
+});
+
+test('the typed part of a name is marked, ignoring case and accents', () => {
+  assert.deepEqual(matchParts('Tel Aviv', 'tel'), [{ text: 'Tel', hit: true }, { text: ' Aviv', hit: false }]);
+  assert.deepEqual(matchParts('Zürich', 'zur'), [{ text: 'Zür', hit: true }, { text: 'ich', hit: false }]);
+  assert.deepEqual(matchParts('New York', 'york'), [{ text: 'New ', hit: false }, { text: 'York', hit: true }]);
+  assert.deepEqual(matchParts('Paris', 'lyon'), [{ text: 'Paris', hit: false }]);
+  assert.deepEqual(matchParts('Paris', ' '), [{ text: 'Paris', hit: false }]);
 });

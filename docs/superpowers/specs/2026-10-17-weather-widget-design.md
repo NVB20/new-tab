@@ -15,7 +15,8 @@ ahead. Up to three copies, each with its own city and units.
   day/night; hourly temperature, code, chance of rain and day/night; daily code, high, low, chance
   of rain, sunrise and sunset. Always fetched in °C and km/h; °F and mph are converted locally, so
   switching units needs no fetch.
-- **City search:** `geocoding-api.open-meteo.com/v1/search` (6 results, English names). Not cached.
+- **City search:** `geocoding-api.open-meteo.com/v1/search` (6 results, English names). Kept per query
+  while the page is open.
 - Through `net.js`'s `feed()`, key `weather-v1:<lat>,<lon>`, TTL 15 minutes: every copy and tab
   showing the same city shares one fetch. A tab checks every 5 minutes while visible and when it
   comes back into view. On failure the last forecast stays, with "Open-Meteo unreachable · from
@@ -47,9 +48,13 @@ snow, storm, fog, wind; clear uses the existing sun and moon.
 
 ## Editor (✎)
 
-- **City:** the current city, a search box (searches when typing pauses, or Enter), and the
-  results as a list: name in bold, region and country after. ↓ from the box into the list, ↑/↓
-  through it, Enter or a click picks one and closes the editor.
+- **City:** the current city and a type-ahead city box (`js/city-search.js`, also in setup and
+  Preferences): from two letters, a list of matches opens under the box and follows every key
+  (120 ms after the last one; a query asked before shows at once). Each match: the name with the
+  typed part in bold (ignoring case and accents), then region and country. A combobox: ↓/↑ move
+  the highlight (the first to start with), Enter or a click picks and closes the editor, Esc
+  closes the list, ↓ opens it again; Enter before the list arrives takes the first match. Towns
+  and cities only (GeoNames PPL codes), each once, unless nothing else matches.
 - **Units:** °C with km/h, or °F with mph.
 - "Forecast: Open-Meteo", linked.
 
@@ -67,8 +72,7 @@ snow, storm, fog, wind; clear uses the existing sun and moon.
 ## Setup
 
 - Widgets step: Weather, after the Clock ("Now, by the hour, the week").
-- Connect step: a city search whose results are chips (picking one puts it in the widget) and °C /
-  °F chips. When Weather is the only widget there is to fill in besides the search bar, the card
+- Connect step: the same city box (picking a match puts it in the widget) and °C / °F chips. When Weather is the only widget there is to fill in besides the search bar, the card
   sits opposite the clock column so the widget fills in in view.
 
 ## Files

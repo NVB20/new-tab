@@ -326,9 +326,11 @@ under the clock). It shows one city's weather:
 - **The next hours:** as many as fit the width, with the chance of rain when it's 20% or more.
 - **The week:** today and the days after, each with its low and high on a bar over the week's
   range, as many as fit the height. A short widget shows only now; a narrow one drops the bars.
-- **Choose the city:** hover the widget and click **✎**, type a city and pick it from the list
-  (arrow keys and Enter work too). The same editor switches between °C with km/h and °F with mph,
-  as does Preferences → Layout → Weather.
+- **Choose the city:** hover the widget and click **✎** and start typing: from the second letter a
+  list of matching towns and cities opens under the box and follows every key, with the letters you
+  typed in bold. ↓ and ↑ move through it, Enter (or a click) picks; Enter straight away takes the
+  first match. The same editor switches between °C with km/h and °F with mph. Preferences → Layout
+  → Weather has the same city box and units.
 - Times are the city's own, and follow the Clock's 12/24-hour setting. Hover an hour or a day for
   the conditions in words.
 - Up to three copies, each with its own city and units.

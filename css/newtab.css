@@ -923,19 +923,31 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .wx-bar { position: relative; height: 4px; border-radius: 2px; background: var(--hover); }
 .wx-bar-fill { position: absolute; top: 0; bottom: 0; border-radius: inherit; background: linear-gradient(90deg, #5aa9e6, var(--accent)); }
 
-/* Editor: the city search, its results and the units. */
+/* Editor: the city box and the units. */
 .wx-editor > .widget-sub:first-child { margin-top: 0; }
 .wx-current { margin: 0 0 6px; font-size: 13px; }
-.wx-search { width: 100%; }
-.wx-results { list-style: none; margin: 6px 0 0; padding: 0; }
-.wx-result {
-  display: flex; align-items: baseline; gap: 6px; width: 100%; margin: 0 -6px; padding: 4px 6px; border: 0; border-radius: 7px;
-  background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
-}
-.wx-result span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
-.wx-result:hover, .wx-result:focus-visible { background: var(--hover); outline: none; }
-.wx-status:empty { display: none; }
 .wx-editor .sp-chips + .widget-note { margin-top: 12px; }
+
+/* The city box (city-search.js), in the editor, setup and Preferences: the matches list under it
+   as you type, the highlighted one in the accent's tint. */
+.city-field { min-width: 0; }
+.city-field .city-input { width: 100%; }
+.pref-row > .city-field { flex: none; width: 220px; }
+/* The label stays level with the box while the list opens under it. */
+.pref-row:has(> .city-field) { align-items: flex-start; }
+.pref-row:has(> .city-field) > .pref-text { padding-top: 4px; }
+.ob-city { align-items: flex-start; }
+.ob-city > .city-field { flex: 1; }
+.city-list {
+  list-style: none; margin: 4px 0 0; padding: 4px; max-height: 232px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--surface);
+}
+.city-option { display: flex; align-items: baseline; gap: 6px; padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.city-option[aria-selected="true"] { background: var(--accent-soft); }
+.city-name { flex: none; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.city-name b { font-weight: 650; }
+.city-where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.city-status { margin: 6px 0 0; font-size: 11.5px; color: var(--muted); }
 .wx-editor a { color: inherit; }
 
 /* Short: just now. Narrow: a smaller now, the bars go. */

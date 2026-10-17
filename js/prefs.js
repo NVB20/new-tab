@@ -8,6 +8,7 @@ import { setTheme } from './store.js';
 import { copyById, copiesOf, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary, activeLayout, ownLayout } from './layout.js';
 import { askOwnLayout, askMainLayout } from './groups.js';
 import { placeLabel } from './weather.js';
+import { cityField } from './city-search.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
 // The GitHub widget's parts as Preferences → GitHub lists them.
@@ -373,7 +374,12 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
         return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
       case 'weather':
         return [
-          row('City', el('span'), s.place ? `${placeLabel(s.place, { region: true })}. Use ✎ on the widget to change it` : 'Use ✎ on the widget to choose it'),
+          row('City', cityField({
+            value: s.place?.name ?? '', label: 'City', onPick: p => {
+              set('place', p);
+              redraw();
+            },
+          }).root, s.place ? placeLabel(s.place, { region: true }) : 'Type a city, then pick it from the list'),
           row('Units', choice('Units', s.unit, [
             { value: 'c', label: '°C, km/h' },
             { value: 'f', label: '°F, mph' },

@@ -15,8 +15,8 @@ import { hasChrome, historySearch, bookmarksTree, requestSiteAccess } from './ch
 import { rankSites, barItems } from './suggest.js';
 import { NBA_TEAMS, NFL_TEAMS, teamOf } from './sports.js';
 import { siteUrl, sitePattern } from './website.js';
-import { searchUrl, parsePlaces, placeLabel } from './weather.js';
-import { fetchJson } from './net.js';
+import { placeLabel } from './weather.js';
+import { cityField } from './city-search.js';
 import { hostOf, normalizeUrl, uid } from './util.js';
 import { addSavedIcons } from './icon-cache.js';
 import { shrinkImage } from './prefs.js';
@@ -711,44 +711,16 @@ export function setupOnboarding(store, canvas, ctx) {
     return [el('div', { class: 'ob-row' }, input, el('button', { type: 'button', class: 'btn', onclick: show }, 'Show')), status];
   }
 
-  // A city search: each result is a chip, and picking one puts it in the widget.
+  // A city box listing matches as you type; picking one puts it in the widget.
   function weatherField() {
     const settings = () => copyOf('weather')?.settings;
-    const status = hint(settings()?.place ? `Showing ${placeLabel(settings().place)}.` : 'Type a city, then pick it.');
-    const results = el('div', { class: 'ob-chips' });
-    let seq = 0;
-    let timer = 0;
-    async function search() {
-      clearTimeout(timer);
-      const q = input.value.trim();
-      const my = ++seq;
-      if (q.length < 2) return;
-      let places = null;
-      try {
-        places = parsePlaces(await fetchJson(searchUrl(q)));
-      } catch {
-        // said below
-      }
-      if (my !== seq) return;
-      status.textContent = places == null ? 'Couldn’t search. Check the connection and try again.' : places.length ? '' : `Nothing found for “${q}”.`;
-      results.replaceChildren(...(places ?? []).map(p => el('button', {
-        type: 'button', class: 'ob-chip', 'aria-pressed': String(placeLabel(settings()?.place) === placeLabel(p)),
-        onclick: () => {
-          setCopy(copyOf('weather').id, { place: p });
-          for (const b of results.children) b.setAttribute('aria-pressed', 'false');
-          results.children[places.indexOf(p)]?.setAttribute('aria-pressed', 'true');
-          status.textContent = `Showing ${placeLabel(p)}.`;
-        },
-      }, placeLabel(p, { region: true }))));
-    }
-    const input = el('input', {
-      type: 'text', class: 'pref-input', placeholder: 'Your city', value: settings()?.place?.name ?? '',
-      spellcheck: false, autocomplete: 'off', 'aria-label': 'City for the weather', maxLength: 100,
-      oninput: () => {
-        clearTimeout(timer);
-        timer = setTimeout(search, 400);
+    const status = hint(settings()?.place ? `Showing ${placeLabel(settings().place)}.` : 'Type a city, then pick it from the list.');
+    const city = cityField({
+      value: settings()?.place?.name ?? '', placeholder: 'Your city', label: 'City for the weather',
+      onPick: p => {
+        setCopy(copyOf('weather').id, { place: p });
+        status.textContent = `Showing ${placeLabel(p)}.`;
       },
-      onkeydown: e => { if (e.key === 'Enter') search(); },
     });
     const unit = el('div', { class: 'ob-chips' }, [['c', '°C'], ['f', '°F']].map(([value, text]) => el('button', {
       type: 'button', class: 'ob-chip', 'aria-pressed': String(settings()?.unit === value),
@@ -757,7 +729,7 @@ export function setupOnboarding(store, canvas, ctx) {
         for (const b of unit.children) b.setAttribute('aria-pressed', String(b === e.currentTarget));
       },
     }, text)));
-    return [el('div', { class: 'ob-row' }, input, unit), results, status];
+    return [el('div', { class: 'ob-row ob-city' }, city.root, unit), status];
   }
 
   // ---- Moves ----
