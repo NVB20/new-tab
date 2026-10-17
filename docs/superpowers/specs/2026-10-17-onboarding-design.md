@@ -39,7 +39,8 @@ tiles block at Sites, everything else at Widgets.
 - **Sites:** Most visited ranks 90 days of history by site (search results, sign-in pages,
   localhost and non-web pages left out; sites already on a tile left out), titles cleaned to the
   site's name. When the group is empty the top six start ticked. Bookmarks bar folders become
-  tile folders. Ticks add and remove tiles on the active group as you click. A Speed Dial 2 import
+  tile folders. Ticks add and remove tiles on the active group as you click. One "From a file" tab
+  takes either kind of file (as Preferences → Backup → Import does). A Speed Dial 2 import
   replaces tiles, groups and settings like Preferences does and carries on at Widgets; a backup
   restores the whole page and ends setup. Outside the extension Most visited shows marked samples.
 - **Widgets:** on a page still in its default places, every click re-flows the page with
@@ -52,6 +53,7 @@ tiles block at Sites, everything else at Widgets.
   for here. Show is a click, so Chrome's site-access prompt can open for the Website widget.
 - **Moves:** each item ticks when it really happens (Jump's dialog opens, the search bar gets the
   cursor, Layout mode starts); Show me does it for you. Ctrl+Space is left out without a search bar.
+  Layout mode opened in Arrange doesn't count: Moves teaches the way in.
 - **Done:** the card shrinks into ☰, a ripple runs out from it on the ASCII field, a note says
   where setup lives.
 

@@ -24,7 +24,9 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
    - open chrome://extensions and switch on Developer mode (top right)
    - click Load unpacked and pick the folder
    - turn off any other extension that replaces the new tab page (Speed Dial 2, Momentum, ...)
-   - open a new tab; if Chrome asks whether I meant to change the page, choose Keep it
+   - open a new tab; if Chrome asks whether I meant to change the page, choose Keep it. A short
+     setup opens on that first tab (my name, the look, tiles from my most visited sites or
+     bookmarks bar, the widgets and what they need); I go through it myself
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
@@ -62,6 +64,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Sidebar** | Chrome bookmarks, the last week of history and recently closed tabs. |
 | **Background** | An animated ASCII field that reacts to the mouse, a plain colour (Chrome's greys or any other), or your own wallpaper. |
 | **Backup and import** | One-file backups, and an importer for Speed Dial 2 exports. |
+| **First-run setup** | A card on the first new tab sets your name, look, tiles (from your most visited sites or bookmarks bar), widgets and what they need, and teaches Ctrl+K, Ctrl+Space and Layout mode; the page fills in as you answer. |
 
 ## Install by hand
 
@@ -71,7 +74,8 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 3. Click **Load unpacked** and pick the folder that contains `manifest.json`.
 4. Turn off Speed Dial 2 or any other new-tab extension. Chrome only lets one extension own the new
    tab page.
-5. Open a new tab. If Chrome asks whether you meant to change the page, choose **Keep it**.
+5. Open a new tab. If Chrome asks whether you meant to change the page, choose **Keep it**. A short
+   setup opens there; see [First run](#first-run).
 
 ### Bring over your Speed Dial 2 tiles
 
@@ -109,6 +113,29 @@ Safari has no extension APIs for bookmarks, history or recently closed tabs, so 
 sidebar don't show them. Tiles show their own logo or a letter instead of the site's icon, and
 searches go to google.com rather than the browser's search engine. The Website widget hasn't been
 tried in Safari.
+
+## First run
+
+The first new tab opens a short setup: a card over the page, and the page fills in behind it as
+you answer. **Skip** keeps whatever you've picked so far, and all of it can be changed later in
+Preferences.
+
+1. **Name:** what the clock calls you, and 24- or 12-hour time.
+2. **Look:** theme, accent and background (ASCII, plain, or your own picture).
+3. **Sites:** tiles from your most visited sites of the last 90 days (the top six start ticked on
+   an empty group), your bookmarks bar (its folders stay folders), or a file: a Speed Dial 2 export,
+   or a backup from this page, which restores everything and ends setup.
+4. **Widgets:** which go on the page; they take their default places as you tick them.
+5. **Arrange:** Layout mode, inside setup. Skipped in a window under 900px wide.
+6. **Connect:** only what your widgets need: search engines, your GitHub username, coins and pairs,
+   teams, a Website address.
+7. **Moves:** Ctrl+K, Ctrl+Space and a right-click, ticked off as you try them.
+
+- Esc folds the card into **Resume setup**. Closing the tab keeps your place: the next new tab
+  carries on at the same step.
+- **Run setup again** is in Preferences → Page, over the page as it is.
+- A page set up before this version doesn't see it, nor does a restored backup. **Reset
+  everything** brings it back.
 
 ## Folders
 
@@ -340,14 +367,17 @@ rearrange them.
   everything since you entered. It needs a window at least 900px wide.
 - **Drag** a widget anywhere on it; an outline shows the cells it will snap to. Nothing else moves.
   A spot that is taken, or off the canvas, shows red, and letting go there puts the widget back.
+- **Swap** by dropping a widget on another one: when both fit after the trade, they swap places
+  (neighbours in a column or a row trade order), and a dashed outline shows where the other goes.
 - **Resize** from any corner or edge. Lists scroll inside their widget; the clock grows with it.
 - **Each widget's toolbar:** settings (its group in Preferences, or for the search bar its own
   section; Tasks, Notes and Claude have none), duplicate, remove. Removing Tasks
   or Notes only takes them off the page; their content comes back when you add them again.
 - **The tray** along the bottom adds widgets: one chip per type with its count. Clock, Tasks, Notes
   and the search bar are single; Markets, GitHub, Sports, Website, tiles blocks and Claude allow five each. A
-  chip is greyed out at the limit or when nothing fits. **Reset layout** puts one copy of each
-  widget back in its default place, keeping its settings.
+  chip is greyed out at the limit or when nothing fits; a new page fills every cell, and the tray
+  then says so. **Reset layout** puts one copy of each widget back in its default place, keeping
+  its settings.
 - **Tiles blocks:** each block either follows the group tabs or is pinned to one group (its
   heading), with its own number of columns (Preferences → Layout). Two blocks can show Work and
   Personal side by side. Drag a tile from one block onto another to move it to that group.
@@ -421,7 +451,8 @@ only. Nothing is sent anywhere except the requests the widgets need:
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 | Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |
 
-Remove a widget in Layout mode and it stops fetching.
+Remove a widget in Layout mode and it stops fetching. Setup's site suggestions read Chrome's
+history and bookmarks on this computer; nothing about them is sent anywhere.
 
 ## Known limits
 
