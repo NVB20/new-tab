@@ -177,6 +177,17 @@ test('addCopy takes the default size, else the minimum, else refuses; duplicates
   assert.equal(duplicateCopy(l, 'nope'), null);
 });
 
+test('a page holds up to 2 Websites, 3 GitHub, 3 Markets and 1 Claude; a saved page keeps that many', () => {
+  for (const [type, max] of [['website', 2], ['github', 3], ['markets', 3], ['claude', 1]]) {
+    assert.equal(TYPES[type].max, max, type);
+    const l = { cols: COLS, rows: ROWS, widgets: [] };
+    for (let i = 0; i < max; i++) assert.ok(addCopy(l, type), type);
+    assert.equal(addCopy(l, type), null, type);
+    const saved = { widgets: Array.from({ length: 5 }, (_, i) => ({ type, x: 0, y: 0, settings: {}, id: `${type}${i}` })) };
+    assert.equal(countOf(normalizeLayout(saved), type), max, type);
+  }
+});
+
 test('a new tiles copy is pinned to the first group no block shows; a block following the tabs shows the active one', () => {
   const l = { cols: COLS, rows: ROWS, widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: null, columns: 4 } }] };
   const groups = [{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }];
@@ -283,7 +294,7 @@ test('a Website copy keeps its address and a zoom from 50 to 100 percent', () =>
   assert.equal(clean({ zoom: '80' }).zoom, 100);
   assert.equal(clean({ url: 42 }).url, '');
   assert.equal(clean({ url: 'x'.repeat(3000) }).url.length, 2000);
-  assert.equal(TYPES.website.max, 5);
+  assert.equal(TYPES.website.max, 2);
 });
 
 test('prefsSection says where Preferences keeps a type’s settings', () => {

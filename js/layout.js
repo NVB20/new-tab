@@ -46,15 +46,15 @@ export const TYPES = {
     clean: s => ({ view: TASK_VIEWS.includes(s.view) ? s.view : 'all', showDone: bool(s.showDone, false) }),
   },
   notes: { label: 'Notes', icon: 'note', size: [3, 3], min: [2, 2], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
-  claude: { label: 'Claude', icon: 'claude', size: [3, 2], min: [2, 2], max: 5, prefs: null, defaults: () => ({}), clean: () => ({}) },
+  claude: { label: 'Claude', icon: 'claude', size: [3, 2], min: [2, 2], max: 1, prefs: null, defaults: () => ({}), clean: () => ({}) },
   markets: {
-    label: 'Markets', icon: 'trend', size: [3, 5], min: [2, 3], max: 5,
+    label: 'Markets', icon: 'trend', size: [3, 5], min: [2, 3], max: 3,
     defaults: () => ({ items: [...MARKET_ITEMS] }),
     clean: s => ({ items: cleanMarketItems(s.items) ?? [...MARKET_ITEMS] }),
   },
   // order: every part, as the copy lists them; parts: the ones shown, in that order.
   github: {
-    label: 'GitHub', icon: 'branch', size: [3, 6], min: [3, 3], max: 5, prefs: 'github',
+    label: 'GitHub', icon: 'branch', size: [3, 6], min: [3, 3], max: 3, prefs: 'github',
     defaults: () => cleanGithubParts({}),
     clean: s => cleanGithubParts(s),
   },
@@ -76,7 +76,7 @@ export const TYPES = {
   search: { label: 'Search bar', icon: 'search', size: [6, 1], min: [3, 1], max: 1, prefs: 'search', defaults: () => ({}), clean: () => ({}) },
   // url: the start address as typed ('' until one is set); zoom: the percent the site is drawn at.
   website: {
-    label: 'Website', icon: 'globe', size: [4, 6], min: [2, 3], max: 5,
+    label: 'Website', icon: 'globe', size: [4, 6], min: [2, 3], max: 2,
     defaults: () => ({ url: '', zoom: 100 }),
     clean: s => ({ url: str(s.url).slice(0, 2000), zoom: clamp(int(s.zoom, 100), 50, 100) }),
   },
