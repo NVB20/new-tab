@@ -5,3 +5,4 @@ node_modules/
 .env*
 # the promo video's frames, music and render (promo/build.mjs)
 promo/out/
+__pycache__/
