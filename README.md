@@ -437,13 +437,15 @@ one, say.
   swaps them); the outline says "Stack with Markets". Or use **Stack onto…** (the layers button) in
   the widget's toolbar, which also says why a spot can't take it: a stack holds three at most, the
   spot must be at least each widget's minimum size, and the search bar never stacks.
+- **Add a third** the same ways, or from the stack itself: **Add to stack…** (the layers button in
+  the stack's toolbar) lists the other widgets, and the one you pick joins and shows.
 - **Switch** with the dots along the bottom; pointing at the stack turns them into the widgets'
   icons. The wheel over them, a sideways swipe over the stack, or ←/→ on a focused one switch too.
   A new tab opens on the widget you looked at last.
 - The widgets behind keep running (a Website stays loaded, Markets keeps its prices), so switching
   is instant.
-- **A stack's toolbar acts on the widget showing:** its settings, duplicate (to a free spot),
-  **Take out** (back to a spot of its own) and remove. With one widget left, it's a plain widget
+- **The rest of a stack's toolbar acts on the widget showing:** its settings, duplicate (to a free
+  spot), **Take out** (back to a spot of its own) and remove. With one widget left, it's a plain widget
   again. Limits count stacked widgets too, and Reset layout takes stacks apart.
 - Under 900px a stack shows the widget in front, at its height.
 
