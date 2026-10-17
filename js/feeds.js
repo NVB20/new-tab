@@ -67,6 +67,18 @@ export function parseCnbcSession(json) {
   return session.filter(b => b.day === last).map(b => b.close);
 }
 
+// CNBC price bars → the closes of the 24 hours up to the latest bar. Futures trade nearly around
+// the clock, so that's their last day of trading, over a weekend too.
+export function parseCnbcDay(json) {
+  const bars = json?.barData?.priceBars;
+  if (!Array.isArray(bars)) return [];
+  const list = bars
+    .map(b => ({ at: Number(b?.tradeTimeinMills), close: parseFloat(b?.close) }))
+    .filter(b => Number.isFinite(b.at) && Number.isFinite(b.close));
+  const last = list.at(-1)?.at;
+  return list.filter(b => b.at > last - 86400e3).map(b => b.close);
+}
+
 // GitHub commit search results → commit rows, newest first, with the message's first line.
 export function parseCommits(json) {
   if (!Array.isArray(json?.items)) return [];

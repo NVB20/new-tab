@@ -1,12 +1,12 @@
-// Markets widget: live crypto prices from Bybit, US index quotes from CNBC and ECB exchange rates
-// with sparklines, for the coins, indexes and currency pairs chosen in its ✎ editor, under segment
+// Markets widget: live crypto prices from Bybit, US index and commodity quotes from CNBC and ECB
+// exchange rates with sparklines, for the coins, indexes and currency pairs chosen in its ✎ editor, under segment
 // headings added from its right-click menu, in the order they're dragged into. Each copy on the
 // page has its own list; the prices are fetched once and shared through the request cache.
 
 import { el, icon, svgEl, widgetHead, widgetSub, widgetEmpty, showMenu } from './ui.js';
 import { feed, fetchJson, peek } from './net.js';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, isPair,
+  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCnbcDay, isPair,
   isSegment, segmentItem, blockEnd, moveMarketItem, headingDropIndex, SEGMENT_MAX,
   formatPrice, formatRate, formatChange, sparkPoints, parseCoins,
 } from './feeds.js';
@@ -23,18 +23,36 @@ const FRANKFURTER = 'https://api.frankfurter.dev/v1';
 const CNBC_QUOTES = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
 const CNBC_BARS = 'https://ts-api.cnbc.com/harmony/app/bars';
 // Products offered by the editor (any other coin can be typed in). Coins are Bybit spot pairs
-// against USDT; indexes are CNBC quotes, by their symbol there and on TradingView; currency pairs
-// use the ECB's daily reference rates.
+// against USDT; indexes and commodities are CNBC quotes, by their symbol there and on
+// TradingView (commodities are front-month futures, priced in their unit); currency pairs use the
+// ECB's daily reference rates.
 const COINS = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'DOGE', 'ADA', 'TRX', 'AVAX', 'LINK', 'DOT', 'LTC', 'SUI', 'HYPE'];
 const STOCKS = {
   SPY: { cnbc: 'SPY', tv: 'AMEX:SPY' },
   QQQ: { cnbc: 'QQQ', tv: 'NASDAQ:QQQ' },
   DJIA: { cnbc: '.DJI', tv: 'DJ:DJI' },
 };
+const COMMODITIES = {
+  GOLD: { cnbc: '@GC.1', tv: 'COMEX:GC1!', unit: 'USD per troy ounce' },
+  SILVER: { cnbc: '@SI.1', tv: 'COMEX:SI1!', unit: 'USD per troy ounce' },
+  PLAT: { cnbc: '@PL.1', tv: 'NYMEX:PL1!', unit: 'USD per troy ounce' },
+  COPPER: { cnbc: '@HG.1', tv: 'COMEX:HG1!', unit: 'USD per pound' },
+  OIL: { cnbc: '@CL.1', tv: 'NYMEX:CL1!', unit: 'USD per barrel' },
+  BRENT: { cnbc: '@LCO.1', tv: 'ICEEUR:BRN1!', unit: 'USD per barrel' },
+  NATGAS: { cnbc: '@NG.1', tv: 'NYMEX:NG1!', unit: 'USD per MMBtu' },
+  CORN: { cnbc: '@C.1', tv: 'CBOT:ZC1!', unit: 'US cents per bushel' },
+  WHEAT: { cnbc: '@W.1', tv: 'CBOT:ZW1!', unit: 'US cents per bushel' },
+  SOY: { cnbc: '@S.1', tv: 'CBOT:ZS1!', unit: 'US cents per bushel' },
+  COFFEE: { cnbc: '@KC.1', tv: 'ICEUS:KC1!', unit: 'US cents per pound' },
+  SUGAR: { cnbc: '@SB.1', tv: 'ICEUS:SB1!', unit: 'US cents per pound' },
+  COCOA: { cnbc: '@CC.1', tv: 'ICEUS:CC1!', unit: 'USD per tonne' },
+};
+const CNBC = { ...STOCKS, ...COMMODITIES };
 const PAIRS = ['USD/ILS', 'EUR/ILS', 'GBP/ILS', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF'];
 
-const isStock = id => Object.hasOwn(STOCKS, id);
-const isCoin = id => !isSegment(id) && !isPair(id) && !isStock(id);
+const isCnbc = id => Object.hasOwn(CNBC, id);
+const isCommodity = id => Object.hasOwn(COMMODITIES, id);
+const isCoin = id => !isSegment(id) && !isPair(id) && !isCnbc(id);
 const segmentName = item => item.slice(1);
 const isoDay = ms => new Date(ms).toISOString().slice(0, 10);
 const trendOf = change => (change > 0 ? 'up' : change < 0 ? 'down' : 'flat');
@@ -81,14 +99,15 @@ export function mountMarkets(root, store, copy) {
     chart: { href: `https://www.tradingview.com/chart/?symbol=BYBIT:${id}USDT`, title: `${id}/USDT chart on TradingView` },
   });
 
-  const stockRow = ({ id, quote, closes }) => marketRow({
+  const cnbcRow = ({ id, quote, closes }) => marketRow({
     label: id,
-    href: `https://www.cnbc.com/quotes/${STOCKS[id].cnbc}`,
-    title: quote ? `${quote.name} on CNBC · as of ${quote.time}` : `No CNBC quote for ${id} yet`,
+    href: `https://www.cnbc.com/quotes/${CNBC[id].cnbc}`,
+    title: !quote ? `No CNBC quote for ${id} yet`
+      : `${quote.name}${CNBC[id].unit ? ` in ${CNBC[id].unit}` : ''} on CNBC · as of ${quote.time}`,
     value: quote ? formatPrice(quote.price) : '—',
     change: quote?.change ?? null,
     closes,
-    chart: { href: `https://www.tradingview.com/chart/?symbol=${STOCKS[id].tv}`, title: `${id} chart on TradingView` },
+    chart: { href: `https://www.tradingview.com/chart/?symbol=${CNBC[id].tv}`, title: `${id} chart on TradingView` },
   });
 
   const pairRow = ({ id, fx }) => marketRow({
@@ -103,7 +122,7 @@ export function mountMarkets(root, store, copy) {
   // One entry of the list, a heading or a row, which knows its place in the items for dragging.
   function entryNode(r, index) {
     const node = isSegment(r.id) ? el('div', { class: 'mk-segment', dir: 'auto', text: segmentName(r.id) })
-      : isPair(r.id) ? pairRow(r) : isStock(r.id) ? stockRow(r) : coinRow(r);
+      : isPair(r.id) ? pairRow(r) : isCnbc(r.id) ? cnbcRow(r) : coinRow(r);
     node.dataset.index = index;
     node.draggable = true;
     return node;
@@ -141,28 +160,28 @@ export function mountMarkets(root, store, copy) {
   const marketKeys = coin => ({ ticker: `ticker:${coin}USDT`, kline: `kline:${coin}USDT` });
   // All pairs come from one request: the ECB's EUR rates for every currency they use.
   const fxKey = currencies => `fx:EUR:${currencies.join(',')}`;
-  // All indexes' quotes come from one request too; each one's session chart from its own.
-  const stocksOf = list => list.filter(isStock).sort();
-  const quotesKey = stocks => `cnbc:quotes:${stocks.join(',')}`;
-  const sessionKey = stock => `cnbc:session:${stock}`;
+  // All indexes' and commodities' quotes come from one request too; each one's chart from its own.
+  const cnbcOf = list => list.filter(isCnbc).sort();
+  const quotesKey = ids => `cnbc:quotes:${ids.join(',')}`;
+  const sessionKey = id => `cnbc:session:${id}`;
 
   // Rows in the chosen order, headings among them; coin(id) gives a coin's { ticker, closes },
-  // stock(id) an index's { quote, closes }.
-  const marketRows = (list, coin, stock, fxTable) => list.map(id => (isSegment(id) ? { id }
+  // cnbc(id) an index's or commodity's { quote, closes }.
+  const marketRows = (list, coin, cnbc, fxTable) => list.map(id => (isSegment(id) ? { id }
     : isPair(id) ? { id, fx: fxTable ? parseFxPair(fxTable, id) : null }
-    : { id, ...(isStock(id) ? stock(id) : coin(id)) }));
+    : { id, ...(isCnbc(id) ? cnbc(id) : coin(id)) }));
 
   function renderCachedMarkets() {
     const list = items();
     const currencies = fxCurrencies(list);
     const fxTable = currencies.length ? peek(fxKey(currencies))?.data ?? null : null;
-    const stocks = stocksOf(list);
-    const quotes = stocks.length ? peek(quotesKey(stocks))?.data ?? {} : {};
+    const ids = cnbcOf(list);
+    const quotes = ids.length ? peek(quotesKey(ids))?.data ?? {} : {};
     renderMarkets(marketRows(list, id => ({
       ticker: peek(marketKeys(id).ticker)?.data ?? null,
       closes: peek(marketKeys(id).kline)?.data ?? [],
     }), id => ({
-      quote: quotes[STOCKS[id].cnbc] ?? null,
+      quote: quotes[CNBC[id].cnbc] ?? null,
       closes: peek(sessionKey(id))?.data ?? [],
     }), fxTable));
   }
@@ -180,26 +199,28 @@ export function mountMarkets(root, store, copy) {
     return [coin, { ticker: ticker.data, closes: kline.data ?? [] }];
   }
 
-  async function loadStocks(stocks) {
-    if (!stocks.length) return new Map();
-    const symbols = stocks.map(id => STOCKS[id].cnbc).join('|');
+  async function loadCnbc(ids) {
+    if (!ids.length) return new Map();
+    const symbols = ids.map(id => CNBC[id].cnbc).join('|');
     const [quotes, sessions] = await Promise.all([
-      feed(quotesKey(stocks), PRICE_TTL, async () => {
+      feed(quotesKey(ids), PRICE_TTL, async () => {
         const table = parseCnbcQuotes(await fetchJson(`${CNBC_QUOTES}?symbols=${encodeURIComponent(symbols)}&requestMethod=itv&output=json`));
         return Object.keys(table).length ? table : null;
       }),
-      Promise.all(stocks.map(loadSession)),
+      Promise.all(ids.map(loadSession)),
     ]);
-    return new Map(stocks.map((id, i) => [id, { quote: quotes.data?.[STOCKS[id].cnbc] ?? null, closes: sessions[i] }]));
+    return new Map(ids.map((id, i) => [id, { quote: quotes.data?.[CNBC[id].cnbc] ?? null, closes: sessions[i] }]));
   }
 
-  // 10-minute bars of the last five days, which reach back over a long weekend to the latest
-  // session. CNBC reads the times in New York; a day either side of UTC's is close enough here.
-  async function loadSession(stock) {
+  // 10-minute bars of the last five days, which reach back over a long weekend: an index charts
+  // its latest session, a commodity its last 24 hours of trading. CNBC reads the times in New
+  // York; a day either side of UTC's is close enough here.
+  async function loadSession(id) {
     const stamp = ms => isoDay(ms).replaceAll('-', '') + '000000';
-    const result = await feed(sessionKey(stock), KLINE_TTL, async () => {
+    const parse = isCommodity(id) ? parseCnbcDay : parseCnbcSession;
+    const result = await feed(sessionKey(id), KLINE_TTL, async () => {
       const span = `${stamp(Date.now() - 5 * 86400e3)}/${stamp(Date.now() + 86400e3)}`;
-      const closes = parseCnbcSession(await fetchJson(`${CNBC_BARS}/${STOCKS[stock].cnbc}/10M/${span}/adjusted/EST5EDT.json`));
+      const closes = parse(await fetchJson(`${CNBC_BARS}/${encodeURIComponent(CNBC[id].cnbc)}/10M/${span}/adjusted/EST5EDT.json`));
       return closes.length ? closes : null;
     });
     return result.data ?? [];
@@ -219,12 +240,12 @@ export function mountMarkets(root, store, copy) {
   async function loadMarkets() {
     const list = items();
     const my = ++seq;
-    const [coins, stocks, fxTable] = await Promise.all([
+    const [coins, cnbc, fxTable] = await Promise.all([
       Promise.all(list.filter(isCoin).map(loadCoin)).then(entries => new Map(entries)),
-      loadStocks(stocksOf(list)),
+      loadCnbc(cnbcOf(list)),
       loadFx(fxCurrencies(list)),
     ]);
-    if (my === seq) renderMarkets(marketRows(list, id => coins.get(id), id => stocks.get(id), fxTable));
+    if (my === seq) renderMarkets(marketRows(list, id => coins.get(id), id => cnbc.get(id), fxTable));
   }
 
   // ---- editor: ✎ swaps the rows for checkboxes; changes apply as they're made ----
@@ -287,6 +308,8 @@ export function mountMarkets(root, store, copy) {
       addForm,
       widgetSub('US indexes · CNBC'),
       el('div', { class: 'mk-checks' }, Object.keys(STOCKS).map(checkbox)),
+      widgetSub('Commodities · CNBC futures'),
+      el('div', { class: 'mk-checks' }, Object.keys(COMMODITIES).map(checkbox)),
       widgetSub('Currencies · ECB daily rate'),
       el('div', { class: 'mk-checks' }, PAIRS.map(checkbox)));
   }

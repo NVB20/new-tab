@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCommits, latestCommits, latestRepos, parseStats, parseIssues,
+  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCnbcDay, parseCommits, latestCommits, latestRepos, parseStats, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
   isPair, isSegment, segmentItem, moveMarketItem, headingDropIndex, parseContributions, heatmapLayout,
 } from '../js/feeds.js';
@@ -70,6 +70,14 @@ test('parseCnbcSession keeps the closes of the latest regular session', () => {
   json.barData.priceBars = json.barData.priceBars.filter(b => b.tradeTime < '20261016093000');
   assert.deepEqual(parseCnbcSession(json), [100, 101]);
   assert.deepEqual(parseCnbcSession({ status: 'ERROR' }), []);
+});
+
+test('parseCnbcDay keeps the closes of the 24 hours up to the latest bar', () => {
+  const hour = 3600e3;
+  const bar = (h, close) => ({ tradeTimeinMills: h * hour, close: String(close) });
+  const json = { barData: { priceBars: [bar(0, 99), bar(10, 98), bar(11, 100), bar(30, 101), bar(33, 'x'), bar(34, 102)] } };
+  assert.deepEqual(parseCnbcDay(json), [100, 101, 102]);
+  assert.deepEqual(parseCnbcDay({ status: 'ERROR' }), []);
 });
 
 test('cleanMarketItems keeps valid coins and pairs once, in order', () => {

@@ -38,8 +38,8 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
      Never ask me to paste the token into this chat.
    - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
-     heading; any Bybit spot coin, priced in USDT, the SPY, QQQ and DJIA indexes, plus pairs such as
-     USD/ILS and EUR/ILS).
+     heading; any Bybit spot coin, priced in USDT, the SPY, QQQ and DJIA indexes, commodities such
+     as gold, oil and corn, plus pairs such as USD/ILS and EUR/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
    on the extension's card in chrome://extensions.
 ```
@@ -53,7 +53,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles, and stack up to three widgets in one spot. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
+| **Markets** | Coins from Bybit, SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to five copies can split them up. |
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
@@ -159,7 +159,7 @@ The Markets widget starts on the right of the page; Layout mode moves it anywher
 copies can each follow their own list (say, coins in one and currencies in another).
 
 - **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins,
-  indexes and currency pairs you want and untick the rest; the list updates as you go. To follow a
+  indexes, commodities and currency pairs you want and untick the rest; the list updates as you go. To follow a
   coin that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're
   done. New picks go to the bottom of the list.
 - **Coins:** BTC, SOL, XRP and ETH by default, as Bybit spot prices in USDT. Each row shows the
@@ -167,9 +167,14 @@ copies can each follow their own list (say, coins in one and currencies in anoth
 - **US indexes:** SPY, QQQ and the Dow (DJIA), as CNBC quotes. Each row shows the last
   regular-session price, its change on the day and a sparkline of that session; outside market
   hours that's the last close.
+- **Commodities:** gold, silver, platinum (PLAT), copper, WTI oil, Brent, natural gas, corn, wheat,
+  soybeans (SOY), coffee, sugar and cocoa, as CNBC quotes of the front-month futures. Each row shows
+  the price in the contract's unit (hover the row to see it: corn, wheat and soybeans are in cents a
+  bushel, coffee and sugar in cents a pound), its change since the last settlement and a sparkline
+  of the last 24 hours of trading.
 - **Currency pairs:** USD/ILS by default; EUR/ILS, GBP/ILS, EUR/USD, GBP/USD, USD/JPY and USD/CHF
   are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
-- **Click a row** to open the coin's chart on Bybit (the index on CNBC, or the pair on Google
+- **Click a row** to open the coin's chart on Bybit (the index or commodity on CNBC, or the pair on Google
   Finance); the candles icon at the end opens it on TradingView.
 - **Drag a row** up or down to reorder the list; a line shows where it will land.
 - **Segments:** right-click a row and choose **New segment above** to put a heading over it (say,
@@ -515,7 +520,7 @@ Chrome profile only. Nothing is sent anywhere except the requests the widgets ne
 | Widget | Talks to | How often |
 | --- | --- | --- |
 | Markets (coins) | `api.bybit.com` (public market data) | every 30 s while visible; sparklines every 5 min |
-| Markets (indexes) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) | every 30 s while visible; sparklines every 5 min |
+| Markets (indexes, commodities) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap | once an hour, or when you press Refresh |
 | Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores); team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |

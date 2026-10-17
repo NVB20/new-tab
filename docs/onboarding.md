@@ -50,7 +50,7 @@ Details per step:
   (`placeDefaults`). Once something was arranged by hand, a tick adds a copy where it fits and an
   untick removes it; nothing else moves. Setup works on the layout of the tab you're on.
 - **Connect:** search engines (one always stays on), GitHub username (saved when typing pauses),
-  Markets coins, indexes and pairs, Sports (Messi's teams, F1, NBA and NFL teams from a list), a
+  Markets coins, indexes, commodities and pairs, Sports (Messi's teams, F1, NBA and NFL teams from a list), a
   Website address (Show asks Chrome for access to the site).
 - **Moves:** noticed by watching the page (Jump's dialog opening, the search bar's input getting
   the cursor, `body.layout-editing`), so those modules don't know about setup. Layout mode opened
@@ -78,7 +78,7 @@ Throughout:
 | Widget stacks (a tip: drop onto another's middle) | Arrange |
 | Search bar engines (Google, Claude, ChatGPT, Gemini) | Connect |
 | GitHub username | Connect |
-| Markets coins, US indexes, currency pairs | Connect |
+| Markets coins, US indexes, commodities, currency pairs | Connect |
 | Sports teams and F1 | Connect |
 | Website address and site access | Connect |
 | Jump (Ctrl+K) | Moves |

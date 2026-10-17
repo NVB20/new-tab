@@ -33,13 +33,16 @@ const BACKGROUNDS = [['ascii', 'ASCII'], ['none', 'Plain'], ['image', 'Image']];
 const NEAR = ['clock', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
 const WIDGETS = {
   clock: 'Time and a greeting', search: 'Google and AI chats', tasks: 'To-dos with due dates',
-  notes: 'A scratch pad', markets: 'Coins, indexes, currencies', github: 'Your activity and PRs',
+  notes: 'A scratch pad', markets: 'Coins, indexes, gold, FX', github: 'Your activity and PRs',
   sports: 'Your teams’ games', website: 'Any site, live', claude: 'A box for long prompts',
   marvel: 'The MCU in story order',
 };
 const CONNECTS = ['search', 'github', 'markets', 'sports', 'website'];
 const ENGINES = [['google', 'Google'], ['claude', 'Claude'], ['chatgpt', 'ChatGPT'], ['gemini', 'Gemini']];
-const MARKETS = [['Coins', ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE']], ['US indexes', ['SPY', 'QQQ', 'DJIA']], ['Currencies', ['USD/ILS', 'EUR/ILS', 'EUR/USD']]];
+const MARKETS = [
+  ['Coins', ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE']], ['US indexes', ['SPY', 'QQQ', 'DJIA']],
+  ['Commodities', ['GOLD', 'SILVER', 'OIL', 'CORN']], ['Currencies', ['USD/ILS', 'EUR/ILS', 'EUR/USD']],
+];
 const MESSI = [['soccer:20232', 'Inter Miami'], ['soccer:202', 'Argentina'], ['f1', 'F1']];
 const MOVES = [
   { key: 'jump', keys: ['Ctrl', 'K'], title: 'Jump', text: 'Find any tile, open tab, bookmark or page you’ve visited.' },
@@ -381,7 +384,7 @@ export function setupOnboarding(store, canvas, ctx) {
       if (has('markets')) {
         parts.push(part('trend', 'Markets',
           MARKETS.map(([group, ids]) => [label(group), el('div', { class: 'ob-chips' }, ids.map(id => chip(id, marketItems().includes(id), () => toggleMarket(id))))]),
-          hint('Any Bybit coin, and the order, from ✎ on the widget.')));
+          hint('Any Bybit coin, more commodities and the order, from ✎ on the widget.')));
       }
       if (has('sports')) parts.push(part('trophy', 'Sports', sportsPicker()));
       if (has('website')) parts.push(part('globe', 'Website', websiteField()));
