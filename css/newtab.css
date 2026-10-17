@@ -867,6 +867,12 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .mv-item.next .mv-row { background: var(--hover); }
 .mv-item.next .mv-num { color: var(--accent); font-weight: 600; }
 .mv-item.next .mv-check { border-color: var(--accent); }
+/* ▶ Disney+ beside the row: on hover, on focus, and always on the next entry. */
+.mv-item { display: flex; align-items: center; gap: 2px; }
+.mv-item .mv-row { flex: 1; min-width: 0; margin-right: 0; }
+.mv-play { flex: none; width: 26px; height: 26px; border-radius: 7px; color: var(--muted); opacity: 0; transition: opacity 0.15s, color 0.12s, background 0.12s; }
+.mv-play:hover { color: var(--accent); }
+.mv-item:hover .mv-play, .mv-play:focus-visible, .mv-item.next .mv-play { opacity: 1; }
 .mv-source { margin-bottom: 4px; }
 .mv-source a { color: inherit; }
 /* Under 3 cells wide: no numbers or years. */

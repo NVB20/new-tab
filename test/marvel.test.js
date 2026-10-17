@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ENTRIES, KINDS, SHOWS, cleanWatched, shownEntries, nextUp, watchedUpTo, unwatchedFrom } from '../js/marvel.js';
+import { ENTRIES, KINDS, SHOWS, cleanWatched, shownEntries, nextUp, disneyUrl, watchedUpTo, unwatchedFrom } from '../js/marvel.js';
 
 const ids = list => list.map(e => e.id);
 
@@ -63,4 +63,18 @@ test('watchedUpTo ticks every shown entry up to one; unwatchedFrom unticks it an
   // Only shown entries change: the Agents of SHIELD part stays ticked.
   assert.deepEqual(unwatchedFrom(upTo, films, 'captain-marvel'), ['captain-america-first-avenger', 'aos-1a']);
   assert.deepEqual(watchedUpTo([], films, 'junk'), []);
+});
+
+test('every entry links to its Disney+ page, except the three titles Disney+ doesn’t have', () => {
+  const byId = id => ENTRIES.find(e => e.id === id);
+  assert.deepEqual(ENTRIES.filter(e => !disneyUrl(e)).map(e => e.id), ['slingshot', 'runaways-1', 'runaways-2', 'runaways-3', 'brand-new-day']);
+  for (const e of ENTRIES.filter(disneyUrl)) {
+    assert.match(disneyUrl(e), /^https:\/\/www\.disneyplus\.com\/browse\/entity-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, e.id);
+  }
+  // One page per title: 76 of them, so no id in the tables is left unused by a misspelt title.
+  assert.equal(new Set(ENTRIES.map(disneyUrl).filter(Boolean)).size, 76);
+  // A series' seasons and parts share its page; the Agent Carter One-Shot isn't the series.
+  assert.equal(disneyUrl(byId('aos-1a')), disneyUrl(byId('aos-7')));
+  assert.notEqual(disneyUrl(byId('agent-carter-one-shot')), disneyUrl(byId('agent-carter-1')));
+  assert.equal(disneyUrl(byId('iron-man')), 'https://www.disneyplus.com/browse/entity-0c520152-b81f-4c20-9310-003debd1947e');
 });

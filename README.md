@@ -322,6 +322,12 @@ and The Winter Soldier).
   it needs care ("Watch its credits scene after Avengers: Endgame").
 - **Starting midway:** right-click an entry and choose **Watched everything up to here**. **Not
   watched from here on** undoes a run of ticks.
+- **Disney+:** the ▶ at the end of a row (it shows when you hover, and always on your next entry)
+  opens that title's page on Disney+, like a tile: Ctrl+click for a new tab. Right-click → **Watch
+  on Disney+** does the same. A series' seasons and parts all open the series. Runaways (on Hulu),
+  the Slingshot web series and Spider-Man: Brand New Day aren't on Disney+, so they have none.
+  Which titles play depends on your country's catalog: in Israel, as of October 2026, the
+  One-Shots, The Incredible Hulk and Cloak & Dagger open an empty page.
 - **Preferences → Layout → Marvel:** **Show** everything, everything but the Marvel TV shows
   (Agents of SHIELD, the Netflix shows and the rest of 2013–2020, which the MCU now places outside
   its main timeline), or the 38 films only. Progress and the next entry count only what's shown. **Hide
