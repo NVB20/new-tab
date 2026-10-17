@@ -5,6 +5,7 @@ import { uid } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
 import { isDay, PRIORITIES, REPEATS } from './tasks.js';
 import { defaultLayout, normalizeLayout } from './layout.js';
+import { cleanWatched } from './marvel.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
@@ -60,7 +61,7 @@ export function setTheme(prefs, theme) {
   prefs.theme = theme;
 }
 
-const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'prefs', 'onboarding'];
+const KEYS = ['groups', 'tiles', 'activeGroupId', 'tasks', 'taskHistory', 'taskStats', 'notes', 'marvel', 'prefs', 'onboarding'];
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v, fallback = '') => (typeof v === 'string' ? v : fallback);
@@ -77,6 +78,8 @@ export function defaultState() {
     taskHistory: [],   // finished tasks, kept for a week
     taskStats: {},     // { 'YYYY-MM-DD': tasks completed that day }, kept forever
     notes: '',
+    // The Marvel widget's progress: the ids (marvel.js) watched, kept when the widget is removed.
+    marvel: { watched: [] },
     // First-run setup (onboarding.js): whether it's done, and the step to resume at.
     onboarding: { done: false, step: 'intro' },
     prefs: { ...structuredClone(DEFAULT_PREFS), layout: defaultLayout(LEGACY_PREFS) },
@@ -149,6 +152,7 @@ export function normalizeState(raw) {
   s.taskStats = Object.fromEntries(Object.entries(isObj(raw.taskStats) ? raw.taskStats : {})
     .filter(([day, n]) => /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isInteger(n) && n > 0));
   s.notes = str(raw.notes);
+  s.marvel = { watched: cleanWatched(raw.marvel?.watched) };
   // A page saved before setup existed was set up by hand, so it counts as done.
   const ob = raw.onboarding;
   s.onboarding = isObj(ob) ? { done: ob.done === true, step: str(ob.step, 'intro') } : { done: true, step: 'done' };

@@ -362,6 +362,19 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
       case 'sports':
         return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'marvel': {
+        const n = store.get().marvel.watched.length;
+        return [
+          row('Show', choice('Show', s.show, [
+            { value: 'all', label: 'All' },
+            { value: 'studios', label: 'No Marvel TV' },
+            { value: 'films', label: 'Films' },
+          ], v => set('show', v)), 'Marvel TV: Agents of SHIELD, Netflix’s shows and the rest from 2013–2020'),
+          row('Hide watched', switchFor('Hide watched', `${copy.id}.hideWatched`, s.hideWatched, on => set('hideWatched', on))),
+          row('Progress', el('button', { type: 'button', class: 'btn', text: 'Clear', disabled: !n, onclick: clearMarvel }),
+            n ? `${n} watched` : 'Nothing watched yet'),
+        ];
+      }
       case 'website':
         return [
           row('Address', textFor('Address', `${copy.id}.url`, s.url, 'pinterest.com', v => set('url', v), { maxLength: 2000 }),
@@ -371,6 +384,13 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
       default:
         return [row('No settings', el('span'))];
     }
+  }
+
+  async function clearMarvel() {
+    const n = store.get().marvel.watched.length;
+    if (!await confirmDialog(`Mark all ${n} as not watched?`, { title: 'Clear Marvel progress', confirmLabel: 'Clear', danger: true })) return;
+    store.update(s => { s.marvel.watched = []; }, ['marvel']);
+    redraw();
   }
 
   async function resetAllLayout() {
@@ -550,10 +570,10 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     if (!await confirmDialog(message, { title: 'Import from Speed Dial 2', confirmLabel: 'Import' })) return;
     // The layout and the token stay; only the export's column count goes to the block that
     // follows the tabs. Blocks pinned to the old groups go back to following the tabs on load.
-    const { tasks, taskHistory, taskStats, notes, prefs: { layout, github } } = structuredClone(store.get());
+    const { tasks, taskHistory, taskStats, notes, marvel, prefs: { layout, github } } = structuredClone(store.get());
     const block = layout.widgets.find(c => c.type === 'tiles' && c.settings.group === null);
     if (block) block.settings.columns = imported.prefs.columns;
-    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, prefs: { ...imported.prefs, layout, github } });
+    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, prefs: { ...imported.prefs, layout, github } });
     redraw();
   }
 

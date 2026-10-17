@@ -42,6 +42,12 @@ test('normalizeState(null) returns a usable default state', () => {
   assert.deepEqual(layout.widgets.map(c => c.type), ['clock', 'tasks', 'notes', 'markets', 'github', 'search', 'tiles']);
 });
 
+test('normalizeState keeps the Marvel progress: known ids once, in the list’s order', () => {
+  assert.deepEqual(normalizeState(null).marvel, { watched: [] });
+  assert.deepEqual(normalizeState({ marvel: { watched: ['endgame', 'junk', 'iron-man', 'endgame'] } }).marvel, { watched: ['iron-man', 'endgame'] });
+  assert.deepEqual(normalizeState({ marvel: 'nope' }).marvel, { watched: [] });
+});
+
 test('a saved state from before Layout mode converts to the same page, and loses the old keys', () => {
   const s = normalizeState({ prefs: {
     columns: 7,

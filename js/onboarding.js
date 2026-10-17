@@ -30,11 +30,12 @@ const PRETICK = 6;   // most visited sites ticked to start with, when the group 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const THEMES = [['auto', 'Auto', 'auto'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon'], ['blue', 'Blue', 'drop'], ['github', 'GitHub', 'branch']];
 const BACKGROUNDS = [['ascii', 'ASCII'], ['none', 'Plain'], ['image', 'Image']];
-const NEAR = ['clock', 'tasks', 'notes', 'claude'];   // the clock column (layout.js)
+const NEAR = ['clock', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
 const WIDGETS = {
   clock: 'Time and a greeting', search: 'Google and AI chats', tasks: 'To-dos with due dates',
   notes: 'A scratch pad', markets: 'Coins, indexes, currencies', github: 'Your activity and PRs',
   sports: 'Your teams’ games', website: 'Any site, live', claude: 'A box for long prompts',
+  marvel: 'The MCU in story order',
 };
 const CONNECTS = ['search', 'github', 'markets', 'sports', 'website'];
 const ENGINES = [['google', 'Google'], ['claude', 'Claude'], ['chatgpt', 'ChatGPT'], ['gemini', 'Gemini']];
@@ -551,10 +552,10 @@ export function setupOnboarding(store, canvas, ctx) {
     // As Preferences imports it: tiles, groups and settings come over; the layout, the GitHub
     // token, tasks and notes stay. Setup carries on at Widgets.
     const apply = () => {
-      const { tasks, taskHistory, taskStats, notes, prefs: { layout: kept, github } } = structuredClone(store.get());
+      const { tasks, taskHistory, taskStats, notes, marvel, prefs: { layout: kept, github } } = structuredClone(store.get());
       const block = kept.widgets.find(c => c.type === 'tiles' && c.settings.group === null);
       if (block) block.settings.columns = imported.prefs.columns;
-      store.replace({ ...imported, tasks, taskHistory, taskStats, notes, onboarding: { done: false, step: 'widgets' }, prefs: { ...imported.prefs, layout: kept, github } });
+      store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, onboarding: { done: false, step: 'widgets' }, prefs: { ...imported.prefs, layout: kept, github } });
       sources = null;
       go('widgets');
     };

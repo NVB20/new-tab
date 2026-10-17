@@ -12,6 +12,7 @@ import { mountSports } from './sports-widget.js';
 import { mountTiles } from './grid.js';
 import { mountSearch } from './searchbar.js';
 import { mountWebsite } from './website-widget.js';
+import { mountMarvel } from './marvel-widget.js';
 
 const MOUNTS = {
   clock: mountClock,
@@ -24,6 +25,7 @@ const MOUNTS = {
   tiles: mountTiles,
   search: mountSearch,
   website: mountWebsite,
+  marvel: mountMarvel,
 };
 
 export const WIDGETS = Object.fromEntries(Object.entries(TYPES).map(([type, t]) => [type, { ...t, mount: MOUNTS[type] }]));

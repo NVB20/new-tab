@@ -337,6 +337,24 @@ test('Website has a default place in the far column', () => {
   assert.deepEqual(rect(byType(l).website), [9, 5, 3, 6]);
 });
 
+test('Marvel: one copy, its own settings, never on an old page, last in the clock column', () => {
+  assert.equal(TYPES.marvel.max, 1);
+  assert.equal(prefsSection('marvel'), 'layout');
+  assert.deepEqual(TYPES.marvel.defaults(), { show: 'all', hideWatched: false });
+  assert.deepEqual(TYPES.marvel.clean({ show: 'films', hideWatched: true }), { show: 'films', hideWatched: true });
+  assert.deepEqual(TYPES.marvel.clean({ show: 'junk', hideWatched: 'yes' }), { show: 'all', hideWatched: false });
+  assert.equal(byType(defaultLayout(legacy())).marvel, undefined);
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'marvel', 'tiles']);
+  assert.deepEqual(rect(byType(l).marvel), [0, 4, 3, 6]);
+  // With the whole clock column it shrinks to its minimum, and the column still fits.
+  l.widgets = placeDefaults(l, ['clock', 'tasks', 'notes', 'claude', 'marvel', 'tiles']);
+  const t = byType(l);
+  assert.deepEqual(rect(t.marvel), [0, 9, 3, 3]);
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  assert.ok(atDefaultPlaces(l));
+});
+
 test('placeDefaults puts the given types in their default places, keeping copies already there', () => {
   const l = defaultLayout(legacy());
   const clock = byType(l).clock;

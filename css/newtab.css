@@ -802,6 +802,60 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .site-setup .pref-input { flex: 1; width: auto; min-width: 0; }
 .site-body > .btn { align-self: flex-start; margin-top: 10px; }
 
+/* ---------- Marvel ---------- */
+
+/* The head, the progress bar and Up next stay put; the order scrolls under them. */
+.widget-root > .widget-marvel { display: flex; flex-direction: column; overflow: hidden; }
+.mv-bar { flex: none; height: 4px; margin: -2px 0 10px; border-radius: 2px; background: var(--hover); overflow: hidden; }
+.mv-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.3s; }
+.mv-next { flex: none; margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
+.mv-next-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.mv-next-row { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.mv-next-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mv-next-title { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.mv-watched { flex: none; gap: 5px; padding: 5px 10px; font-size: 12.5px; color: var(--text); }
+.mv-watched:hover { border-color: var(--accent); color: var(--accent); }
+.mv-note { margin: 4px 0 0; font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+.mv-credits { color: var(--text); }
+.mv-all { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--accent); }
+
+.mv-scroll { position: relative; flex: 1; min-height: 0; overflow: hidden auto; }
+.mv-list { list-style: none; margin: 0; padding: 0; }
+.mv-row { display: flex; align-items: center; gap: 8px; margin: 0 -6px; padding: 4px 6px; border-radius: 8px; cursor: pointer; }
+.mv-row:hover { background: var(--hover); }
+.mv-num { flex: none; width: 22px; text-align: right; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.mv-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  appearance: none;
+  background: none;
+  cursor: pointer;
+}
+.mv-check:hover { border-color: var(--accent); }
+.mv-check:checked {
+  border-color: var(--accent);
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 11px no-repeat;
+}
+.mv-check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mv-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mv-title, .mv-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.mv-title { font-size: 13.5px; }
+.mv-meta { font-size: 11.5px; color: var(--muted); }
+.mv-item.done .mv-title { color: var(--muted); text-decoration: line-through; }
+.mv-item.done .mv-meta { opacity: 0.7; }
+.mv-item.next .mv-row { background: var(--hover); }
+.mv-item.next .mv-num { color: var(--accent); font-weight: 600; }
+.mv-item.next .mv-check { border-color: var(--accent); }
+.mv-source { margin-bottom: 4px; }
+.mv-source a { color: inherit; }
+/* Under 3 cells wide: no numbers or years, and Watched is its tick alone. */
+.widget-marvel.narrow .mv-num, .widget-marvel.narrow .mv-year, .widget-marvel.narrow .mv-watched > span { display: none; }
+.widget-marvel.narrow .mv-watched { padding: 6px; }
+
 /* ---------- Tiles ---------- */
 
 /* Laid out by .grid-wrap. */
@@ -1146,6 +1200,8 @@ body.tiles-card .folder-thumb { background: rgb(0 0 0 / 0.06); }
 .pref-slider, .pref-stack { flex-direction: column; align-items: stretch; gap: 8px; }
 .pref-label { display: flex; justify-content: space-between; }
 .pref-text { min-width: 0; }
+/* A choice keeps its width; a long hint beside it wraps instead of clipping the last option. */
+.pref-row > .seg { flex: none; }
 .pref-hint { margin-top: 2px; font-size: 12.5px; color: var(--muted); }
 .pref-input { width: 220px; }
 

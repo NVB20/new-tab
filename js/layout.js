@@ -7,6 +7,7 @@ import { cleanMarketItems } from './feeds.js';
 import { cleanSports } from './sports.js';
 import { siteUrl, siteDomain } from './website.js';
 import { VIEWS as TASK_VIEWS } from './tasks.js';
+import { SHOWS as MARVEL_SHOWS } from './marvel.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -79,6 +80,13 @@ export const TYPES = {
     defaults: () => ({ url: '', zoom: 100 }),
     clean: s => ({ url: str(s.url).slice(0, 2000), zoom: clamp(int(s.zoom, 100), 50, 100) }),
   },
+  // show: 'all', 'studios' (no Marvel Television shows) or 'films' (see marvel.js). What's watched
+  // is the page's (state.marvel), not the copy's.
+  marvel: {
+    label: 'Marvel', icon: 'shield', size: [3, 6], min: [2, 3], max: 1,
+    defaults: () => ({ show: 'all', hideWatched: false }),
+    clean: s => ({ show: MARVEL_SHOWS.includes(s.show) ? s.show : 'all', hideWatched: bool(s.hideWatched, false) }),
+  },
 };
 
 // ---- GitHub parts ----
@@ -145,17 +153,19 @@ export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.
 
 // ---- default layout ----
 
-const NEAR = { clock: 4, tasks: 4, notes: 4, claude: 2 };   // the clock column, top to bottom
+// The clock column, top to bottom. Marvel goes here: the other column's four minimums already
+// take all 12 rows.
+const NEAR = { clock: 4, tasks: 4, notes: 4, claude: 2, marvel: 6 };
 const FAR = { markets: 5, github: 7, sports: 5, website: 6 };   // the other column
 
-// Heights of a column sum to at most ROWS: the tallest shrinks first, never below its minimum.
+// Heights of a column sum to at most ROWS: the tallest that is above its minimum shrinks first.
 // With fill, one widget alone takes the whole column.
 function column(items, fill) {
   if (fill && items.length === 1) items[0].h = ROWS;
   let total = items.reduce((n, it) => n + it.h, 0);
   while (total > ROWS) {
-    const tallest = items.reduce((a, b) => (b.h > a.h ? b : a));
-    if (tallest.h <= TYPES[tallest.type].min[1]) break;
+    const tallest = items.filter(it => it.h > TYPES[it.type].min[1]).reduce((a, b) => (!a || b.h > a.h ? b : a), null);
+    if (!tallest) break;
     tallest.h--;
     total--;
   }
@@ -198,8 +208,8 @@ export const partsFromShow = show => (show === 'commits' ? ['heatmap', 'pulls', 
 export function defaultLayout(old) {
   const w = old.widgets;
   const on = name => w.enabled !== false && w[name]?.enabled !== false;
-  // Sports came after Layout mode: an old page never had it.
-  const types = [...Object.keys(NEAR), 'markets', 'github'].filter(on);
+  // Sports and Marvel came after Layout mode: an old page never had them.
+  const types = ['clock', 'tasks', 'notes', 'claude', 'markets', 'github'].filter(on);
   const settings = {
     clock: () => ({ hour24: w.clock.hour24, name: w.clock.name, greeting: w.clock.greeting, face: w.clock.face, colon: w.clock.colon }),
     markets: () => ({ items: [...w.markets.items] }),
