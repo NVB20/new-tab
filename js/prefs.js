@@ -5,7 +5,7 @@ import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
 import { CLOCK_FACES } from './clock-widget.js';
 import { setTheme } from './store.js';
-import { copyById, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary, activeLayout, ownLayout } from './layout.js';
+import { copyById, copiesOf, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary, activeLayout, ownLayout } from './layout.js';
 import { askOwnLayout, askMainLayout } from './groups.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
@@ -324,7 +324,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     const s = store.get();
     const tab = s.groups.find(g => g.id === s.activeGroupId);
     const ownTab = !!ownLayout(s, tab.id);
-    const own = activeLayout(s).widgets.filter(copy => prefsSection(copy.type) === 'layout');
+    const own = copiesOf(activeLayout(s)).filter(copy => prefsSection(copy.type) === 'layout');
     const toggleOwn = async () => {
       if (ownTab) await askMainLayout(store, tab);
       else await askOwnLayout(store, tab, () => { dialog.close(); enterLayoutMode(); });
@@ -419,7 +419,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
   // open('github', <copy id>) to that widget's parts.
   function github() {
     const s = store.get();
-    const copies = activeLayout(s).widgets.filter(copy => copy.type === 'github');
+    const copies = copiesOf(activeLayout(s)).filter(copy => copy.type === 'github');
     return [
       title('Account'),
       group('account', textInput('Username', 'github.user', 'NVB20', { hint: 'Whose activity every GitHub widget shows' })),
@@ -581,7 +581,7 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     // The layout and the token stay; only the export's column count goes to the block that
     // follows the tabs. Blocks pinned to the old groups go back to following the tabs on load.
     const { tasks, taskHistory, taskStats, notes, marvel, prefs: { layout, github } } = structuredClone(store.get());
-    const block = layout.widgets.find(c => c.type === 'tiles' && c.settings.group === null);
+    const block = copiesOf(layout).find(c => c.type === 'tiles' && c.settings.group === null);
     if (block) block.settings.columns = imported.prefs.columns;
     store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, prefs: { ...imported.prefs, layout, github } });
     redraw();

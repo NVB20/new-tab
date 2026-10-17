@@ -2,6 +2,7 @@
 // Tile order only matters within a group, so tiles of different groups may interleave in the array.
 
 import { uid } from './util.js';
+import { copiesOf } from './layout.js';
 
 export function addTile(s, { title, url, icon = '', groupId }) {
   const tile = { id: uid(), groupId: groupId ?? s.activeGroupId, title, url, icon };
@@ -148,7 +149,7 @@ export function deleteGroup(s, id, mode = 'move') {
   // Its own layout goes, and a tiles block pinned to it, in any layout, goes back to following the tabs.
   if (s.prefs?.layouts) delete s.prefs.layouts[id];
   const layouts = [s.prefs?.layout, ...Object.values(s.prefs?.layouts ?? {})].filter(Boolean);
-  for (const c of layouts.flatMap(l => l.widgets)) if (c.type === 'tiles' && c.settings.group === id) c.settings.group = null;
+  for (const c of layouts.flatMap(copiesOf)) if (c.type === 'tiles' && c.settings.group === id) c.settings.group = null;
   return true;
 }
 
