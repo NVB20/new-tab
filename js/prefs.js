@@ -10,6 +10,8 @@ import { askOwnLayout, askMainLayout } from './groups.js';
 import { placeLabel } from './weather.js';
 import { cityField } from './city-search.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
+import { sweep } from './net.js';
+import { hasChrome, clearChatHandoffs } from './chrome-api.js';
 
 // The GitHub widget's parts as Preferences → GitHub lists them.
 const PART_NAMES = {
@@ -132,11 +134,14 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     return input;
   }
 
-  function textField(label, path, placeholder, { type = 'text', maxLength = 60 } = {}) {
+  function textField(label, path, placeholder, { type = 'text', maxLength = 60, onInput } = {}) {
     const input = el('input', {
       type, class: 'pref-input', value: getPref(path), placeholder, dir: 'auto', maxLength, 'aria-label': label,
       autocomplete: 'off', spellcheck: false,
-      oninput: () => setPref(path, input.value),
+      oninput: () => {
+        setPref(path, input.value);
+        onInput?.();
+      },
     });
     return input;
   }
@@ -448,7 +453,11 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
       textInput('Access token (optional)', 'github.token', 'github_pat_…', {
         type: 'password',
         maxLength: 300,
-        hint: 'One token for every GitHub widget. Only needed for private repos. Kept only in this browser and left out of backups.',
+        hint: hasChrome
+          ? 'One token for every GitHub widget. Only needed for private repos. Kept only in this browser and left out of backups.'
+          : 'One token for every GitHub widget. Only needed for private repos. Outside the extension it isn’t saved: it’s gone when the page reloads.',
+        // What the old token fetched (private repos, commits) isn't kept for the next one.
+        onInput: () => sweep('github-', key => !key.endsWith(':token')),
       }),
       tokenHelp(),
     ];
@@ -488,9 +497,12 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
       el('div', { class: 'pref-help-title', text: 'How to get a token' }),
       el('ol', {},
         el('li', {}, 'Open ', link('https://github.com/settings/personal-access-tokens/new', 'a new fine-grained token'), ' on GitHub.'),
-        el('li', { text: 'Pick the owner (you or an organisation) and the repos it may see.' }),
+        el('li', { text: 'Give it an expiry (90 days, say); GitHub emails you before it runs out.' }),
+        el('li', { text: 'Pick the owner (you or an organisation), then Only select repositories and the ones it may see.' }),
         el('li', { text: 'Under Permissions, add Contents, Issues and Pull requests, each Read-only.' }),
         el('li', { text: 'Generate it, copy it and paste it above.' })),
+      el('div', {}, 'Done with it? Delete it on ',
+        link('https://github.com/settings/personal-access-tokens', 'GitHub’s token page'), ' and clear the box above.'),
       el('div', {}, 'Private repos under more than one owner? ',
         link('https://github.com/NVB20/new-tab#tokens-for-private-repos', 'See the README'), '.'));
   }
@@ -616,9 +628,13 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
 
   async function resetAll() {
     if (!await confirmDialog('This deletes all tiles, groups, settings, tasks, notes and the wallpaper. Download a backup first if you might want them back.', { title: 'Reset everything?', confirmLabel: 'Reset', danger: true })) return;
-    store.replace(null);
+    store.replace(null, { keepToken: false });
     await store.setWallpaper('');
     await clearSavedIcons();
+    // What the widgets fetched (private GitHub data, the weather's place) and Ask messages that
+    // never reached their chat site go too.
+    sweep('', () => false);
+    await clearChatHandoffs();
     show('page');
   }
 

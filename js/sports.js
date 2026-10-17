@@ -2,6 +2,7 @@
 // (NBA, NFL, soccer) and Jolpica F1, and the timeline the widget draws. Pure (unit-tested in Node).
 
 import { MONTHS } from './feeds.js';
+import { onlyFrom } from './util.js';
 
 const MIN = 60e3;
 const DAY = 86400e3;
@@ -54,7 +55,7 @@ export function teamOf(followId) {
   const parts = String(followId).split(':');
   if (parts.length !== 2) return null;
   const [sport, id] = parts;
-  const team = TEAMS[sport]?.find(t => t.id === id);
+  const team = Object.hasOwn(TEAMS, sport) ? TEAMS[sport].find(t => t.id === id) : null;
   return team ? { sport, ...team } : null;
 }
 
@@ -78,7 +79,7 @@ const COMPETITIONS = {
   'fifa.worldq.conmebol': 'WC qual.',
   'conmebol.america': 'Copa América',
 };
-export const competitionTag = (slug, abbreviation) => COMPETITIONS[slug] ?? (abbreviation ? String(abbreviation) : 'Soccer');
+export const competitionTag = (slug, abbreviation) => (Object.hasOwn(COMPETITIONS, slug) ? COMPETITIONS[slug] : abbreviation ? String(abbreviation) : 'Soccer');
 
 const LEAGUES = { nba: 'basketball/nba', nfl: 'football/nfl' };
 // A league on ESPN's site API ('basketball/nba', 'soccer/usa.1'), and a team's schedule. Soccer
@@ -105,9 +106,9 @@ const scoreOf = s => {
   return v == null || v === '' ? null : String(v);
 };
 
-// Links and logos come from a response we don't control: keep only https links, and logos from ESPN's CDN.
-const onlyFrom = (prefix, url) => (typeof url === 'string' && url.startsWith(prefix) ? url : '');
-const https = url => onlyFrom('https://', url);
+// Links and logos come from a response we don't control: keep only links to ESPN's site (its
+// events also link to bookmakers), and logos from ESPN's CDN.
+const espnLink = url => onlyFrom('https://www.espn.com/', url);
 
 function side(competitors, where) {
   const c = competitors.find(x => x?.homeAway === where);
@@ -134,7 +135,9 @@ export function parseEspnEvent(e, sport, league) {
   if (e?.id == null || !Number.isFinite(start) || !home || !away) return null;
   const type = c.status?.type ?? e.status?.type ?? {};
   const state = STATES.includes(type.state) ? type.state : 'pre';
-  const slug = sport === 'soccer' ? String(league ?? e.league?.slug ?? '') : sport;
+  // The soccer slug goes into scoreboard addresses later, so it must look like one ('usa.1').
+  const raw = String(league ?? e.league?.slug ?? '');
+  const slug = sport === 'soccer' ? (/^[a-z0-9.]+$/.test(raw) ? raw : '') : sport;
   const tv = Array.isArray(c.broadcasts) ? c.broadcasts[0] : null;
   const scored = state !== 'pre';   // scoreboards show 0–0 before the start
   return {
@@ -146,11 +149,11 @@ export function parseEspnEvent(e, sport, league) {
     timeValid: (e.timeValid ?? c.timeValid) !== false,
     state,
     detail: String(type.shortDetail ?? ''),
-    off: OFF[type.name] ?? null,
+    off: Object.hasOwn(OFF, String(type.name)) ? OFF[type.name] : null,
     home: { ...home, score: scored ? home.score : null },
     away: { ...away, score: scored ? away.score : null },
     tv: String(tv?.media?.shortName ?? tv?.names?.[0] ?? ''),
-    url: https(e.links?.find(l => l?.rel?.includes('summary') && l.rel.includes('desktop'))?.href),
+    url: espnLink(e.links?.find(l => l?.rel?.includes('summary') && l.rel.includes('desktop'))?.href),
   };
 }
 

@@ -3,7 +3,7 @@
 
 import { normalizeUrl, hostOf } from './util.js';
 
-export const MAX_SITES = 20;   // dynamic rule ids 1–20 are the Website widget's
+export const MAX_SITES = 20;   // sites per tab; dynamic rules 1–20 held them before they moved to session rules
 
 // The address a copy shows: http(s) only, without a user name or password; null otherwise.
 export function siteUrl(input) {
@@ -26,12 +26,28 @@ export const siteDomains = widgets => [...new Set(widgets
   .filter(Boolean)
   .map(siteDomain))];
 
-// One rule per site: its frame-blocking headers go from frames this extension starts, and from
-// loads the site starts inside them (a login redirect, a reload). Anywhere else in Chrome the
-// site keeps them. The API can't edit one CSP directive, so the whole CSP goes, in the frame only.
-export function frameRules(domains, extensionId) {
+// Whether a session rule is a tab's own (frameRules scopes each to one tab). background.js drops
+// a tab's rules when it closes or leaves the new tab page.
+export const forTab = (rule, tabId) => rule?.condition?.tabIds?.length === 1 && rule.condition.tabIds[0] === tabId;
+
+// Ids for a tab's `count` rules, given every session rule Chrome holds: the ones the tab holds
+// already, then the lowest that no rule holds. (Tab ids run past what a rule id can hold, so the
+// ids can't come from them.) Two tabs may pick the same free id at once; Chrome then refuses the
+// later write, and that tab picks again.
+export function pickRuleIds(rules, tabId, count) {
+  const ids = rules.filter(r => forTab(r, tabId)).map(r => r.id).sort((a, b) => a - b).slice(0, count);
+  const taken = new Set(rules.map(r => r.id));
+  for (let id = 1; ids.length < count; id++) if (!taken.has(id)) ids.push(id);
+  return ids;
+}
+
+// One rule per site, in this tab only: its frame-blocking headers go from frames this extension
+// starts, and from loads the site starts inside them (a login redirect, a reload). In every
+// other tab the site keeps them, even where it frames itself. The API can't edit one CSP
+// directive, so the whole CSP goes, in the frame only. ids: from pickRuleIds.
+export function frameRules(domains, extensionId, tabId, ids) {
   return domains.slice(0, MAX_SITES).map((domain, i) => ({
-    id: i + 1,
+    id: ids[i],
     priority: 1,
     action: {
       type: 'modifyHeaders',
@@ -40,15 +56,15 @@ export function frameRules(domains, extensionId) {
         { header: 'content-security-policy', operation: 'remove' },
       ],
     },
-    condition: { requestDomains: [domain], initiatorDomains: [extensionId, domain], resourceTypes: ['sub_frame'] },
+    condition: { requestDomains: [domain], initiatorDomains: [extensionId, domain], resourceTypes: ['sub_frame'], tabIds: [tabId] },
   }));
 }
 
-// Whether the dynamic rules Chrome holds are already `rules` (as frameRules makes them), so a
-// new tab needn't write them again. Compared by id and sites: Chrome may fill in other fields.
+// Whether the rules Chrome holds for a tab are already `rules` (as frameRules makes them), so
+// they needn't be written again. Compared by id, sites and tab: Chrome may fill in other fields.
 export function sameRules(stored, rules) {
   const key = list => JSON.stringify(list
-    .map(r => [r.id, r.condition?.requestDomains, r.condition?.initiatorDomains])
+    .map(r => [r.id, r.condition?.requestDomains, r.condition?.initiatorDomains, r.condition?.tabIds])
     .sort((a, b) => a[0] - b[0]));
   return key(stored) === key(rules);
 }

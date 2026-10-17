@@ -261,3 +261,18 @@ test('parseStats counts followers, public repos and the stars on repos that aren
   assert.deepEqual(parseStats({}, {}), { followers: 0, repos: 0, stars: 0 });
   assert.deepEqual(parseStats(null, null), { followers: 0, repos: 0, stars: 0 });
 });
+
+test('GitHub rows link only to github.com, whatever the response says', () => {
+  const bad = ['javascript:alert(1)', 'https://evil.example/login', 'https://github.com.evil.example/', 42];
+  for (const html_url of bad) {
+    assert.equal(parseCommits({ items: [{ sha: 'a', html_url }] })[0].url, '', String(html_url));
+    assert.equal(parseIssues({ items: [{ title: 'x', html_url }] })[0].url, '', String(html_url));
+  }
+  assert.equal(parseIssues({ items: [{ html_url: 'https://github.com/o/r/pull/1' }] })[0].url, 'https://github.com/o/r/pull/1');
+});
+
+test('parseCnbcQuotes skips a "__proto__" symbol', () => {
+  const quotes = parseCnbcQuotes({ FormattedQuoteResult: { FormattedQuote: [{ symbol: '__proto__', code: 0, last: '1' }] } });
+  assert.equal(Object.getPrototypeOf(quotes), Object.prototype);
+  assert.deepEqual(Object.keys(quotes), []);
+});

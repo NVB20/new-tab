@@ -5,10 +5,10 @@
 
 import { el, icon, widgetEmpty } from './ui.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
-import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules, framePatterns, sameRules } from './website.js';
+import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules, framePatterns, sameRules, forTab, pickRuleIds } from './website.js';
 import {
-  canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, onSiteAccessChange, setFrameRules,
-  frameRulesNow, syncFrameScript, faviconUrl, openUrl,
+  canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, releaseSiteAccess, onSiteAccessChange,
+  currentTabId, setFrameRules, frameRulesNow, dropSharedFrameRules, syncFrameScript, faviconUrl, openUrl,
 } from './chrome-api.js';
 
 const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a changed address
@@ -16,15 +16,29 @@ const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a change
 const SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads';
 const ALLOW = 'fullscreen; clipboard-write; autoplay; encrypted-media; picture-in-picture';
 
-// The header rules and the frame script for every site a layout shows (the main one and every
-// tab's own, so switching tabs rewrites nothing). Each is written only when Chrome doesn't hold
-// it already, so a new tab usually just reads them.
+const layoutDomains = store => siteDomains(allLayouts(store.get()).flatMap(copiesOf)).slice(0, MAX_SITES);
+
+// This tab's header rules and the frame script, for every site a layout shows (the main one and
+// every group tab's own, so switching tabs rewrites nothing). The rules are written only when
+// Chrome doesn't hold them already, so the copies of one page share the work.
 async function syncSites(store) {
-  const domains = siteDomains(allLayouts(store.get()).flatMap(copiesOf)).slice(0, MAX_SITES);
-  const rules = frameRules(domains, extensionId);
+  const domains = layoutDomains(store);
   const syncRules = async () => {
     try {
-      if (!sameRules(await frameRulesNow(MAX_SITES), rules)) await setFrameRules(rules, MAX_SITES);
+      const tab = await currentTabId();
+      if (tab == null) return;
+      for (let tries = 3; ; tries--) {
+        const all = await frameRulesNow();
+        const own = all.filter(r => forTab(r, tab));
+        const rules = frameRules(domains, extensionId, tab, pickRuleIds(all, tab, domains.length));
+        if (sameRules(own, rules)) return;
+        try {
+          await setFrameRules(rules, own.map(r => r.id));
+          return;
+        } catch (err) {
+          if (tries <= 1) throw err;   // else another tab (or copy) took one of those ids just now
+        }
+      }
     } catch (err) {
       console.warn('Could not update the Website rules', err);
     }
@@ -32,11 +46,19 @@ async function syncSites(store) {
   await Promise.all([syncRules(), syncFrameScript(framePatterns(domains))]);
 }
 
-// The frame script used to be registered for every site. Once, even with no Website widget on
-// the page, a registration left from then is narrowed to the widgets' sites (or removed).
+// A removed copy's site: Chrome's access to it goes back once no layout shows it.
+async function releaseSite(store, url) {
+  const site = siteUrl(url);
+  if (site && !layoutDomains(store).includes(siteDomain(site))) await releaseSiteAccess(sitePattern(site));
+}
+
+// On every new tab, with or without a Website widget: header rules left from when they held in
+// every tab go. Once, a frame script registration from when it ran on every site is narrowed to
+// the widgets' sites (or removed).
 const TIDIED_KEY = 'newtab:frame-script-tidied';
 export function tidyFrameScript(store) {
   if (!canFrameSites) return;
+  dropSharedFrameRules(MAX_SITES).catch(err => console.warn('Could not remove the old Website rules', err));
   try {
     if (localStorage.getItem(TIDIED_KEY)) return;
     localStorage.setItem(TIDIED_KEY, '1');
@@ -47,10 +69,18 @@ export function tidyFrameScript(store) {
 }
 
 // fn(url) runs whenever the site in `iframe` reports the page it's on (content/site-frame.js). A
-// site's own scripts could post the same message, but only about their own frame.
+// site's own scripts could post the same message, but only about their own frame, and only an
+// address on the origin that sent it.
 function watchFrame(iframe, fn) {
+  const sameOrigin = (url, origin) => {
+    try {
+      return new URL(url).origin === origin;
+    } catch {
+      return false;
+    }
+  };
   const listener = e => {
-    if (e.source === iframe.contentWindow && e.data?.type === 'newtab:site-page' && siteUrl(e.data.url)) fn(e.data.url);
+    if (e.source === iframe.contentWindow && e.data?.type === 'newtab:site-page' && siteUrl(e.data.url) && sameOrigin(e.data.url, e.origin)) fn(e.data.url);
   };
   window.addEventListener('message', listener);
   return () => window.removeEventListener('message', listener);
@@ -214,7 +244,9 @@ export function mountWebsite(root, store, copy, ctx) {
       stopWatching();
       stopAccess();
       unsubscribe();
-      if (canFrameSites) syncSites(store);   // the site of a removed copy loses its rule and script
+      // The site of a removed copy loses its rule, its script and, unless another copy shows it,
+      // the access Chrome gave.
+      if (canFrameSites) syncSites(store).then(() => { if (!copyById(store.get(), copy.id)) releaseSite(store, conf); });
     },
   };
 }

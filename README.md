@@ -245,10 +245,12 @@ pull requests, give it a personal access token. GitHub has two kinds:
 1. Open <https://github.com/settings/personal-access-tokens/new> (your avatar → **Settings** →
    **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new
    token**). If GitHub asks, verify your email address first.
-2. **Token name:** anything, e.g. `New Tab`. **Expiration:** up to you; when it runs out the widget
-   says GitHub rejected the token, and you make a new one.
+2. **Token name:** anything, e.g. `New Tab`. **Expiration:** pick one (90 days, say) rather than
+   none; GitHub emails you before it runs out. When it does, the widget says GitHub rejected the
+   token, and you make a new one.
 3. **Resource owner:** you, or the organisation whose private repos you want to see.
-4. **Repository access:** **All repositories**, or **Only select repositories** and pick them.
+4. **Repository access:** **Only select repositories** and pick the ones you want in the widget
+   (**All repositories** works too, but a leaked token then reads every private repo).
 5. **Permissions:** add these repository permissions, each set to **Read-only**. *Metadata*
    (read-only) is added on its own; leave everything else out.
 
@@ -281,7 +283,13 @@ repos, also allows changes. Treat it like a password.
 
 Paste it into Preferences → GitHub → **Access token**, then press **Refresh** on the
 widget (otherwise it checks again within the hour). The token stays in this browser and is never
-written into backup files.
+written into backup files. It's kept in the new tab page's own storage, apart from everything else,
+where the extension's scripts on other sites (the chat sites, Website frames) can't read it; it's
+only ever sent to `api.github.com`. Restoring a backup keeps it; **Reset everything** deletes it.
+On the Live Server preview it isn't saved at all and is gone when the page reloads.
+
+Done with a token? Delete it on GitHub's token page and clear the box. Clearing or replacing it
+also deletes what the old token fetched.
 
 #### If something is missing
 
@@ -406,10 +414,11 @@ in it and press **Show**.
 
 - **Access, once per site.** Most sites refuse to be shown inside another page, so the extension
   lifts that refusal for its own widgets, and only for sites you give it access to: Show opens
-  Chrome's prompt (*Read and change your data on …pinterest.com*). Everywhere else in Chrome the
-  site keeps its protection. If you decline, the widget offers **Allow access** again.
+  Chrome's prompt (*Read and change your data on …pinterest.com*). The refusal is lifted only in
+  tabs showing the new tab page, and comes back in a tab once it goes to a site or closes; in every
+  other tab the site keeps its protection. If you decline, the widget offers **Allow access** again.
   chrome://extensions → New Tab → Details → Site access lists the sites, and removing one there
-  takes it off the widget too.
+  takes it off the widget too. Removing the last widget that shows a site gives its access back.
 - **Logged in as you are.** The widget uses your Chrome cookies, so log in to the site once in a
   normal tab and the widget shows your own feed.
 - **The head:** **Home** goes back to the start address, **Reload** reloads the page the widget is
@@ -589,11 +598,16 @@ Chrome profile only. Nothing is sent anywhere except the requests the widgets ne
 | Sports (F1) | `api.jolpi.ca` | calendar once a day; hourly after a race until the result is in |
 | Weather | `api.open-meteo.com` (the forecast for the city's coordinates); `geocoding-api.open-meteo.com` (the name you type, while choosing a city) | every 15 min while visible |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
+| Background (a pasted image link) | the host of that link | whenever a new tab opens |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 | Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |
 
 Remove a widget in Layout mode and it stops fetching. Setup's site suggestions read Chrome's
-history and bookmarks on this computer; nothing about them is sent anywhere.
+history and bookmarks on this computer; nothing about them is sent anywhere. **Reset everything**
+also deletes what the widgets saved from those requests (e.g. private GitHub data, the weather's
+place) and Ask messages still waiting for their chat site. A backup file is plain JSON: keep it
+somewhere private, and restore only backups you made. A restored backup can't bring in tiles that
+run script (`javascript:`, `data:`) or a wallpaper that's a link.
 
 ## Known limits
 

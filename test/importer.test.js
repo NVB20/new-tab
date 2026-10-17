@@ -126,3 +126,13 @@ test('input that is not a Speed Dial 2 export is rejected', () => {
   assert.throws(() => fromSpeedDial2({ groups: [] }), /Speed Dial 2/);
   assert.throws(() => fromSpeedDial2('text'), /Speed Dial 2/);
 });
+
+test('Speed Dial 2 dials that run script or carry a page are left out', () => {
+  const json = structuredClone(sample);
+  json.dials = [
+    { id: 1, idgroup: json.groups[0].id, position: 1, title: 'ok', url: 'https://example.com/' },
+    { id: 2, idgroup: json.groups[0].id, position: 2, title: 'js', url: 'javascript:alert(1)' },
+    { id: 3, idgroup: json.groups[0].id, position: 3, title: 'data', url: 'data:text/html,<h1>x</h1>' },
+  ];
+  assert.deepEqual(fromSpeedDial2(json, counterIds()).tiles.map(t => t.title), ['ok']);
+});

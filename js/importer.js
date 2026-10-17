@@ -2,7 +2,7 @@
 // Pure: no DOM or Chrome access.
 
 import { DEFAULT_PREFS, LEGACY_PREFS, deepMerge } from './store.js';
-import { uid, clamp, hostOf } from './util.js';
+import { uid, clamp, hostOf, isSafeUrl } from './util.js';
 
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const num = (v, min, max) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, min, max) : undefined);
@@ -27,7 +27,7 @@ export function fromSpeedDial2(json, makeId = uid) {
   const idMap = new Map(sdGroups.map((g, i) => [g.id, groups[i].id]));
 
   const dials = json.dials
-    .filter(d => isObj(d) && typeof d.url === 'string' && d.url.trim())
+    .filter(d => isObj(d) && typeof d.url === 'string' && d.url.trim() && isSafeUrl(d.url))
     .sort(byPosition);
   const toTile = (d, groupId) => {
     const url = d.url.trim();

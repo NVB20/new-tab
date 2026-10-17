@@ -459,3 +459,36 @@ test('teamOf accepts only an exact sport:id', () => {
   assert.equal(teamOf('nba:13:extra'), null);
   assert.deepEqual(cleanSports({ follow: ['nba:13:extra', 'nba:13'] }).follow, ['nba:13']);
 });
+
+test('an ESPN event links only to espn.com, never to the bookmakers its links include', () => {
+  const event = links => ({
+    id: '1', date: '2026-10-20T00:00Z',
+    competitions: [{ competitors: [{ homeAway: 'home', team: { id: '13' } }, { homeAway: 'away', team: { id: '2' } }] }],
+    links,
+  });
+  const rel = ['summary', 'desktop'];
+  assert.equal(parseEspnEvent(event([{ rel, href: 'https://www.espn.com/nba/game/_/gameId/1' }]), 'nba').url, 'https://www.espn.com/nba/game/_/gameId/1');
+  for (const href of ['https://www.bet365.com/x', 'https://www.espn.com.evil.example/', 'javascript:alert(1)']) {
+    assert.equal(parseEspnEvent(event([{ rel, href }]), 'nba').url, '', href);
+  }
+});
+
+test('names from ESPN that are Object keys read as unknown', () => {
+  const e = {
+    id: '1', date: '2026-10-20T00:00Z',
+    competitions: [{ competitors: [{ homeAway: 'home', team: { id: '1' } }, { homeAway: 'away', team: { id: '2' } }], status: { type: { name: 'toString' } } }],
+  };
+  assert.equal(parseEspnEvent(e, 'nba').off, null);
+  assert.equal(competitionTag('constructor', 'X'), 'X');
+  assert.equal(teamOf('toString:1'), null);
+  assert.equal(teamOf('constructor:1'), null);
+});
+
+test('a soccer league slug that would bend a scoreboard address is dropped', () => {
+  const e = {
+    id: '1', date: '2026-10-20T00:00Z',
+    competitions: [{ competitors: [{ homeAway: 'home', team: { id: '1' } }, { homeAway: 'away', team: { id: '2' } }] }],
+  };
+  assert.equal(parseEspnEvent(e, 'soccer', 'usa.1').league, 'usa.1');
+  assert.equal(parseEspnEvent(e, 'soccer', '../../x?y').league, '');
+});
