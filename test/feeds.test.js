@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCommits, latestCommits, parseIssues,
+  parseTicker, parseKline, parseFxPair, fxCurrencies, parseCnbcQuotes, parseCnbcSession, parseCommits, latestCommits, latestRepos, parseStats, parseIssues,
   formatPrice, formatRate, formatChange, sparkPoints, timeAgo, parseCoins, cleanMarketItems,
   isPair, isSegment, segmentItem, moveMarketItem, headingDropIndex, parseContributions, heatmapLayout,
 } from '../js/feeds.js';
@@ -228,3 +228,28 @@ test('parseCoins upper-cases, de-duplicates and drops junk', () => {
   assert.deepEqual(parseCoins('btc, SOL xrp,eth  btc ;; $doge'), ['BTC', 'SOL', 'XRP', 'ETH']);
 });
 
+
+test('latestRepos lists each repo once, by its newest commit', () => {
+  const commits = [
+    { repo: 'me/a', at: 100, private: false },
+    { repo: 'org/b', at: 300, private: true },
+    { repo: 'me/a', at: 200, private: false },
+    { repo: 'me/c', at: 50, private: false },
+    { repo: '', at: 999, private: false },
+  ];
+  assert.deepEqual(latestRepos(commits, 5), [
+    { repo: 'org/b', url: 'https://github.com/org/b', at: 300, private: true },
+    { repo: 'me/a', url: 'https://github.com/me/a', at: 200, private: false },
+    { repo: 'me/c', url: 'https://github.com/me/c', at: 50, private: false },
+  ]);
+  assert.deepEqual(latestRepos(commits, 1).map(r => r.repo), ['org/b']);
+  assert.deepEqual(latestRepos([], 5), []);
+  assert.equal(commits[0].repo, 'me/a');   // the list passed in keeps its order
+});
+
+test('parseStats counts followers, public repos and the stars on repos that aren’t forks', () => {
+  const repos = [{ stargazers_count: 10 }, { stargazers_count: 5, fork: true }, { stargazers_count: 2 }, { stargazers_count: 'x' }, null];
+  assert.deepEqual(parseStats({ followers: 128, public_repos: 42 }, repos), { followers: 128, repos: 42, stars: 12 });
+  assert.deepEqual(parseStats({}, {}), { followers: 0, repos: 0, stars: 0 });
+  assert.deepEqual(parseStats(null, null), { followers: 0, repos: 0, stars: 0 });
+});

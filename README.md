@@ -28,9 +28,9 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
 4. Ask which of these I want, then walk me through the ones I pick:
    - Bring over my Speed Dial 2 tiles: Preferences (the ☰ button, top right) → Backup →
      Import file, then pick my Speed Dial 2 export (.json).
-   - GitHub widget: my username and the access token are in the GitHub section of Preferences;
-     what each widget shows (activity map, pull requests, issues, commits) is under Preferences →
-     Layout (the ✎ on the widget opens it). For private repos, walk me through
+   - GitHub widget: my username, the access token and what each widget shows (profile stats,
+     activity map, pull requests, review requests, issues, latest repos, commits, in any order) are
+     in the GitHub section of Preferences (the ✎ on the widget opens it). For private repos, walk me through
      making a token as described under "Tokens for private repos" in the README: usually a
      fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
@@ -52,7 +52,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ and the Dow from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
-| **GitHub** | Any of your contribution heatmap, open pull requests, open issues and latest commits, including private repos with a token; up to five copies can split them up. |
+| **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to five copies can split them up. |
 | **Sports** | Your NBA and NFL teams' games, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to five, each with its own address and zoom. |
 | **Clock** | One UI–style faces, from a slim classic clock to big stencil digits, stacked or on one line. |
@@ -154,29 +154,36 @@ copy, so having many tabs open doesn't multiply the requests.
 
 ## GitHub
 
-Your username and the optional access token live in the **GitHub** section of Preferences, with a
-short how-to for getting a token; every copy of the widget uses them. Until there's a username the
-widget shows a **Set up GitHub** button that opens that section. Each copy has its own group under
-Preferences → **Layout** for which parts it shows (activity map, pull requests, issues, commits, in
-any combination); hover the widget and click **✎** to go straight there. Up to five copies can split
-the parts up: the map in one corner, commits in another, issues in a third; they share one fetch an
-hour.
+Everything about the widget lives in the **GitHub** section of Preferences: your username, what
+each copy shows, and the optional access token with a short how-to for getting one. Until there's a
+username the widget shows a **Set up GitHub** button that opens that section; hover the widget and
+click **✎** to go straight to its own list.
 
-The widget shows:
+Each copy lists the seven parts below in its own order. A switch shows or hides a part, and **↑**
+and **↓** move it, so the widget draws them top to bottom in that order. A part you switch off keeps
+its place for when you switch it back on. A new copy shows the activity map, pull requests, issues
+and commits. Up to five copies can split the parts up: the map in one corner, commits in another,
+issues in a third. With more than one, each copy has its own numbered list.
 
-- **Your contribution heatmap:** the past year as on your profile, with the yearly total. Hover a
-  square for that day's count; click the map to open your profile. Private contributions count if
-  you've switched on *Include private contributions on my profile* in your GitHub settings.
-- **Your open pull requests:** the four most recently updated ones you opened, are assigned to,
-  commented on or are mentioned in. They're always at the top.
-- **Your open issues:** the five most recently updated open issues you opened, are assigned to,
-  commented on or are mentioned in, in any repo (archived repos are left out).
-- **Your latest commits:** the newest, as many as fill the widget down to its bottom (at least
-  six), across every repo and organisation you've committed to (default branches). Private repos
-  get a lock icon.
+- **Profile stats:** one line with your followers, public repos and the stars on your own repos
+  (forks left out; counted over your 100 most recently pushed repos). Click it to open your profile.
+- **Activity map:** your contribution heatmap, the past year as on your profile, with the yearly
+  total. Hover a square for that day's count; click the map to open your profile. Private
+  contributions count if you've switched on *Include private contributions on my profile* in your
+  GitHub settings.
+- **Pull requests:** the four most recently updated open ones you opened, are assigned to,
+  commented on or are mentioned in.
+- **Review requests:** the four most recently updated open pull requests waiting for your review.
+- **Issues:** the five most recently updated open issues you opened, are assigned to, commented on
+  or are mentioned in, in any repo (archived repos are left out).
+- **Latest repos:** the five repos you committed to most recently, in any organisation, with the
+  time of your last commit there. Private repos get a lock icon.
+- **Commits:** your newest, as many as fill the widget down to its bottom (at least six), across
+  every repo and organisation you've committed to (default branches). Private repos get a lock icon.
 
-Which of these a copy shows is up to its four switches under Preferences → Layout. Everything is
-fetched either way, so switching is instant, and every copy shares one fetch an hour.
+Pull requests, review requests, issues, repos and commits come from one fetch, whichever of them
+are shown, so switching them is instant; the stats and the map are fetched only while they're
+shown. Every copy shares the same fetches, at most once an hour.
 
 The heatmap is read from `github.com/users/<you>/contributions`, which is why the extension asks
 for access to github.com. After updating from an older version, press the extension's reload

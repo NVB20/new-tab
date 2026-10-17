@@ -5,10 +5,19 @@ import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import { normalizeUrl, clamp, backgroundImage } from './util.js';
 import { CLOCK_FACES } from './clock-widget.js';
 import { setTheme } from './store.js';
-import { GITHUB_PARTS, copyById, copyTitle, resetLayout, prefsSection } from './layout.js';
+import { copyById, copyTitle, resetLayout, prefsSection, moveGithubPart, showGithubPart, partsSummary } from './layout.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 
-const PART_NAMES = { heatmap: 'Activity map', pulls: 'Pull requests', issues: 'Issues', commits: 'Commits' };
+// The GitHub widget's parts as Preferences → GitHub lists them.
+const PART_NAMES = {
+  stats: { name: 'Profile stats', hint: 'Followers, public repos and stars' },
+  heatmap: { name: 'Activity map', hint: 'A year of contributions' },
+  pulls: { name: 'Pull requests', hint: 'Open ones you opened, are assigned to or commented on' },
+  reviews: { name: 'Review requests', hint: 'Open pull requests waiting for your review' },
+  issues: { name: 'Issues', hint: 'Open ones you opened, are assigned to or commented on' },
+  repos: { name: 'Latest repos', hint: 'The repos you committed to most recently' },
+  commits: { name: 'Commits', hint: 'Your newest commits in every repo' },
+};
 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 // Chrome's own greys for the plain background. Text keeps the theme's colour, so the light
@@ -346,13 +355,6 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
           sliderFor('Columns', `${copy.id}.columns`, s.columns, 2, 10, v => set('columns', v)),
         ];
       }
-      case 'github':
-        return [
-          ...GITHUB_PARTS.map(part => row(PART_NAMES[part], switchFor(PART_NAMES[part], `${copy.id}.${part}`, s.parts.includes(part),
-            on => set('parts', GITHUB_PARTS.filter(p => (p === part ? on : s.parts.includes(p))))))),
-          row('Username and token', el('button', { type: 'button', class: 'btn', text: 'GitHub section', onclick: () => show('github') }),
-            'Shared by every GitHub widget'),
-        ];
       case 'markets':
         return [row('Coins and pairs', el('span'), 'Use ✎ on the widget to choose them')];
       case 'sports':
@@ -380,11 +382,22 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
     redraw();
   }
 
-  // open('github', 'account') scrolls to the username and puts the cursor in it while it's empty.
+  // open('github', 'account') scrolls to the username and puts the cursor in it while it's empty;
+  // open('github', <copy id>) to that widget's parts.
   function github() {
+    const s = store.get();
+    const copies = s.prefs.layout.widgets.filter(copy => copy.type === 'github');
     return [
       title('Account'),
       group('account', textInput('Username', 'github.user', 'NVB20', { hint: 'Whose activity every GitHub widget shows' })),
+      // One list per copy; when there are several, each is numbered and says what it shows.
+      ...copies.flatMap((copy, i) => [
+        title(copies.length > 1 ? `Widget ${i + 1} · ${partsSummary(copy.settings.parts)}` : 'What the widget shows'),
+        group(copy.id, ...partRows(copy)),
+      ]),
+      ...(copies.length ? [] : [title('What the widget shows'), row('No GitHub widget on the page', el('button', {
+        type: 'button', class: 'btn', onclick: () => { dialog.close(); enterLayoutMode(); },
+      }, icon('layout', 16), 'Edit layout'), 'Add one from the tray in Layout mode')]),
       title('Private repos'),
       textInput('Access token (optional)', 'github.token', 'github_pat_…', {
         type: 'password',
@@ -392,8 +405,35 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
         hint: 'One token for every GitHub widget. Only needed for private repos. Kept only in this browser and left out of backups.',
       }),
       tokenHelp(),
-      el('p', { class: 'pref-hint pref-intro', text: 'What each GitHub widget shows is under Layout.' }),
     ];
+  }
+
+  // A GitHub copy's parts in its order, shown or not: ↑ and ↓ move one, the switch shows it.
+  function partRows(copy) {
+    const s = copy.settings;
+    const save = ({ order, parts }) => store.update(st => {
+      const own = copyById(st, copy.id);
+      if (own) Object.assign(own.settings, { order, parts });
+    });
+    const arrow = (part, step, i) => {
+      const dir = step < 0 ? 'up' : 'down';
+      const key = `${copy.id}.${part}.`;
+      return el('button', {
+        type: 'button', class: 'icon-btn pref-move', disabled: step < 0 ? i === 0 : i === s.order.length - 1,
+        title: `Move ${dir}`, 'aria-label': `Move ${PART_NAMES[part].name} ${dir}`, dataset: { key: key + dir },
+        onclick: () => {
+          save(moveGithubPart(s, part, step));
+          redraw();
+          // At the top or bottom this arrow is off: the focus goes to the other one.
+          const find = k => content.querySelector(`[data-key="${CSS.escape(k)}"]`);
+          if (find(key + dir)?.disabled) find(key + (step < 0 ? 'down' : 'up'))?.focus();
+        },
+      }, icon(`arrow-${dir}`, 15));
+    };
+    return s.order.map((part, i) => row(PART_NAMES[part].name, el('div', { class: 'btn-row pref-part' },
+      arrow(part, -1, i), arrow(part, 1, i),
+      switchFor(PART_NAMES[part].name, `${copy.id}.${part}`, s.parts.includes(part), on => save(showGithubPart(s, part, on)))),
+    PART_NAMES[part].hint));
   }
 
   function tokenHelp() {
@@ -731,7 +771,9 @@ export function setupPrefs(store, { enterLayoutMode = () => {} } = {}) {
       place(offset.x, offset.y);
       const target = anchor && [...content.querySelectorAll('[data-anchor]')].find(n => n.dataset.anchor === anchor);
       if (target) {
-        target.scrollIntoView({ block: 'start' });
+        // A group right under its title comes into view with it.
+        const above = target.previousElementSibling;
+        (above?.matches('.pref-section-title') ? above : target).scrollIntoView({ block: 'start' });
         [...target.querySelectorAll('input.pref-input')].find(i => !i.value)?.focus();
       }
     },
