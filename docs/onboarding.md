@@ -31,7 +31,7 @@ closing the tab mid-way resumes there on the next new tab, without the opening.
 | 2 | Look | Picks theme, accent, background (ASCII, plain, or a picture by upload or link) | Everything re-themes on each click | – |
 | 3 | Sites | Ticks sites in Most visited or Bookmarks bar, or drops a file (From a file) | Each tick adds or removes a tile on the active group; the tiles block appears | – |
 | 4 | Widgets | Ticks the widgets they want | Widgets slide into their default places; the rest of the page appears | – |
-| 5 | Arrange | Drags, resizes, swaps, stacks, removes, adds from the tray | The real Layout mode, with the card docked above the tray | The window is under 900px wide |
+| 5 | Arrange | Drags, resizes, swaps, stacks, removes, adds from the tray (hovering a chip previews its widget) | The real Layout mode, with the card docked above the tray | The window is under 900px wide |
 | 6 | Connect | Fills in what the picked widgets need | Each widget fills in behind the card | No picked widget needs anything |
 | 7 | Moves | Tries Ctrl+K, Ctrl+Space and a right-click (or Show me) | Each item ticks when it really happens | – |
 | – | Done | Finish (or Skip the rest at any step) | The card shrinks into ☰, a ripple runs out from it, a note says where setup lives | – |
@@ -74,7 +74,7 @@ Throughout:
 | Theme, accent, background (ASCII, plain, picture) | Look |
 | Tiles from history, the bookmarks bar, Speed Dial 2, a backup | Sites |
 | Every widget type: Clock, Search bar, Tasks, Notes, Markets, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
-| Layout mode: drag, resize, swap, remove, the tray | Arrange, Moves |
+| Layout mode: drag, resize, swap, remove, the tray and its previews | Arrange, Moves |
 | Widget stacks (a tip: drop onto another's middle) | Arrange |
 | Search bar engines (Google, Claude, ChatGPT, Gemini) | Connect |
 | GitHub username | Connect |

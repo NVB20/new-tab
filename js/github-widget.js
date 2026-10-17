@@ -2,7 +2,7 @@
 // requests, open issues, latest repos and latest commits, in the order the copy's `parts` say.
 // Every copy shares one fetch an hour through the request cache and one token (prefs.github.token).
 
-import { el, icon, svgEl, widgetSub, widgetEmpty } from './ui.js';
+import { el, icon, svgEl, widgetSub, widgetEmpty, scaleOf } from './ui.js';
 import { feed, peek, fetchJson, fetchText } from './net.js';
 import { parseCommits, latestCommits, latestRepos, parseIssues, parseStats, timeAgo, parseContributions, heatmapLayout, MONTHS } from './feeds.js';
 import { copyById, TYPES } from './layout.js';
@@ -79,7 +79,8 @@ export function mountGithub(root, store, copy, ctx) {
     if (rows.length > COMMITS && getComputedStyle(section).overflowY !== 'visible') {
       for (const r of rows) r.hidden = false;
       const excess = section.scrollHeight - section.clientHeight;
-      const bottom = i => rows[i].getBoundingClientRect().bottom;
+      const k = scaleOf(section);   // rects are drawn pixels; scrollHeight is layout pixels
+      const bottom = i => rows[i].getBoundingClientRect().bottom / k;
       n = rows.length;
       while (n > COMMITS && bottom(rows.length - 1) - bottom(n - 1) < excess) n--;
     }

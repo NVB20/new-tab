@@ -117,6 +117,9 @@ export function icon(name, size = 18) {
 export const widgetHead = (iconName, text) => el('h2', { class: 'widget-head' }, icon(iconName, 18), el('span', { text }));
 export const widgetSub = text => el('div', { class: 'widget-sub', text });
 export const widgetEmpty = (...children) => el('p', { class: 'widget-empty' }, ...children);
+// How much a node is drawn scaled by a transform on it or an ancestor (1 when it isn't):
+// getBoundingClientRect measures drawn pixels, offsetWidth and clientWidth layout pixels.
+export const scaleOf = node => (node.offsetWidth ? node.getBoundingClientRect().width / node.offsetWidth : 1);
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 export function svgEl(tag, attrs = {}, text) {
