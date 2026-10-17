@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   COLS, ROWS, TYPES, GITHUB_PARTS, fits, firstFree, countOf, stackOrder, defaultLayout, normalizeLayout,
-  addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle, prefsSection,
+  addCopy, plannedCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle, prefsSection,
   placeDefaults, atDefaultPlaces, swapPlan, swapCopy,
   cleanGithubParts, moveGithubPart, showGithubPart,
   copyById, allLayouts, ownLayout, activeLayout, giveOwnLayout, dropOwnLayout, normalizeLayouts,
@@ -192,6 +192,33 @@ test('a new tiles copy is pinned to the first group no block shows; a block foll
   const d = addCopy(n, 'tiles', undefined, groups, 'g1');
   assert.deepEqual(rect(d), [9, 0, 3, 3]);
   assert.equal(d.settings.columns, 3);
+});
+
+test('plannedCopy is what a tray click would add, without adding it', () => {
+  const l = defaultLayout(legacy());
+  assert.equal(plannedCopy(l, 'clock'), null);                 // limit 1
+  assert.equal(plannedCopy(l, 'claude'), null);                // no room
+  assert.equal(plannedCopy(l, 'weather'), null);
+  removeCopy(l, byType(l).search.id);
+  assert.deepEqual(plannedCopy(l, 'search'), { type: 'search', x: 3, y: 0, w: 6, h: 1, settings: {} });
+  removeCopy(l, byType(l).notes.id);
+  const m = plannedCopy(l, 'markets');
+  assert.deepEqual(rect(m), [0, 8, 2, 3]);                     // where Notes was, at the minimum size
+  assert.deepEqual(m.settings, { items: ['BTC', 'SOL', 'XRP', 'ETH', 'USD/ILS'] });
+  assert.equal('id' in m, false);
+  assert.equal(l.widgets.length, 5);                           // nothing was added
+  const { id, ...added } = addCopy(l, 'markets');
+  assert.equal(typeof id, 'string');
+  assert.deepEqual(added, m);                                  // the click adds exactly the plan
+});
+
+test('plannedCopy pins a new tiles block and gives it columns for its width, as addCopy does', () => {
+  const l = { cols: COLS, rows: ROWS, widgets: [{ id: 't', type: 'tiles', x: 0, y: 0, w: 3, h: 3, settings: { group: null, columns: 4 } }] };
+  const groups = [{ id: 'g1' }, { id: 'g2' }];
+  assert.deepEqual(plannedCopy(l, 'tiles', groups, 'g1'), { type: 'tiles', x: 3, y: 0, w: 6, h: 6, settings: { group: 'g2', columns: 5 } });
+  assert.equal(plannedCopy(l, 'tiles').settings.group, null);  // no groups given: it follows the tabs
+  const n = { cols: COLS, rows: ROWS, widgets: [{ id: 'big', type: 'tiles', x: 0, y: 0, w: 9, h: 12, settings: { group: null, columns: 5 } }] };
+  assert.deepEqual(plannedCopy(n, 'tiles', groups, 'g1'), { type: 'tiles', x: 9, y: 0, w: 3, h: 3, settings: { group: 'g2', columns: 3 } });
 });
 
 test('moveCopy refuses overlaps, the edge and sizes under the minimum', () => {

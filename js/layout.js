@@ -313,21 +313,30 @@ function unshownGroup(layout, groups, activeGroupId) {
   return groups.find(g => !shown.has(g.id))?.id ?? null;
 }
 
-// Adds a copy at the first spot that takes its default size, else its minimum size. Returns the
-// copy, or null when the type is at its limit or nothing fits. A new tiles block is pinned to
-// the first group no block shows.
-export function addCopy(layout, type, settings, groups = [], activeGroupId = null) {
+// The copy a click on the tray would add, without an id and without adding it: the first spot
+// that takes the type's default size, else its minimum size, with the type's default settings. A
+// new tiles block is pinned to the first group no block shows, with columns to suit its width.
+// Null when the type is at its limit or nothing fits.
+export function plannedCopy(layout, type, groups = [], activeGroupId = null) {
   const t = TYPES[type];
   if (!t || countOf(layout, type) >= t.max) return null;
   const spot = firstFree(layout, ...t.size) ?? firstFree(layout, ...t.min);
   if (!spot) return null;
-  const own = { ...t.defaults(), ...(isObj(settings) ? structuredClone(settings) : {}) };
+  const settings = t.defaults();
   if (type === 'tiles') {
-    if (!(isObj(settings) && 'group' in settings)) own.group = unshownGroup(layout, groups, activeGroupId);
+    settings.group = unshownGroup(layout, groups, activeGroupId);
     // Columns to suit the width it landed in: the default block is 6 wide with 5 columns.
-    if (!(isObj(settings) && 'columns' in settings)) own.columns = clamp(Math.round(spot.w * 5 / 6), 2, 10);
+    settings.columns = clamp(Math.round(spot.w * 5 / 6), 2, 10);
   }
-  const copy = { id: uid(), type, ...spot, settings: own };
+  return { type, ...spot, settings };
+}
+
+// Adds the planned copy, with `settings` over the planned ones. Returns the copy, or null when
+// the type is at its limit or nothing fits.
+export function addCopy(layout, type, settings, groups = [], activeGroupId = null) {
+  const plan = plannedCopy(layout, type, groups, activeGroupId);
+  if (!plan) return null;
+  const copy = { id: uid(), ...plan, settings: { ...plan.settings, ...(isObj(settings) ? structuredClone(settings) : {}) } };
   layout.widgets.push(copy);
   return copy;
 }
