@@ -545,7 +545,8 @@ tiles and the rest.
   **Today** (due today or overdue, with a count), **Upcoming** (by date) and **High**; ⌕ searches
   every task and subtask. Drag to reorder (not in Upcoming); **Sort** puts them in order once
   (by due date, then importance). A ticked task stays where it is, struck through, until you press
-  **Clear** under the add bar, which removes the finished tasks in the tab you're on. Cleared
+  **Clear finished** at the top of the widget (beside ⌕), which removes the finished tasks in the
+  tab you're on. Cleared
   tasks are kept in a history for 7 days, and the number completed per day is kept for good
   (counted on the day you tick it; unticking takes it back).
 - **Clock:** your name, a greeting and 12/24-hour time, all set under Preferences → Layout → Clock. Hover

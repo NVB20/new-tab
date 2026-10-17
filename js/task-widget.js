@@ -1,6 +1,6 @@
 // Tasks widget: tabs (All, Today, Upcoming, High), search, rows with a flag and a details tray
 // (task-row.js), an add bar that reads quick-add shorthand (task-parse.js), ticked tasks that stay
-// in place until Clear, and drag to reorder.
+// in place until Clear finished, and drag to reorder.
 
 import { el, icon, showMenu, openDialog, field, widgetEmpty } from './ui.js';
 import { copyById, TYPES } from './layout.js';
@@ -46,8 +46,15 @@ export function mountTasks(root, store, copy) {
   let dragId = null;
   let marked = null;   // the row showing a drop line
 
-  // ---- heading: search, tabs, Sort ----
+  // ---- heading: Clear finished, search, tabs, Sort ----
 
+  let shownDone = [];   // ids of the finished tasks this tab shows, for Clear finished
+  const clearButton = el('button', {
+    type: 'button',
+    class: 'link-btn task-clear',
+    text: 'Clear finished',
+    onclick: () => store.update(s => { clearDone(s, Date.now(), shownDone); }),
+  });
   const searchButton = el('button', {
     type: 'button',
     class: 'icon-btn task-search-btn',
@@ -110,20 +117,10 @@ export function mountTasks(root, store, copy) {
     searchButton.focus();
   }
 
-  // ---- list, empty line, Clear ----
+  // ---- list, empty line ----
 
   const list = el('ul', { class: 'task-list' });
   const empty = widgetEmpty();
-  let shownDone = [];   // ids of the finished tasks this tab shows, for Clear
-  const doneCount = el('span');
-  const clearButton = el('button', {
-    type: 'button',
-    class: 'link-btn',
-    text: 'Clear',
-    title: 'Remove the finished tasks shown here (kept in history for a week)',
-    onclick: () => store.update(s => { clearDone(s, Date.now(), shownDone); }),
-  });
-  const clearRow = el('div', { class: 'task-clear-row' }, doneCount, clearButton);
 
   // ---- add bar ----
 
@@ -208,13 +205,12 @@ export function mountTasks(root, store, copy) {
   }
 
   const section = el('section', { class: 'widget widget-tasks' },
-    el('h2', { class: 'widget-head' }, icon('check-circle', 18), el('span', { text: 'Tasks' }), searchButton),
+    el('h2', { class: 'widget-head' }, icon('check-circle', 18), el('span', { text: 'Tasks' }), clearButton, searchButton),
     tabs,
     searchBar,
     list,
     empty,
-    el('label', { class: 'task-add' }, icon('plus', 16), input, flagButton, dateButton),
-    clearRow);
+    el('label', { class: 'task-add' }, icon('plus', 16), input, flagButton, dateButton));
 
   // ---- render ----
 
@@ -246,11 +242,12 @@ export function mountTasks(root, store, copy) {
     count.classList.toggle('overdue', due.overdue);
     sortButton.hidden = view !== 'all' || shown.length < 2;
 
-    // empty line and Clear
+    // empty line and Clear finished
     empty.hidden = shown.length > 0 || (!searching && view === 'all');
     empty.textContent = searching ? 'No matches' : (EMPTY[view] ?? '');
-    clearRow.hidden = searching || !shownDone.length;
-    doneCount.textContent = `${shownDone.length} finished`;
+    clearButton.hidden = searching || !shownDone.length;
+    const n = shownDone.length;
+    clearButton.title = `Remove the ${n === 1 ? 'finished task' : `${n} finished tasks`} shown here (kept in history for a week)`;
 
     // focus: a control asked for (ui.focus), else whichever had it before the rebuild
     const want = ui.focus ?? active;
