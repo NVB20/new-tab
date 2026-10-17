@@ -28,7 +28,7 @@ bar's downbeat.
 | 1 | 0–2 s | ASCII background lighting up as the cursor sweeps across it | "Your new tab." (beat 2) |
 | 2 | 2–4 s | Tiles; a folder pops open | "One click." (beat 1) |
 | 3 | 4–6 s | Layout mode: a widget is dragged, resized, stacked | "Drag." "Resize." "Stack." (beats 1, 2, 3) |
-| 4 | 6–8 s | Markets: sparklines draw in, prices tick | "Live markets." (beat 1) |
+| 4 | 6–8 s | Markets: sparklines draw in | "Live markets." (beat 1) |
 | 5 | 8–10 s | GitHub: heatmap fills, PR list | "Your GitHub." (beat 1) |
 | 6 | 10–12 s | Sports (10–11 s), hard cut to Weather (11–12 s) | "Scores." (10 s) "Weather." (11 s) |
 | 7–8 | 12–16 s | End card: icon and name on the ASCII background | "New Tab" (12 s), "Free for Chrome" (13 s) |
@@ -41,29 +41,39 @@ bar's downbeat.
   leave on the cut.
 - Spotlight: the rest of the page dims to 55% around the featured widget.
 - Camera: each scene opens with a 150 ms zoom punch (scale 1.06 → 1) towards the featured widget.
+  The Layout mode scene is the exception, since its first drag starts on its first frame. Markets,
+  GitHub, Sports and Weather are also shown closer (1.35–1.6×), on the side away from the headline.
 - A rendered cursor (a dot with a click ripple), because headless Chrome doesn't draw one.
 
 ## How it's built
 
 All of it lives in `promo/`.
 
-1. **Fixtures** (`promo/fixtures/`): a seeded `state` (tiles for well-known sites, two groups, one
-   folder, and the Markets, GitHub, Sports and Weather widgets), plus canned API responses for every
-   host those widgets call. Prices trend up, the heatmap is full, a game is live, the weather is
-   sunny.
+1. **Fixtures** (`promo/fixtures/`):
+   - A seeded `state`: tiles for well-known sites with simple-icons logos, two groups, one folder,
+     and the Markets, GitHub, Sports and Weather widgets. A second tab, Work, has room to move
+     widgets for the Layout mode scene.
+   - Every cache entry the widgets read before asking the network (`newtab:cache:*` in
+     localStorage), dated at the video's clock, so no widget asks the network.
+   - Prices trend up, the heatmap is full, a game is live, the weather is sunny.
+   - Team logos are left out, so no third-party images are used.
 2. **Recorder** (`promo/record.mjs`, Node 22, raw CDP, the same way as the repo's existing browser
    checks):
    - Launches Playwright's Chromium headless at 1920×1080 with the unpacked extension and its own
      profile and CDP port.
    - Closes the startup tab, then seeds `chrome.storage.local` and localStorage.
-   - Answers every widget request from the fixtures through the CDP `Fetch` domain, in the page and
-     in the service worker, so no real request leaves.
-   - Records each scene as its own clip. A scene's camera, spotlight and headlines come from
-     `promo/overlay.js`, which is injected into the page and timed from the scene's start.
-3. **Capture:** CDP `Page.startScreencast` (JPEG, quality 95), with each frame's timestamp kept.
-   If a scene clip shows dropped frames (any gap over 50 ms), that scene switches to frame-stepped
-   capture: virtual time advanced 33.3 ms per frame with a screenshot of each. The choice is made
-   per scene and logged.
+   - Blocks every http(s) request from the page through the CDP `Fetch` domain. Any request
+     fails the run.
+   - Records each scene from a freshly seeded page. A scene's camera, spotlight, headlines and
+     cursor come from `promo/lib/overlay.js`, which is injected into the page and drawn from the
+     frame number.
+3. **Capture:** frame by frame.
+   - A clock injected before the page's scripts (`promo/lib/vclock.js`) stands in for
+     `performance.now`, `Date`, timers and `requestAnimationFrame`.
+   - Every CSS animation is paused and set to the frame's time.
+   - Each frame is a JPEG screenshot (quality 92), so a frame looks the same however long it took
+     to capture. Real-time screencast dropped frames at 1080p in a trial.
+   - The clock reads Tue 20 Oct 2026, 09:41.
 4. **Music** (`promo/music.py`, numpy): a 16 s, 120 BPM, 44.1 kHz stereo WAV.
    - Four-on-the-floor kick, off-beat hi-hats, and claps on beats 2 and 4.
    - A side-chained saw bass on A–F–C–G (one chord per bar).
@@ -78,8 +88,8 @@ single scene (`--scene markets`) is allowed while iterating.
 
 ## Errors
 
-- If a widget makes a request that has no fixture, the recorder fails with the request URL, so
-  live data can't leak into a frame.
+- If the page makes any network request, the recorder fails with the request URL, so live data
+  can't leak into a frame.
 - If a widget is empty or shows an error banner when its scene starts, the recorder fails with the
   scene's name.
 - The build checks the output: 480 frames, 16.000 s, and an audio stream present.
@@ -88,8 +98,9 @@ single scene (`--scene markets`) is allowed while iterating.
 
 - The build's checks above.
 - Contact sheet: one frame per scene (`promo/out/contact.png`), checked by eye before handing over.
-- Beat sync: the music's onsets (from the generated beat grid) match the cut and headline frames
-  within 1 frame.
+- Beat sync: a test checks that every cut, headline, click and drag starts on a beat (15 frames). A
+  music test checks that the kicks land on the same grid, with the drop on the end card's first
+  frame.
 
 ## Not included
 
