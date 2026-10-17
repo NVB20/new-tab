@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "input=$(cat); case \"$input\" in *commit*) printf '%s' \"$input\" | node \"$CLAUDE_PROJECT_DIR/.claude/hooks/onboarding-check.mjs\" ;; esac",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
