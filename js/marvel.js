@@ -16,7 +16,7 @@ export const KINDS = { film: 'Film', series: 'Series', short: 'Short', special: 
 // and Freeform, 2013–2020, which the MCU now places outside its main timeline), or the films.
 export const SHOWS = ['all', 'studios', 'films'];
 
-// tv: a Marvel Television show. credits: the entry whose end this one's credits scene belongs after.
+// tv: a Marvel Television show.
 const entry = (kind, id, title, part, year, more = {}) => ({ id, title, part, kind, year, tv: false, note: '', ...more });
 const film = (id, title, year, more) => entry('film', id, title, '', year, more);
 const series = (id, title, part, year, more) => entry('series', id, title, part, year, more);
@@ -33,7 +33,7 @@ export const ENTRIES = [
   short('agent-carter-one-shot', 'Agent Carter', 2013, { note: 'One-Shot on the Iron Man 3 disc' }),
   tv('agent-carter-1', 'Agent Carter', 'Season 1', 2015),
   tv('agent-carter-2', 'Agent Carter', 'Season 2', 2016),
-  film('captain-marvel', 'Captain Marvel', 2019, { note: 'Its mid-credits scene is set after Avengers: Infinity War', credits: 'infinity-war' }),
+  film('captain-marvel', 'Captain Marvel', 2019, { note: 'Its mid-credits scene is set after Avengers: Infinity War' }),
   film('iron-man', 'Iron Man', 2008),
   film('iron-man-2', 'Iron Man 2', 2010),
   film('incredible-hulk', 'The Incredible Hulk', 2008),
@@ -76,7 +76,7 @@ export const ENTRIES = [
   film('civil-war', 'Captain America: Civil War', 2016),
   short('team-thor', 'Team Thor', 2016, { note: 'One-Shot on the Captain America: Civil War disc' }),
   short('team-thor-2', 'Team Thor: Part 2', 2017, { note: 'One-Shot on the Doctor Strange disc' }),
-  film('black-widow', 'Black Widow', 2021, { note: 'Watch its credits scene after Avengers: Endgame', credits: 'endgame' }),
+  film('black-widow', 'Black Widow', 2021, { note: 'Watch its credits scene after Avengers: Endgame' }),
   aos('aos-3c', 'Season 3 · episodes 20–22', 2015),
   tv('defenders', 'The Defenders', '', 2017),
   aos('aos-4a', 'Season 4 · episodes 1–6', 2016),
@@ -105,7 +105,7 @@ export const ENTRIES = [
   tv('punisher-2', 'The Punisher', 'Season 2', 2019),
   tv('jessica-jones-3', 'Jessica Jones', 'Season 3', 2019),
   // 71
-  film('ant-man-wasp', 'Ant-Man and the Wasp', 2018, { note: CREDITS_AFTER_INFINITY_WAR, credits: 'infinity-war' }),
+  film('ant-man-wasp', 'Ant-Man and the Wasp', 2018, { note: CREDITS_AFTER_INFINITY_WAR }),
   film('infinity-war', 'Avengers: Infinity War', 2018),
   aos('aos-5c', 'Season 5 · episodes 19–22', 2017, { note: 'Runs alongside Infinity War' }),
   aos('aos-6', 'Season 6', 2019, { note: 'During Endgame’s five-year jump' }),
@@ -177,9 +177,6 @@ export function nextUp(shown, watched) {
   const seen = new Set(watched);
   return shown.find(e => !seen.has(e.id)) ?? null;
 }
-
-// The watched films whose credits scenes belong after the entry with this id.
-export const creditsAfter = (id, watched) => ENTRIES.filter(e => e.credits === id && watched.includes(e.id));
 
 // Every shown entry up to and including id ticked; the others as they were.
 export function watchedUpTo(watched, shown, id) {

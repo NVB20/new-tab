@@ -807,21 +807,10 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 
 /* ---------- Marvel ---------- */
 
-/* The head, the progress bar and Up next stay put; the order scrolls under them. */
+/* The head and the progress bar stay put; the order scrolls under them. */
 .widget-root > .widget-marvel { display: flex; flex-direction: column; overflow: hidden; }
 .mv-bar { flex: none; height: 4px; margin: -2px 0 10px; border-radius: 2px; background: var(--hover); overflow: hidden; }
 .mv-fill { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.3s; }
-.mv-next { flex: none; margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; background: var(--accent-soft); }
-.mv-next-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.mv-next-row { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
-.mv-next-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.mv-next-title { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
-.mv-watched, .mv-disney { flex: none; gap: 5px; padding: 5px 10px; font-size: 12.5px; color: var(--text); text-decoration: none; }
-.mv-watched:hover, .mv-disney:hover { border-color: var(--accent); color: var(--accent); }
-.mv-next-row .mv-disney { margin-left: -4px; }   /* a pair with Watched */
-.mv-note { margin: 4px 0 0; font-size: 11.5px; line-height: 1.35; color: var(--muted); }
-.mv-credits { color: var(--text); }
-.mv-all { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; color: var(--accent); }
 
 .mv-scroll { position: relative; flex: 1; min-height: 0; overflow: hidden auto; }
 .mv-list { list-style: none; margin: 0; padding: 0; }
@@ -862,10 +851,8 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .mv-item:hover .mv-play, .mv-play:focus-visible, .mv-item.next .mv-play { opacity: 1; }
 .mv-source { margin-bottom: 4px; }
 .mv-source a { color: inherit; }
-/* Under 3 cells wide: no numbers or years, and Watched and Disney+ are their icons alone. */
-.widget-marvel.narrow .mv-num, .widget-marvel.narrow .mv-year,
-.widget-marvel.narrow .mv-watched > span, .widget-marvel.narrow .mv-disney > span { display: none; }
-.widget-marvel.narrow :is(.mv-watched, .mv-disney) { padding: 6px; }
+/* Under 3 cells wide: no numbers or years. */
+.widget-marvel.narrow .mv-num, .widget-marvel.narrow .mv-year { display: none; }
 /* Wide (say, a tab of its own): the order fills the width in columns, read row by row. */
 @container (min-width: 640px) {
   .mv-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); column-gap: 20px; }
