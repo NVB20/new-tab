@@ -1,7 +1,7 @@
 // Clock widget: date, time and greeting in one of the One UI style faces. The time fills what the
 // date and greeting leave of the widget's frame, so a bigger clock is a bigger clock.
 
-import { el, icon } from './ui.js';
+import { el, icon, scaleOf } from './ui.js';
 import { copyById, TYPES } from './layout.js';
 import { playClockIntro } from './clock-intro.js';
 
@@ -41,7 +41,8 @@ function clockDigits(face, now, { hour24, colon }) {
     : [`${hh}${colon ? ':' : ''}${mm}`, ampm].filter(Boolean);
 }
 
-export function mountClock(root, store, copy) {
+// ctx.preview: drawn in the Layout mode tray's preview, which mounts it on every hover.
+export function mountClock(root, store, copy, ctx) {
   const settings = () => copyById(store.get(), copy.id)?.settings ?? TYPES.clock.defaults();
 
   const date = el('div', { class: 'clock-date' });
@@ -60,21 +61,23 @@ export function mountClock(root, store, copy) {
   const section = el('section', { class: 'widget widget-clock' }, face, editButton, faces);
   root.append(section);
 
-  // The biggest font size at which the time fits width × height (0 if none).
+  // The biggest font size at which the time fits width × height (0 if none). Rects are drawn
+  // pixels, so they're divided by the widget's scale: the fit holds when it's drawn shrunk.
   function sizeFor(width, height) {
     if (width <= 0 || height <= 0) return 0;
+    const k = scaleOf(section);
     let size = 100;
     for (let i = 0; i < 2; i++) {   // twice, as AM/PM keeps its own size while the digits scale
       probe.style.fontSize = `${size}px`;
       const box = probe.getBoundingClientRect();
-      size *= Math.min(width / box.width, height / box.height);
+      size *= Math.min(width * k / box.width, height * k / box.height);
     }
     return size;
   }
   const textWidth = node => {
     const range = document.createRange();
     range.selectNodeContents(node);
-    return range.getBoundingClientRect().width;
+    return range.getBoundingClientRect().width / scaleOf(section);
   };
 
   // The time's size in a face `height` tall, with the date and greeting under it or beside it:
@@ -179,8 +182,9 @@ export function mountClock(root, store, copy) {
     renderClock(true);
   }, ['prefs']);
   renderClock(true);
-  // A new tab builds its time out of a single point, then redraws it as plain text.
-  playClockIntro(time, [date, greeting]).then(() => renderClock(true));
+  // A new tab builds its time out of a single point, then redraws it as plain text. Not in the
+  // tray's preview, where it would replay on every hover.
+  if (!ctx?.preview) playClockIntro(time, [date, greeting]).then(() => renderClock(true));
   // The time shows minutes: one wake a minute, just after it turns, and none while the tab is
   // hidden (it catches up when shown).
   let timer = 0;
