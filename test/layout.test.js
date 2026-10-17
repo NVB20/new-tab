@@ -5,6 +5,7 @@ import {
   addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, copyTitle, prefsSection,
   placeDefaults, atDefaultPlaces, swapPlan, swapCopy,
   cleanGithubParts, moveGithubPart, showGithubPart,
+  copyById, allLayouts, ownLayout, activeLayout, giveOwnLayout, dropOwnLayout, normalizeLayouts,
 } from '../js/layout.js';
 
 const legacy = over => ({
@@ -423,4 +424,64 @@ test('swapPlan refuses drops on two copies, off the canvas, or trades that donâ€
   ] };
   assert.equal(swapPlan(tight, 'a', { x: 5, y: 0, w: 2, h: 2 }), null);
   assert.equal(swapCopy(tight, 'a', { x: 5, y: 0, w: 2, h: 2 }), false);
+});
+
+// ---- tab layouts ----
+
+const tabs = () => {
+  const s = state(defaultLayout(legacy()));
+  s.activeGroupId = 'g1';
+  s.prefs.layouts = {};
+  return s;
+};
+
+test('a tab shows the main layout until it has its own', () => {
+  const s = tabs();
+  assert.equal(activeLayout(s), s.prefs.layout);
+  assert.equal(ownLayout(s, 'g2'), null);
+  const own = giveOwnLayout(s, 'g2', 'empty');
+  assert.deepEqual(own, { cols: COLS, rows: ROWS, widgets: [] });
+  assert.equal(activeLayout(s), s.prefs.layout);   // g1 is still the active tab
+  s.activeGroupId = 'g2';
+  assert.equal(activeLayout(s), own);
+  assert.deepEqual(allLayouts(s), [s.prefs.layout, own]);
+  assert.equal(dropOwnLayout(s, 'g2'), true);
+  assert.equal(activeLayout(s), s.prefs.layout);
+  assert.equal(dropOwnLayout(s, 'g2'), false);
+  assert.equal(giveOwnLayout(s, 'nope'), null);
+});
+
+test('an own layout copied from the main one gets new ids; copyById finds copies in any layout', () => {
+  const s = tabs();
+  const own = giveOwnLayout(s, 'g2', 'copy');
+  const main = s.prefs.layout.widgets;
+  assert.deepEqual(own.widgets.map(c => [c.type, c.x, c.y, c.w, c.h]), main.map(c => [c.type, c.x, c.y, c.w, c.h]));
+  assert.deepEqual(own.widgets.map(c => c.settings), main.map(c => c.settings));
+  assert.ok(own.widgets.every(c => !main.some(m => m.id === c.id)));
+  own.widgets[0].settings.name = 'changed';
+  assert.notEqual(main[0].settings.name, 'changed');   // a deep copy
+  own.widgets = own.widgets.filter(c => c.type !== 'notes');   // the copy is as full as the main page
+  const marvel = addCopy(own, 'marvel');
+  assert.equal(copyById(s, marvel.id), marvel);
+  assert.equal(copyById(s, main[0].id), main[0]);
+  assert.equal(copyById(s, 'nope'), null);
+  // Limits count per layout: the main page can have its own Marvel too, but only one.
+  s.prefs.layout.widgets = [];
+  assert.ok(addCopy(s.prefs.layout, 'marvel'));
+  assert.equal(addCopy(s.prefs.layout, 'marvel'), null);
+});
+
+test('normalizeLayouts keeps the layouts of groups that exist, valid, with ids no other layout uses', () => {
+  const s = tabs();
+  const taken = s.prefs.layout.widgets[0].id;
+  const out = normalizeLayouts({
+    g2: { widgets: [{ id: taken, type: 'marvel', x: 0, y: 0, w: 12, h: 12 }, { id: 'm2', type: 'marvel', x: 0, y: 0 }, { type: 'junk' }] },
+    gone: { widgets: [{ type: 'clock' }] },
+    g1: 'not a layout',
+  }, s);
+  assert.deepEqual(Object.keys(out), ['g2']);
+  assert.equal(out.g2.widgets.length, 1);   // one Marvel per layout
+  assert.notEqual(out.g2.widgets[0].id, taken);
+  assert.deepEqual(rect(out.g2.widgets[0]), [0, 0, 12, 12]);
+  assert.deepEqual(normalizeLayouts(undefined, s), {});
 });

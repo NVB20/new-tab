@@ -5,7 +5,7 @@
 import { el, icon, confirmDialog, alertDialog } from './ui.js';
 import {
   TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, prefsSection,
-  swapPlan, swapCopy,
+  swapPlan, swapCopy, activeLayout, ownLayout,
 } from './layout.js';
 import { gridArea } from './canvas.js';
 
@@ -16,8 +16,10 @@ export function setupEditMode(store, canvas, ctx) {
   const root = canvas.root;
   const button = document.getElementById('btn-layout');
   let active = false;
-  let snapshot = null;   // the layout on entering, for Cancel
-  const layout = () => store.get().prefs.layout;
+  let snapshot = null;   // { scope, layout } on entering, for Cancel
+  const layout = () => activeLayout(store.get());
+  // Which layout is shown: the active tab's id when it has its own, else 'main'.
+  const scopeOf = s => (ownLayout(s, s.activeGroupId) ? s.activeGroupId : 'main');
 
   // The cell outlines, the outline of where a drag or resize will land, and during a swap the
   // dashed outline of where the other widget goes.
@@ -27,7 +29,9 @@ export function setupEditMode(store, canvas, ctx) {
   const other = el('div', { class: 'canvas-ghost other', 'aria-hidden': 'true', hidden: true });
   const chips = el('div', { class: 'tray-chips' });
   const full = el('span', { class: 'tray-note', hidden: true, text: 'Page full: shrink or remove a widget to add one.' });
+  const scope = el('span', { class: 'tray-scope', hidden: true });
   const tray = el('div', { class: 'layout-tray', role: 'toolbar', 'aria-label': 'Layout mode' },
+    scope,
     el('span', { class: 'tray-label', text: 'Add' }),
     chips,
     full,
@@ -74,7 +78,7 @@ export function setupEditMode(store, canvas, ctx) {
     const t = TYPES[copy.type];
     const dup = frame.querySelector('.frame-dup');
     if (dup) {
-      const full = countOf(state.prefs.layout, copy.type) >= t.max;
+      const full = countOf(activeLayout(state), copy.type) >= t.max;
       dup.disabled = full;
       dup.title = full ? limitTitle(t) : 'Duplicate (D)';
     }
@@ -90,6 +94,11 @@ export function setupEditMode(store, canvas, ctx) {
 
   function renderTray() {
     const l = layout();
+    // A tab with its own layout is named, so it's clear the main page isn't the one changing.
+    const s = store.get();
+    const own = scopeOf(s) !== 'main' && s.groups.find(g => g.id === s.activeGroupId);
+    scope.hidden = !own;
+    scope.textContent = own ? `${own.title}’s own layout` : '';
     let roomless = 0;
     chips.replaceChildren(...Object.entries(TYPES).map(([type, t]) => {
       const n = countOf(l, type);
@@ -113,7 +122,7 @@ export function setupEditMode(store, canvas, ctx) {
 
   function add(type) {
     let copy = null;
-    store.update(s => { copy = addCopy(s.prefs.layout, type, undefined, s.groups, s.activeGroupId); });
+    store.update(s => { copy = addCopy(activeLayout(s), type, undefined, s.groups, s.activeGroupId); });
     if (copy) focusFrame(copy.id);
     else noRoom();
   }
@@ -122,24 +131,24 @@ export function setupEditMode(store, canvas, ctx) {
     const own = copyById(store.get(), id);
     if (!own || countOf(layout(), own.type) >= TYPES[own.type].max) return;
     let copy = null;
-    store.update(s => { copy = duplicateCopy(s.prefs.layout, id, s.groups, s.activeGroupId); });
+    store.update(s => { copy = duplicateCopy(activeLayout(s), id, s.groups, s.activeGroupId); });
     if (copy) focusFrame(copy.id);
     else noRoom();
   }
 
   function remove(id) {
-    store.update(s => { removeCopy(s.prefs.layout, id); });
+    store.update(s => { removeCopy(activeLayout(s), id); });
     canvas.frames().values().next().value?.focus({ preventScroll: true });
   }
 
   async function reset() {
     const s = store.get();
-    const names = resetLayout(structuredClone(s.prefs.layout)).map(c => copyTitle(c, s.groups)).join(', ');
+    const names = resetLayout(structuredClone(activeLayout(s))).map(c => copyTitle(c, s.groups)).join(', ');
     const ok = await confirmDialog(
       names ? `Put every widget back in its default place? ${names} will be removed.` : 'Put every widget back in its default place?',
       { title: 'Reset layout', confirmLabel: 'Reset' },
     );
-    if (ok) store.update(st => { resetLayout(st.prefs.layout); });
+    if (ok) store.update(st => { resetLayout(activeLayout(st)); });
   }
 
   // ---- drag and resize ----
@@ -211,8 +220,8 @@ export function setupEditMode(store, canvas, ctx) {
       other.hidden = true;
       const changed = ['x', 'y', 'w', 'h'].some(k => target[k] !== start[k]);
       let moved = false;
-      if (valid && changed) store.update(s => { moved = moveCopy(s.prefs.layout, copy.id, target); });
-      else if (plan) store.update(s => { moved = swapCopy(s.prefs.layout, copy.id, target); });
+      if (valid && changed) store.update(s => { moved = moveCopy(activeLayout(s), copy.id, target); });
+      else if (plan) store.update(s => { moved = swapCopy(activeLayout(s), copy.id, target); });
       if (!moved) frame.style.gridArea = gridArea(copyById(store.get(), copy.id) ?? start);
       focusFrame(copy.id);
     };
@@ -234,7 +243,7 @@ export function setupEditMode(store, canvas, ctx) {
       const target = e.shiftKey
         ? { x: copy.x, y: copy.y, w: copy.w + d[0], h: copy.h + d[1] }
         : { x: copy.x + d[0], y: copy.y + d[1], w: copy.w, h: copy.h };
-      store.update(s => { moveCopy(s.prefs.layout, copy.id, target); });
+      store.update(s => { moveCopy(activeLayout(s), copy.id, target); });
       focusFrame(copy.id);
     } else if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
@@ -254,7 +263,7 @@ export function setupEditMode(store, canvas, ctx) {
       return;
     }
     active = true;
-    snapshot = structuredClone(layout());
+    snapshot = { scope: scopeOf(store.get()), layout: structuredClone(layout()) };
     document.body.classList.add('layout-editing');
     button?.setAttribute('aria-pressed', 'true');
     root.append(overlay, ghost, other);
@@ -268,8 +277,11 @@ export function setupEditMode(store, canvas, ctx) {
     if (!active) return;
     active = false;
     if (restore) {
-      const back = snapshot;
-      store.update(s => { s.prefs.layout = structuredClone(back); });
+      const { scope: was, layout: back } = snapshot;
+      store.update(s => {
+        if (was === 'main') s.prefs.layout = structuredClone(back);
+        else if (ownLayout(s, was)) s.prefs.layouts[was] = structuredClone(back);
+      });
     }
     snapshot = null;
     document.body.classList.remove('layout-editing');
@@ -284,11 +296,17 @@ export function setupEditMode(store, canvas, ctx) {
   }
 
   canvas.onFrame(frame => { if (active) decorate(frame); });
-  store.subscribe(() => {
+  store.subscribe(state => {
     if (!active) return;
+    // Another tab showing another layout: Layout mode ends, keeping the changes made so far
+    // (Cancel would put one tab's layout back into another).
+    if (scopeOf(state) !== snapshot.scope) {
+      exit();
+      return;
+    }
     refresh();
     root.append(overlay, ghost, other);   // after the frames the canvas may have re-added
-  }, ['prefs', 'groups']);
+  }, ['prefs', 'groups', 'activeGroupId']);
   addEventListener('keydown', e => {
     if (!active || e.key !== 'Escape') return;
     if (document.querySelector('dialog[open]') || e.target.closest?.('input, textarea, select, [contenteditable]')) return;

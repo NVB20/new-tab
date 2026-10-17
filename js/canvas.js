@@ -1,10 +1,11 @@
-// The canvas: one frame per widget copy in prefs.layout, placed on the 12 × 12 grid with
-// grid-area. Copies are mounted when they appear and destroyed when they go; a move or resize
+// The canvas: one frame per widget copy in the layout shown (the active tab's own, else the main
+// one), placed on the 12 × 12 grid with grid-area. Copies are mounted when they appear and
+// destroyed when they go, including when a tab switch shows another layout; a move or resize
 // only changes the frame's place, so widgets keep their timers and feeds while Layout mode drags
 // them. Frames are kept in reading order in the DOM, so Tab and the narrow-window stack follow it.
 
 import { WIDGETS } from './registry.js';
-import { stackOrder } from './layout.js';
+import { stackOrder, activeLayout } from './layout.js';
 import { el } from './ui.js';
 
 export const gridArea = c => `${c.y + 1} / ${c.x + 1} / span ${c.h} / span ${c.w}`;
@@ -15,7 +16,7 @@ export function mountCanvas(root, store, ctx) {
   const listeners = new Set();
 
   function sync() {
-    const { widgets } = store.get().prefs.layout;
+    const { widgets } = activeLayout(store.get());
     const live = new Set(widgets.map(c => c.id));
     for (const [id, m] of mounted) {
       if (live.has(id)) continue;
@@ -46,7 +47,7 @@ export function mountCanvas(root, store, ctx) {
     if (current.join() !== order.join()) for (const id of order) root.append(mounted.get(id).frame);
   }
 
-  store.subscribe(sync, ['prefs']);
+  store.subscribe(sync, ['prefs', 'activeGroupId']);
   sync();
 
   return {

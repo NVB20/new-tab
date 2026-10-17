@@ -145,8 +145,10 @@ export function deleteGroup(s, id, mode = 'move') {
     s.tiles.push(...own);
   }
   if (s.activeGroupId === id) s.activeGroupId = target;
-  // A tiles block pinned to the group goes back to following the tabs.
-  for (const c of s.prefs?.layout?.widgets ?? []) if (c.type === 'tiles' && c.settings.group === id) c.settings.group = null;
+  // Its own layout goes, and a tiles block pinned to it, in any layout, goes back to following the tabs.
+  if (s.prefs?.layouts) delete s.prefs.layouts[id];
+  const layouts = [s.prefs?.layout, ...Object.values(s.prefs?.layouts ?? {})].filter(Boolean);
+  for (const c of layouts.flatMap(l => l.widgets)) if (c.type === 'tiles' && c.settings.group === id) c.settings.group = null;
   return true;
 }
 

@@ -42,6 +42,17 @@ test('normalizeState(null) returns a usable default state', () => {
   assert.deepEqual(layout.widgets.map(c => c.type), ['clock', 'tasks', 'notes', 'markets', 'github', 'search', 'tiles']);
 });
 
+test('normalizeState keeps each tab’s own layout, for groups that exist', () => {
+  assert.deepEqual(normalizeState(null).prefs.layouts, {});
+  const s = normalizeState({
+    groups: [{ id: 'g1', title: 'Home' }, { id: 'g2', title: 'Marvel' }],
+    prefs: { layout: { widgets: [] }, layouts: { g2: { widgets: [{ id: 'm', type: 'marvel', x: 0, y: 0, w: 12, h: 12, settings: { show: 'films' } }] }, gone: { widgets: [] } } },
+  });
+  assert.deepEqual(Object.keys(s.prefs.layouts), ['g2']);
+  assert.deepEqual(s.prefs.layouts.g2.widgets, [{ id: 'm', type: 'marvel', x: 0, y: 0, w: 12, h: 12, settings: { show: 'films', hideWatched: false } }]);
+  assert.deepEqual(normalizeState({ prefs: { layouts: [1, 2] } }).prefs.layouts, {});
+});
+
 test('normalizeState keeps the Marvel progress: known ids once, in the list’s order', () => {
   assert.deepEqual(normalizeState(null).marvel, { watched: [] });
   assert.deepEqual(normalizeState({ marvel: { watched: ['endgame', 'junk', 'iron-man', 'endgame'] } }).marvel, { watched: ['iron-man', 'endgame'] });

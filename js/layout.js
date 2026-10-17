@@ -146,7 +146,55 @@ export function firstFree(layout, w, h) {
 }
 
 export const countOf = (layout, type) => layout.widgets.filter(c => c.type === type).length;
-export const copyById = (state, id) => state.prefs.layout.widgets.find(c => c.id === id) ?? null;
+
+// ---- tab layouts ----
+// prefs.layout is the main layout; prefs.layouts holds the tabs (groups) that have their own.
+
+export const allLayouts = state => [state.prefs.layout, ...Object.values(state.prefs.layouts ?? {})];
+export const ownLayout = (state, groupId) => state.prefs.layouts?.[groupId] ?? null;
+// The layout the page shows: the active tab's own, else the main one.
+export const activeLayout = state => ownLayout(state, state.activeGroupId) ?? state.prefs.layout;
+export const copyById = (state, id) => {
+  for (const l of allLayouts(state)) {
+    const copy = l.widgets.find(c => c.id === id);
+    if (copy) return copy;
+  }
+  return null;
+};
+
+// Gives a tab a layout of its own: a copy of the main one (with new ids) or an empty page.
+// Returns it, or null when there's no such group.
+export function giveOwnLayout(state, groupId, from = 'copy') {
+  if (!state.groups.some(g => g.id === groupId)) return null;
+  const main = state.prefs.layout;
+  const layout = { cols: COLS, rows: ROWS, widgets: from === 'copy' ? main.widgets.map(c => ({ ...structuredClone(c), id: uid() })) : [] };
+  state.prefs.layouts = { ...state.prefs.layouts, [groupId]: layout };
+  return layout;
+}
+
+export function dropOwnLayout(state, groupId) {
+  if (!ownLayout(state, groupId)) return false;
+  delete state.prefs.layouts[groupId];
+  return true;
+}
+
+// The groups' own layouts, each valid. A key that isn't a group goes, and a copy id the main
+// layout or an earlier tab already uses gets a new one, so copyById finds one copy per id.
+// state.groups and state.prefs.layout must already be clean.
+export function normalizeLayouts(raw, state) {
+  const out = {};
+  const seen = new Set(state.prefs.layout.widgets.map(c => c.id));
+  for (const g of state.groups) {
+    if (!isObj(raw) || !isObj(raw[g.id])) continue;
+    const layout = normalizeLayout(raw[g.id], state);
+    for (const c of layout.widgets) {
+      if (seen.has(c.id)) c.id = uid();
+      seen.add(c.id);
+    }
+    out[g.id] = layout;
+  }
+  return out;
+}
 
 // Reading order for narrow windows and Tab: top to bottom, then left to right.
 export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.x - b.x).map(c => c.id);

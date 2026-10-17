@@ -9,7 +9,7 @@
 
 import { el, icon, tileIcon } from './ui.js';
 import { setTheme } from './store.js';
-import { TYPES, firstFree, addCopy, placeDefaults, atDefaultPlaces } from './layout.js';
+import { TYPES, firstFree, addCopy, placeDefaults, atDefaultPlaces, activeLayout, copyById } from './layout.js';
 import { addTile, isFolder } from './actions.js';
 import { hasChrome, historySearch, bookmarksTree, requestSiteAccess } from './chrome-api.js';
 import { rankSites, barItems } from './suggest.js';
@@ -57,16 +57,16 @@ const SAMPLES = [
 // ctx: { openJump(), enterLayout(), exitLayout() }. Returns { start({ again }) }.
 export function setupOnboarding(store, canvas, ctx) {
   const prefs = () => store.get().prefs;
-  const layout = () => prefs().layout;
+  const layout = () => activeLayout(store.get());   // setup sets up the page you're on
   const copyOf = type => layout().widgets.find(c => c.type === type) ?? null;
   const has = type => !!copyOf(type);
   const layoutOn = () => document.body.classList.contains('layout-editing');
   const narrow = () => innerWidth < LAYOUT_MIN_WIDTH;
   const setPrefs = fn => store.update(s => fn(s.prefs), ['prefs']);
-  const setCopy = (id, patch) => setPrefs(p => {
-    const copy = p.layout.widgets.find(c => c.id === id);
+  const setCopy = (id, patch) => store.update(s => {
+    const copy = copyById(s, id);
     if (copy) Object.assign(copy.settings, patch);
-  });
+  }, ['prefs']);
   const groupTiles = () => {
     const s = store.get();
     return s.tiles.filter(t => t.groupId === s.activeGroupId && !t.folderId);
@@ -582,7 +582,7 @@ export function setupOnboarding(store, canvas, ctx) {
   function toggleWidget(type) {
     let noRoom = false;
     store.update(s => {
-      const l = s.prefs.layout;
+      const l = activeLayout(s);
       const on = l.widgets.some(c => c.type === type);
       if (atDefaultPlaces(l)) {
         const types = [...new Set(l.widgets.map(c => c.type))].filter(t => t !== type);

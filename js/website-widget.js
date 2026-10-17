@@ -4,7 +4,7 @@
 // can lift them, and the widget is a link to the site.
 
 import { el, icon, widgetEmpty } from './ui.js';
-import { copyById, TYPES } from './layout.js';
+import { copyById, allLayouts, TYPES } from './layout.js';
 import { MAX_SITES, siteUrl, siteDomain, sitePattern, siteDomains, frameRules, framePatterns, sameRules } from './website.js';
 import {
   canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, onSiteAccessChange, setFrameRules,
@@ -16,10 +16,11 @@ const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a change
 const SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads';
 const ALLOW = 'fullscreen; clipboard-write; autoplay; encrypted-media; picture-in-picture';
 
-// The header rules and the frame script for every site the layout shows. Each is written only
-// when Chrome doesn't hold it already, so a new tab usually just reads them.
+// The header rules and the frame script for every site a layout shows (the main one and every
+// tab's own, so switching tabs rewrites nothing). Each is written only when Chrome doesn't hold
+// it already, so a new tab usually just reads them.
 async function syncSites(store) {
-  const domains = siteDomains(store.get().prefs.layout.widgets).slice(0, MAX_SITES);
+  const domains = siteDomains(allLayouts(store.get()).flatMap(l => l.widgets)).slice(0, MAX_SITES);
   const rules = frameRules(domains, extensionId);
   const syncRules = async () => {
     try {

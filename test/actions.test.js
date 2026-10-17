@@ -96,6 +96,19 @@ test('deleteGroup with delete removes its tiles', () => {
   assert.equal(s.activeGroupId, 'home');
 });
 
+test('deleteGroup deletes the group’s own layout and unpins blocks pinned to it in every layout', () => {
+  const s = state();
+  const block = group => ({ id: `t-${group}`, type: 'tiles', x: 0, y: 0, w: 6, h: 6, settings: { group, columns: 5 } });
+  s.prefs = {
+    layout: { widgets: [block('dev')] },
+    layouts: { dev: { widgets: [block('home')] }, home: { widgets: [block('dev')] } },
+  };
+  deleteGroup(s, 'dev', 'move');
+  assert.deepEqual(Object.keys(s.prefs.layouts), ['home']);
+  assert.equal(s.prefs.layout.widgets[0].settings.group, null);
+  assert.equal(s.prefs.layouts.home.widgets[0].settings.group, null);
+});
+
 test('deleteGroup refuses to delete the last group', () => {
   const s = state();
   deleteGroup(s, 'dev', 'delete');

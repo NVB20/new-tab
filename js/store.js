@@ -4,7 +4,7 @@
 import { uid } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
 import { isDay, PRIORITIES, REPEATS } from './tasks.js';
-import { defaultLayout, normalizeLayout } from './layout.js';
+import { defaultLayout, normalizeLayout, normalizeLayouts } from './layout.js';
 import { cleanWatched } from './marvel.js';
 
 export const DEFAULT_PREFS = {
@@ -30,6 +30,8 @@ export const DEFAULT_PREFS = {
   // The widget copies on the 12 × 12 canvas (see layout.js). null here: defaultState and
   // normalizeState fill it in.
   layout: null,
+  // The tabs (group ids) with a layout of their own; every other tab shows `layout`.
+  layouts: {},
   sidebar: { enabled: true },
 };
 
@@ -168,6 +170,7 @@ export function normalizeState(raw) {
     const token = rp.widgets?.github?.token;
     if (typeof token === 'string' && !s.prefs.github.token) s.prefs.github.token = token;
   }
+  s.prefs.layouts = normalizeLayouts(rp.layouts, s);
   // The username was each GitHub copy's own setting (or the old widget's) before they shared one.
   const copies = Array.isArray(rp.layout?.widgets) ? rp.layout.widgets : [];
   const user = [...copies.map(c => c?.settings?.user), rp.widgets?.github?.user].find(u => typeof u === 'string' && u.trim());
