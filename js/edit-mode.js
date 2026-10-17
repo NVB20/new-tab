@@ -5,7 +5,7 @@
 import { el, icon, confirmDialog, alertDialog, showMenu } from './ui.js';
 import {
   TYPES, COLS, ROWS, copyById, copyTitle, countOf, fits, firstFree, addCopy, duplicateCopy, removeCopy, moveCopy, resetLayout, prefsSection,
-  swapPlan, swapCopy, activeLayout, ownLayout, isStack, minOf, stackOrder, stackProblem, stackCopy, unstackCopy, plannedCopy,
+  swapPlan, swapCopy, activeLayout, ownLayout, isStack, minOf, stackOrder, stackProblem, stackCopy, unstackCopy, plannedCopy, STACK_MAX,
 } from './layout.js';
 import { gridArea } from './canvas.js';
 import { createPreview } from './widget-preview.js';
@@ -31,6 +31,8 @@ function cellPitch(root) {
 // Why a drop or a Stack onto… target can't take the widget (stackProblem's answers).
 const DROP_NOTES = { search: 'The search bar can’t be stacked', full: 'Full: a stack holds three at most', small: 'Too small for it: make this one bigger first' };
 const MENU_NOTES = { search: 'can’t be stacked', full: 'full', small: 'too small' };
+// The same answers seen from a stack's Add to stack…: why that widget can't join this one.
+const ADD_NOTES = { search: 'can’t be stacked', full: 'too many', small: 'needs a bigger spot' };
 
 export function setupEditMode(store, canvas, ctx) {
   const root = canvas.root;
@@ -75,8 +77,8 @@ export function setupEditMode(store, canvas, ctx) {
     const stack = frame.dataset.type === 'stack';
     // Settings: the copy's group (under Layout, or GitHub for a GitHub copy), or the section every
     // copy shares; none for a type with nothing to set. A section without the copy's group just
-    // opens at the top. A stack's buttons act on the widget showing; it has Take out where a
-    // widget has Stack onto….
+    // opens at the top. A stack's buttons act on the widget showing, except Add to stack… (where a
+    // widget has Stack onto…), which brings another widget into it; it also has Take out.
     const section = !stack && prefsSection(frame.dataset.type);
     frame.tabIndex = 0;
     frame.append(
@@ -85,8 +87,9 @@ export function setupEditMode(store, canvas, ctx) {
         (stack || section) && el('button', { type: 'button', class: 'icon-btn frame-settings', title: 'Settings', 'aria-label': 'Settings', onclick: () => openSettings(id) }, icon('settings', 15)),
         el('button', { type: 'button', class: 'icon-btn frame-dup', 'aria-label': 'Duplicate', onclick: () => duplicate(id) }, icon('copy', 15)),
         stack
-          ? el('button', { type: 'button', class: 'icon-btn frame-out', onclick: () => takeOut(id) }, icon('unstack', 15))
+          ? el('button', { type: 'button', class: 'icon-btn frame-add', 'aria-haspopup': 'menu', onclick: e => addMenu(id, e.currentTarget) }, icon('stack', 15))
           : el('button', { type: 'button', class: 'icon-btn frame-onto', 'aria-haspopup': 'menu', onclick: e => stackMenu(id, e.currentTarget) }, icon('stack', 15)),
+        stack && el('button', { type: 'button', class: 'icon-btn frame-out', onclick: () => takeOut(id) }, icon('unstack', 15)),
         el('button', { type: 'button', class: 'icon-btn frame-remove', title: 'Remove (Delete)', 'aria-label': 'Remove', onclick: () => remove(id) }, icon('x', 15))),
       ...DIRS.map(dir => el('div', { class: `frame-handle ${dir}`, dataset: { dir }, 'aria-hidden': 'true' })));
     refreshFrame(frame);
@@ -125,6 +128,8 @@ export function setupEditMode(store, canvas, ctx) {
     if (stack) {
       const section = prefsSection(copy.type);
       tool('frame-settings', !section, section ? `Settings: ${name}` : `${name} has no settings`);
+      const roomy = entry.items.length < STACK_MAX;
+      tool('frame-add', !roomy || l.widgets.length < 2, roomy ? 'Add to stack…' : 'Full: a stack holds three at most', 'Add to stack…');
       const room = firstFree(l, ...t.size) ?? firstFree(l, ...t.min);
       tool('frame-out', !room, room ? `Take ${name} out` : `No room to take ${name} out`, `Take ${name} out`);
       tool('frame-remove', false, `Remove ${name} (Delete)`, `Remove ${name}`);
@@ -227,9 +232,9 @@ export function setupEditMode(store, canvas, ctx) {
     if (stack) focusFrame(stack.id);
   }
 
-  // Stack onto…: every other widget and stack in reading order, greyed out with the reason when it
-  // can't take this one. The way to stack from the keyboard.
-  function stackMenu(id, anchor) {
+  // Every other widget and stack in reading order, greyed out with the reason when it can't stack
+  // with this one. join(otherId) → [what joins, what it joins]; notes words stackProblem's answers.
+  function pickMenu(id, anchor, heading, join, notes) {
     const state = store.get();
     const l = activeLayout(state);
     const entry = l.widgets.find(c => c.id === id);
@@ -237,18 +242,29 @@ export function setupEditMode(store, canvas, ctx) {
     const others = stackOrder(l.widgets).filter(o => o !== id).map(o => l.widgets.find(c => c.id === o));
     const r = anchor.getBoundingClientRect();
     showMenu(r.left, r.bottom + 4, [
-      { heading: `Stack ${copyTitle(entry, state.groups)} onto` },
+      { heading },
       ...others.map(c => {
-        const problem = stackProblem(l, id, c.id);
+        const problem = stackProblem(l, ...join(c.id));
         return {
           label: copyTitle(c, state.groups),
           icon: isStack(c) ? 'stack' : TYPES[c.type].icon,
           disabled: !!problem,
-          note: problem && MENU_NOTES[problem],
-          action: () => stackOnto(id, c.id),
+          note: problem && notes[problem],
+          action: () => stackOnto(...join(c.id)),
         };
       }),
     ]);
+  }
+
+  // Stack onto…: this widget joins another widget or stack. The way to stack from the keyboard.
+  function stackMenu(id, anchor) {
+    const entry = copyById(store.get(), id);
+    if (entry) pickMenu(id, anchor, `Stack ${copyTitle(entry, store.get().groups)} onto`, other => [id, other], MENU_NOTES);
+  }
+
+  // Add to stack…: another widget joins this stack, in this stack's spot, and shows.
+  function addMenu(id, anchor) {
+    pickMenu(id, anchor, 'Add to this stack', other => [other, id], ADD_NOTES);
   }
 
   async function reset() {
