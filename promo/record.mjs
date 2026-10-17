@@ -1,8 +1,8 @@
 // Records the promo into promo/out/frames/NNNN.jpg. For each shot it seeds the demo page
 // (fixtures/), opens the new tab on a held virtual clock (lib/vclock.js), then for every frame
-// moves the pointer and, for each of its PROMO_SUB sub-frames (default 4), draws the overlay
-// (lib/overlay.js), takes a screenshot and steps the clock; ffmpeg averages each frame's sub-frames
-// into one (motion blur). The page may not touch the network: any http(s) request fails the run.
+// moves the pointer and, for each of its PROMO_SUB sub-frames (default 6, spread over the first
+// half of the frame's time), draws the overlay (lib/overlay.js), takes a screenshot and steps the
+// clock; ffmpeg averages each frame's sub-frames into one (motion blur). The page may not touch the network: any http(s) request fails the run.
 // node promo/record.mjs [--scene <name>]      PROMO_SUB=1 for quick, unblurred frames
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -22,7 +22,10 @@ export const FRAMES = join(OUT, 'frames');
 const SUBFRAMES = join(OUT, 'sub');
 // What the page's clock reads as the video starts: Tue 20 Oct 2026, 09:41 local time.
 export const EPOCH = new Date(2026, 9, 20, 9, 41, 0).getTime();
-const SUB = Math.max(1, Number(process.env.PROMO_SUB ?? 4));
+const SUB = Math.max(1, Number(process.env.PROMO_SUB ?? 6));
+// The share of each frame's time its sub-frames span (a film camera's 180° shutter): wider smears
+// fast moves into visible copies, narrower barely blurs.
+const SHUTTER = 0.5;
 const PORT = 9479;
 const SIZE = { width: 1920, height: 1080 };
 // A widget is ready once it shows this (by its frame's data-type).
@@ -234,13 +237,15 @@ async function recordScene(cdp, extId, scene, { vclock, overlay }) {
   const pointer = new Pointer(page, scene);
   for (let f = 0; f < scene.frames; f++) {
     const at = await pointer.step(f);
+    const open = SUB === 1 ? 1 : SHUTTER;
     for (let s = 0; s < SUB; s++) {
-      await page.eval(`__promo.render(${f + s / SUB}, ${JSON.stringify(at)})`);
+      await page.eval(`__promo.render(${f + (s * open) / SUB}, ${JSON.stringify(at)})`);
       const { data } = await page.send('Page.captureScreenshot', { format: 'jpeg', quality: 92 });
       const file = SUB === 1 ? join(FRAMES, `${pad(scene.start + f, 4)}.jpg`) : join(SUBFRAMES, `${pad(f * SUB + s, 5)}.jpg`);
       writeFileSync(file, Buffer.from(data, 'base64'));
-      await page.eval(`__vclock.step(${1000 / FPS / SUB})`);
+      await page.eval(`__vclock.step(${(1000 / FPS) * (open / SUB)})`);
     }
+    if (open < 1) await page.eval(`__vclock.step(${(1000 / FPS) * (1 - open)})`);
   }
   await cdp.send('Target.closeTarget', { targetId });
   if (asked.size) throw new Error(`Shot "${scene.name}" asked the network for (give it a cache entry in fixtures/cache.mjs):\n  ${[...asked].join('\n  ')}`);

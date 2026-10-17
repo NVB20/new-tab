@@ -52,7 +52,7 @@ export const SCENES = [
   },
   {
     name: 'markets', frames: 6 * BEAT, stage: 'dark', fx: 'sparklines',
-    float: [{ sel: frame('markets'), f: 0, x: 1240, y: 560, scale: 1.3, ry: -14 }],
+    float: [{ sel: frame('markets'), f: 0, x: 1230, y: 560, scale: 1.75, ry: -14 }],
     brackets: { f: BEAT },
     words: [{ f: 0, text: 'Live *markets*', at: 'left' }],
   },

@@ -149,11 +149,14 @@
   }
 
   // A copy of a live page element, as wide as it is on the page and as tall as its content (a
-  // widget's frame is often taller than what it shows), to move around the stage.
+  // widget's frame is often taller than what it shows, and its wrappers fill it), to move around
+  // the stage. The content is the visible leaves: elements with no element inside, and drawings.
   function lift(original, parent) {
     const b = original.getBoundingClientRect();
     let bottom = b.top;
     for (const el of original.querySelectorAll('*')) {
+      if (el.childElementCount && !(el instanceof SVGSVGElement)) continue;
+      if (el.closest('svg') && !(el instanceof SVGSVGElement)) continue;
       const r = el.getBoundingClientRect();
       if (r.height && r.width && getComputedStyle(el).visibility !== 'hidden') bottom = Math.max(bottom, r.bottom);
     }
@@ -239,13 +242,11 @@
     cursor = node('div', 'cursor');
     cursor.innerHTML = '<svg viewBox="0 0 28 28" width="34" height="34"><path d="M5 3 L5 23 L10.2 18.2 L13.6 25.6 L17 24 L13.7 16.8 L20.6 16.6 Z" fill="#fff" stroke="#0d1117" stroke-width="1.6" stroke-linejoin="round"/></svg>';
 
+    // The lines draw in by a clip sliding off to the right (their strokes don't scale with the
+    // drawing, so a dash trick would come out dashed).
     if (s.fx === 'sparklines') {
-      sparks = [...root.querySelectorAll('.clone .mk-spark polyline')];
-      if (!sparks.length) need('.clone .mk-spark polyline');
-      for (const p of sparks) {
-        p.setAttribute('pathLength', '1');
-        p.style.strokeDasharray = '1';
-      }
+      sparks = [...root.querySelectorAll('.clone .mk-spark')];
+      if (!sparks.length) need('.clone .mk-spark');
     }
     if (s.fx === 'heatmap') {
       const rects = [...document.querySelectorAll('.frame-github .gh-heatmap-grid rect')];
@@ -367,8 +368,8 @@
     curves.forEach((p, i) => {
       p.style.strokeDashoffset = scene.curves === 'drawn' ? '0' : String(1 - easeOutCubic((f - 5 * i) / 45));
     });
-    sparks.forEach((p, i) => {
-      p.style.strokeDashoffset = String(1 - easeOutCubic((f - 4 - 2 * i) / 18));
+    sparks.forEach((svg, i) => {
+      svg.style.clipPath = `inset(-4px ${100 * (1 - easeOutCubic((f - 4 - 2 * i) / 18))}% -4px 0)`;
     });
     for (const { r, col } of cells) r.style.opacity = String(clamp01((f - col * 0.5) / 5));
     cursor.style.display = pointer ? '' : 'none';
