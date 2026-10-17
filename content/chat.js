@@ -36,12 +36,13 @@ function handoffId(hash) {
   return /^#nt=([\w-]{1,64})$/.exec(hash)?.[1] ?? null;
 }
 
-// The stored message with this id if it is for this site and recent enough, and the list without it.
+// The stored message with this id if it is for this site and recent enough, and the list without
+// it or any message too old to be picked up (one whose chat never opened).
 function takeHandoff(list, id, engine, now) {
   const all = Array.isArray(list) ? list : [];
   const hit = all.find(h => h?.id === id);
   const fresh = hit && hit.engine === engine && typeof hit.text === 'string' && now >= hit.at && now - hit.at < HANDOFF_TTL;
-  return { text: fresh ? hit.text : null, rest: all.filter(h => h !== hit) };
+  return { text: fresh ? hit.text : null, rest: all.filter(h => h !== hit && now - h?.at < HANDOFF_TTL) };
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));

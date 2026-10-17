@@ -126,6 +126,11 @@ export async function askChat(engine, text, { newTab = false } = {}) {
   await openUrl(CHAT_PAGES[engine], { newTab });
 }
 
+// Messages still waiting for a chat site (Reset everything).
+export async function clearChatHandoffs() {
+  if (hasChrome && c.storage) await c.storage.local.remove(HANDOFF_KEY);
+}
+
 export async function webSearch(text, { newTab = false } = {}) {
   if (can.search) {
     await c.search.query({ text, disposition: newTab ? 'NEW_TAB' : 'CURRENT_TAB' });
@@ -172,20 +177,39 @@ export function onSiteAccessChange(fn) {
   };
 }
 
-// The dynamic rules with ids 1…maxId (see setFrameRules).
-export async function frameRulesNow(maxId) {
-  if (!canFrameSites) return [];
-  return (await c.declarativeNetRequest.getDynamicRules()).filter(r => r.id <= maxId);
+// Gives back the access to a site (a pattern as for requestSiteAccess), once no widget shows it.
+export async function releaseSiteAccess(pattern) {
+  if (!canFrameSites) return;
+  try {
+    await c.permissions.remove({ origins: [pattern] });
+  } catch (err) {
+    console.warn('Could not give back access to', pattern, err);
+  }
 }
 
-// Replaces the dynamic rules with ids 1…maxId by `rules`. Every tab writes the whole set it
-// derives from the shared layout, so tabs racing each other agree on the result.
-export async function setFrameRules(rules, maxId) {
+// This page's tab id, or null outside a tab.
+export async function currentTabId() {
+  return can.tabs ? (await c.tabs.getCurrent())?.id ?? null : null;
+}
+
+// Every session rule Chrome holds (the Website widgets' header rules, each scoped to one tab).
+export async function frameRulesNow() {
+  if (!canFrameSites) return [];
+  return c.declarativeNetRequest.getSessionRules();
+}
+
+// Replaces the session rules with ids `remove` (a tab's own) by `rules`, in one step.
+export async function setFrameRules(rules, remove) {
   if (!canFrameSites) return;
-  await c.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: Array.from({ length: maxId }, (_, i) => i + 1),
-    addRules: rules,
-  });
+  await c.declarativeNetRequest.updateSessionRules({ removeRuleIds: remove, addRules: rules });
+}
+
+// The header rules used to be dynamic rules 1…maxId, which held in every tab. Any left (or
+// written by a tab still running the old files) go.
+export async function dropSharedFrameRules(maxId) {
+  if (!canFrameSites) return;
+  const old = (await c.declarativeNetRequest.getDynamicRules()).filter(r => r.id <= maxId).map(r => r.id);
+  if (old.length) await c.declarativeNetRequest.updateDynamicRules({ removeRuleIds: old });
 }
 
 // content/site-frame.js, which tells a Website widget the page its frame is on, runs on the

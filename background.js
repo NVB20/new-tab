@@ -2,8 +2,10 @@
 // they end, with or without a new tab open. It reads the saved state, keeps one alarm per
 // countdown that will end, and shows a notification when one does. The page never talks to it:
 // starting, pausing or editing a countdown saves the state, and that's what it follows.
+// It also takes away a tab's Website header rules once the tab isn't the new tab page any more.
 
 import { cleanCountdowns, endOf, nameOf, doneText } from './js/countdown.js';
+import { forTab } from './js/website.js';
 
 // An alarm per countdown, named for its end: "countdown:<id>:<end ms>". A changed end is a new
 // name, so nothing has to compare times.
@@ -59,4 +61,25 @@ chrome.notifications?.onClicked.addListener(id => {
   if (!id.startsWith(PREFIX)) return;
   chrome.notifications.clear(id);
   chrome.tabs.create({});
+});
+
+// ---- Website widget ----
+
+// A new tab page lifts its Website sites' frame-blocking headers in its own tab only (session
+// rules, see js/website.js). When the tab closes, is swapped for another, or goes to a site, its
+// rules go, so the sites keep their protection there.
+const ownPage = url => url.startsWith('chrome://newtab') || url.startsWith(chrome.runtime.getURL(''));
+async function dropFrameRules(tabId) {
+  try {
+    const ids = (await chrome.declarativeNetRequest.getSessionRules()).filter(r => forTab(r, tabId)).map(r => r.id);
+    if (ids.length) await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: ids });
+  } catch {
+    // no rules API (permissions from before the Website widget): nothing to drop
+  }
+}
+
+chrome.tabs.onRemoved.addListener(tabId => dropFrameRules(tabId));
+chrome.tabs.onReplaced.addListener((added, removed) => dropFrameRules(removed));
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.url && !ownPage(change.url)) dropFrameRules(tabId);
 });

@@ -84,3 +84,14 @@ test('takeHandoff copes with missing or malformed storage', () => {
   assert.deepEqual(takeHandoff(undefined, 'a', 'claude', now), { text: null, rest: [] });
   assert.equal(takeHandoff([null, { id: 'a', engine: 'claude', text: 42, at: now }], 'a', 'claude', now).text, null);
 });
+
+test('takeHandoff also drops messages too old to be picked up, so a chat that never opened leaves nothing', () => {
+  const list = [
+    { id: 'old', engine: 'gemini', text: 'never sent', at: now - TTL - 1 },
+    { id: 'b', engine: 'claude', text: 'now', at: now },
+    { id: 'c', engine: 'chatgpt', text: 'waiting', at: now - 1000 },
+  ];
+  const out = takeHandoff(list, 'b', 'claude', now);
+  assert.equal(out.text, 'now');
+  assert.deepEqual(out.rest.map(h => h.id), ['c']);
+});

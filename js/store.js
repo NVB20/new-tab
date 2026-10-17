@@ -1,7 +1,7 @@
 // App state: defaults, validation, persistence and change notification.
 // Touches no browser globals at import time (unit-tested in Node).
 
-import { uid } from './util.js';
+import { uid, isSafeUrl } from './util.js';
 import { parseCoins, cleanMarketItems } from './feeds.js';
 import { isDay, PRIORITIES, REPEATS } from './tasks.js';
 import { defaultLayout, normalizeLayout, normalizeLayouts } from './layout.js';
@@ -26,7 +26,8 @@ export const DEFAULT_PREFS = {
   // The engines the search bar offers; mode is the one Enter goes to.
   search: { google: true, claude: true, chatgpt: false, gemini: false, mode: 'google' },
   // One username and one token for every GitHub widget. The token is optional (read-only), only
-  // adds private repos' commits, issues and PRs, and is never exported in backups.
+  // adds private repos' commits, issues and PRs, is saved apart from the state (see pickAdapter)
+  // and is never exported in backups.
   github: { user: '', token: '' },
   // The widget copies on the 12 × 12 canvas (see layout.js). null here: defaultState and
   // normalizeState fill it in.
@@ -94,10 +95,13 @@ export function defaultState() {
 
 // Values from `over` win when they have the same type as the default;
 // nested objects merge, so prefs added in later versions get their default.
+// Keys that would reach the object's prototype (from a hand-made backup) are skipped.
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 export function deepMerge(base, over) {
   const src = isObj(over) ? over : {};
   const out = {};
   for (const k of new Set([...Object.keys(base), ...Object.keys(src)])) {
+    if (UNSAFE_KEYS.has(k)) continue;
     const b = base[k];
     const o = src[k];
     if (isObj(b)) out[k] = deepMerge(b, o);
@@ -118,7 +122,7 @@ export function normalizeState(raw) {
   const ids = new Set(s.groups.map(g => g.id));
 
   const tiles = (Array.isArray(raw.tiles) ? raw.tiles : [])
-    .filter(t => isObj(t) && (t.kind === 'folder' || (typeof t.url === 'string' && t.url)))
+    .filter(t => isObj(t) && (t.kind === 'folder' || (typeof t.url === 'string' && t.url && isSafeUrl(t.url))))
     .map(t => ({
       id: str(t.id) || uid(),
       groupId: ids.has(t.groupId) ? t.groupId : s.groups[0].id,
@@ -194,6 +198,11 @@ function legacyMarketItems(raw) {
   return cleanMarketItems(m.items) ?? legacy ?? [...LEGACY_PREFS.widgets.markets.items];
 }
 
+const TOKEN_KEY = 'newtab:github-token';
+
+// The state as it is saved: everything but the GitHub token, which the adapter keeps apart.
+const withoutToken = s => ({ ...s, prefs: { ...s.prefs, github: { ...s.prefs.github, token: '' } } });
+
 export function pickAdapter() {
   const local = {
     get(key) {
@@ -205,6 +214,9 @@ export function pickAdapter() {
     },
   };
   const area = globalThis.chrome?.storage?.local;
+  // Outside the extension (the Live Server preview) there's no token store: localStorage there
+  // belongs to the whole host and port, which other projects served from it can read. The token
+  // lasts until the page reloads.
   if (!area) {
     return {
       get: async key => local.get(key),
@@ -214,6 +226,25 @@ export function pickAdapter() {
   return {
     get: async key => (await area.get(key))[key],
     set: (key, value) => area.set({ [key]: value }),
+    // The GitHub token, in this extension's own localStorage rather than chrome.storage: the
+    // content scripts that run on other sites (content/chat.js, content/site-frame.js) can read
+    // chrome.storage.local, but not this page's localStorage. null when none was ever saved here.
+    token: {
+      get() {
+        try {
+          return localStorage.getItem(TOKEN_KEY);
+        } catch {
+          return null;
+        }
+      },
+      set(value) {
+        try {
+          localStorage.setItem(TOKEN_KEY, value);
+        } catch {
+          // storage unavailable; the token lasts until the page reloads
+        }
+      },
+    },
     // A copy of the state in localStorage, which reads synchronously, so a new tab can render
     // without waiting for chrome.storage. A failed write removes it rather than leave it stale.
     cached() {
@@ -244,7 +275,29 @@ export function createStore(adapter) {
   let timer = null;
   let pending = null;
   let edited = false;
+  // The token as last read or written (adapter.token), so a tab writes it only when it changed it
+  // here: a tab opened before another one saved a token mustn't put back its own empty one.
+  let savedToken = '';
   const subs = new Set();
+
+  // A saved state, validated, with the token put back from where it's kept. A token still inside
+  // the state (saved before it moved, or outside the extension) is used if there's none apart,
+  // and `moved` says the state needs saving again without it.
+  let moved = false;
+  function revive(raw) {
+    const s = normalizeState(raw);
+    if (s.prefs.github.token) moved = true;
+    const kept = adapter.token?.get() ?? null;
+    if (kept !== null) s.prefs.github.token = kept;
+    savedToken = kept ?? '';
+    return s;
+  }
+
+  function moveToken() {
+    if (!moved) return;
+    moved = false;
+    pending = save();
+  }
 
   const snapshot = keys => Object.fromEntries(keys.map(k => [k, JSON.stringify(state[k])]));
 
@@ -274,8 +327,14 @@ export function createStore(adapter) {
   }
 
   function save() {
-    adapter.cache?.(state);
-    return adapter.set('state', state);
+    const token = state.prefs.github.token;
+    if (adapter.token && token !== savedToken) {
+      adapter.token.set(token);
+      savedToken = token;
+    }
+    const saved = withoutToken(state);
+    adapter.cache?.(saved);
+    return adapter.set('state', saved);
   }
 
   function scheduleSave() {
@@ -297,10 +356,14 @@ export function createStore(adapter) {
       return;
     }
     if (fresh === undefined || edited) return;
-    const next = normalizeState(fresh);
-    if (JSON.stringify(next) === JSON.stringify(state)) return;
+    const next = revive(fresh);
+    if (JSON.stringify(next) === JSON.stringify(state)) {
+      moveToken();
+      return;
+    }
     state = next;
-    adapter.cache?.(state);
+    adapter.cache?.(withoutToken(state));
+    moveToken();
     notify([...KEYS]);
     readWallpaperIfShown();
   }
@@ -312,12 +375,14 @@ export function createStore(adapter) {
     async load() {
       const cached = adapter.cached?.();
       if (cached !== undefined) {
-        state = normalizeState(cached);
+        state = revive(cached);
+        moveToken();
         verify();
       } else {
         try {
-          state = normalizeState(await adapter.get('state'));
-          adapter.cache?.(state);
+          state = revive(await adapter.get('state'));
+          adapter.cache?.(withoutToken(state));
+          moveToken();
         } catch (err) {
           console.warn('Saved state unreadable, starting from defaults.', err);
           state = defaultState();
@@ -353,17 +418,25 @@ export function createStore(adapter) {
       if (changed.includes('prefs')) readWallpaperIfShown();
     },
 
-    replace(next) {
+    // The GitHub token stays unless keepToken is false (Reset everything): a backup carries none,
+    // and one written into a file by hand isn't taken.
+    replace(next, { keepToken = true } = {}) {
+      const token = state.prefs.github.token;
       state = normalizeState(next);
+      state.prefs.github.token = keepToken ? token : '';
+      if (!keepToken) savedToken = null;   // written even if this tab never had one: another tab may have saved it
       edited = true;
       scheduleSave();
       notify([...KEYS]);
       readWallpaperIfShown();
     },
 
+    // Only an image in a data URL: a backup's wallpaper that's a link would load from that
+    // host on every new tab.
     async setWallpaper(dataUrl) {
-      await adapter.set('wallpaper', dataUrl || '');
-      wallpaper = dataUrl || '';
+      const image = typeof dataUrl === 'string' && dataUrl.startsWith('data:image/') ? dataUrl : '';
+      await adapter.set('wallpaper', image);
+      wallpaper = image;
       wallpaperRead = Promise.resolve(wallpaper);
       notify(['wallpaper']);
     },

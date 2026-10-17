@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeUrl, hostOf, fuzzyScore, clamp, uid, backgroundImage, idle } from '../js/util.js';
+import { normalizeUrl, hostOf, fuzzyScore, clamp, uid, backgroundImage, idle, isSafeUrl, onlyFrom } from '../js/util.js';
 
 test('idle runs the function later, also without requestIdleCallback', async () => {
   let ran = false;
@@ -60,4 +60,29 @@ test('backgroundImage is the upload or the link while showImage is on', () => {
   assert.equal(backgroundImage(bg, 'data:w'), 'https://x/a.jpg');
   assert.equal(backgroundImage({ ...bg, useUpload: true }, 'data:w'), 'data:w');
   assert.equal(backgroundImage({ ...bg, showImage: false }, 'data:w'), '');
+});
+
+test('normalizeUrl refuses addresses that run script or carry a whole page', () => {
+  for (const input of ['javascript:alert(1)', 'JavaScript:alert(1)', 'data:text/html,<h1>hi</h1>', 'vbscript:msgbox(1)', 'blob:https://x.com/1']) {
+    assert.equal(normalizeUrl(input), null, input);
+  }
+  assert.equal(normalizeUrl('obsidian://open?vault=x'), 'obsidian://open?vault=x');
+  assert.equal(normalizeUrl('data.example.com'), 'https://data.example.com/');
+});
+
+test('isSafeUrl sees through the spaces and tabs browsers drop from a scheme', () => {
+  for (const url of ['javascript:x', ' javascript:x', 'java\tscript:x', 'java\nscript:x', '\u0001javascript:x', 'DATA:text/html,x']) {
+    assert.equal(isSafeUrl(url), false, JSON.stringify(url));
+  }
+  for (const url of ['https://example.com/', 'chrome://settings', 'example.com', 'localhost:3000/x', 'mailto:me@example.com']) {
+    assert.equal(isSafeUrl(url), true, url);
+  }
+  assert.equal(isSafeUrl(null), false);
+});
+
+test('onlyFrom keeps a link only when it starts with the prefix', () => {
+  assert.equal(onlyFrom('https://github.com/', 'https://github.com/a/b'), 'https://github.com/a/b');
+  assert.equal(onlyFrom('https://github.com/', 'https://github.com.evil.example/'), '');
+  assert.equal(onlyFrom('https://github.com/', 'javascript:alert(1)'), '');
+  assert.equal(onlyFrom('https://github.com/', undefined), '');
 });

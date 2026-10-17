@@ -1,5 +1,10 @@
 // Parsing and formatting for the Markets and GitHub widgets. Pure (unit-tested in Node).
 
+import { onlyFrom } from './util.js';
+
+// GitHub's own pages only: a row's link comes from the API's response.
+const githubLink = url => onlyFrom('https://github.com/', url);
+
 const finite = v => (Number.isFinite(v) ? v : null);
 
 // Bybit /v5/market/tickers → { price, change } with change as a fraction (0.0118 = +1.18%).
@@ -158,7 +163,7 @@ export function parseCnbcQuotes(json) {
   const quotes = {};
   for (const q of Array.isArray(list) ? list : []) {
     const price = q?.code === 0 ? num(q.last) : null;
-    if (price == null) continue;
+    if (price == null || q.symbol === '__proto__') continue;   // keyed by the response's symbols
     quotes[q.symbol] = { price, change: (num(q.change_pct) ?? 0) / 100, name: String(q.name ?? q.symbol), time: String(q.last_timedate ?? '') };
   }
   return quotes;
@@ -199,7 +204,7 @@ export function parseCommits(json) {
       sha: String(i.sha ?? '').slice(0, 7),
       message: String(i.commit?.message ?? '').split('\n')[0],
       repo: String(i.repository?.full_name ?? ''),
-      url: i.html_url,
+      url: githubLink(i.html_url),
       at: Date.parse(i.commit?.author?.date) || 0,
       private: !!i.repository?.private,
     }))
@@ -242,7 +247,7 @@ export function parseIssues(json) {
   return json.items.map(i => ({
     title: String(i.title ?? ''),
     number: i.number,
-    url: i.html_url,
+    url: githubLink(i.html_url),
     repo: String(i.repository_url ?? '').replace('https://api.github.com/repos/', ''),
     updatedAt: Date.parse(i.updated_at) || 0,
     draft: !!i.draft,

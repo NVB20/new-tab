@@ -472,3 +472,183 @@ test('store notifies onboarding subscribers when setup moves on', async () => {
   store.update(s => { s.onboarding.step = 'name'; });
   assert.equal(calls, 1);
 });
+
+// ---- the GitHub token, kept apart from the state ----
+
+// cachingAdapter plus a token store, as pickAdapter gives in the extension.
+function tokenAdapter(initial = {}, copy = undefined, token = null) {
+  const adapter = cachingAdapter(initial, copy);
+  adapter.saved = token;
+  adapter.token = { get: () => adapter.saved, set: v => { adapter.saved = v; } };
+  return adapter;
+}
+
+const withToken = (token, extra = {}) => ({ ...extra, prefs: { layout: { widgets: [] }, github: { user: 'octo', token } } });
+
+test('the token is saved apart: never in chrome.storage or the localStorage copy', async () => {
+  const adapter = tokenAdapter();
+  const store = createStore(adapter);
+  await store.load();
+  store.update(s => { s.prefs.github.token = 'github_pat_secret'; });
+  await store.flush();
+  assert.equal(adapter.saved, 'github_pat_secret');
+  assert.equal(adapter.data.state.prefs.github.token, '');
+  assert.equal(adapter.copy.prefs.github.token, '');
+  assert.equal(JSON.stringify(adapter.data).includes('github_pat_secret'), false);
+  assert.equal(store.get().prefs.github.token, 'github_pat_secret');
+});
+
+test('a new tab gets the token back from where it is kept', async () => {
+  const adapter = tokenAdapter({ state: withToken('') }, withToken(''), 'github_pat_kept');
+  const store = createStore(adapter);
+  await store.load();
+  await settle();
+  assert.equal(store.get().prefs.github.token, 'github_pat_kept');
+});
+
+test('a token saved in the state by an older version moves out of it on load', async () => {
+  const old = withToken('github_pat_old', { notes: 'kept' });
+  const adapter = tokenAdapter({ state: structuredClone(old) }, structuredClone(old));
+  const store = createStore(adapter);
+  await store.load();
+  await store.flush();
+  await settle();
+  assert.equal(store.get().prefs.github.token, 'github_pat_old');
+  assert.equal(adapter.saved, 'github_pat_old');
+  assert.equal(adapter.data.state.prefs.github.token, '');
+  assert.equal(adapter.copy.prefs.github.token, '');
+  assert.equal(adapter.data.state.notes, 'kept');
+});
+
+test('a token left in the old widget settings moves out too', async () => {
+  const raw = { prefs: { widgets: { github: { user: 'octo', token: 'ghp_legacy' } } } };
+  const adapter = tokenAdapter({ state: raw });
+  const store = createStore(adapter);
+  await store.load();
+  await store.flush();
+  assert.equal(adapter.saved, 'ghp_legacy');
+  assert.equal(JSON.stringify(adapter.data.state).includes('ghp_legacy'), false);
+});
+
+test('outside the extension the token is never saved, and one left in localStorage is removed', async () => {
+  const adapter = memoryAdapter({ state: withToken('github_pat_preview') });
+  const store = createStore(adapter);
+  await store.load();
+  await store.flush();
+  assert.equal(store.get().prefs.github.token, 'github_pat_preview');   // until the page reloads
+  assert.equal(adapter.data.state.prefs.github.token, '');
+  store.update(s => { s.prefs.github.token = 'github_pat_typed'; });
+  await store.flush();
+  assert.equal(JSON.stringify(adapter.data).includes('github_pat_'), false);
+});
+
+test('a tab writes the token only when it changed it, so it keeps another tab\'s new one', async () => {
+  const adapter = tokenAdapter({}, undefined, 'github_pat_a');
+  const store = createStore(adapter);
+  await store.load();
+  adapter.saved = 'github_pat_b';   // another tab saved a new token
+  store.update(s => { s.notes = 'edit'; });
+  await store.flush();
+  assert.equal(adapter.saved, 'github_pat_b');
+});
+
+test('restoring a backup keeps this browser\'s token and ignores one written into the file', async () => {
+  const adapter = tokenAdapter({}, undefined, 'github_pat_mine');
+  const store = createStore(adapter);
+  await store.load();
+  store.replace(withToken('github_pat_planted', { notes: 'restored' }));
+  await store.flush();
+  assert.equal(store.get().notes, 'restored');
+  assert.equal(store.get().prefs.github.token, 'github_pat_mine');
+  assert.equal(adapter.saved, 'github_pat_mine');
+});
+
+test('Reset everything deletes the token', async () => {
+  const adapter = tokenAdapter({}, undefined, 'github_pat_mine');
+  const store = createStore(adapter);
+  await store.load();
+  store.replace(null, { keepToken: false });
+  await store.flush();
+  assert.equal(store.get().prefs.github.token, '');
+  assert.equal(adapter.saved, '');
+});
+
+test('setWallpaper takes only an image data URL, not a link from a backup', async () => {
+  const adapter = memoryAdapter();
+  const store = createStore(adapter);
+  await store.load();
+  await store.setWallpaper('https://tracker.example/pixel.gif');
+  assert.equal(adapter.data.wallpaper, '');
+  assert.equal(store.wallpaper, '');
+  await store.setWallpaper('data:text/html,<script>alert(1)</script>');
+  assert.equal(store.wallpaper, '');
+  await store.setWallpaper('data:image/jpeg;base64,AAAA');
+  assert.equal(store.wallpaper, 'data:image/jpeg;base64,AAAA');
+});
+
+test('deepMerge skips keys that would reach the prototype', () => {
+  const out = deepMerge({ a: { b: 1 } }, JSON.parse('{"__proto__": {"polluted": "yes"}, "a": {"__proto__": {"x": 1}, "b": 2}, "constructor": {"prototype": {"y": 1}}}'));
+  assert.deepEqual(out, { a: { b: 2 } });
+  assert.equal(Object.getPrototypeOf(out), Object.prototype);
+  assert.equal(Object.getPrototypeOf(out.a), Object.prototype);
+  assert.equal(({}).polluted, undefined);
+});
+
+test('a backup\'s tiles that run script or carry a page are dropped', () => {
+  const s = normalizeState({ groups: [{ id: 'g', title: 'G' }], tiles: [
+    { id: 'ok', groupId: 'g', url: 'https://example.com/' },
+    { id: 'js', groupId: 'g', url: 'javascript:alert(1)' },
+    { id: 'js2', groupId: 'g', url: ' JaVa\tScRiPt:alert(1)' },
+    { id: 'data', groupId: 'g', url: 'data:text/html,<h1>hi</h1>' },
+    { id: 'app', groupId: 'g', url: 'obsidian://open?vault=x' },
+  ] });
+  assert.deepEqual(s.tiles.map(t => t.id), ['ok', 'app']);
+});
+
+test('a saved widget type that is an Object key is dropped, not thrown on', () => {
+  const s = normalizeState({ prefs: { layout: { widgets: [
+    { id: 'p', type: '__proto__', x: 0, y: 0, w: 2, h: 2, settings: {} },
+    { id: 'c', type: 'constructor', x: 0, y: 0, w: 2, h: 2, settings: {} },
+    { id: 'k', type: 'notes', x: 0, y: 0, w: 2, h: 2, settings: {} },
+    { id: 's', type: 'stack', x: 4, y: 0, w: 3, h: 3, items: [{ id: 'i', type: 'toString' }, { id: 'n', type: 'clock' }] },
+  ] } } });
+  assert.equal(s.prefs.layout.widgets.some(c => c.id === 'p' || c.id === 'c'), false);
+  assert.ok(s.prefs.layout.widgets.some(c => c.id === 'k'));
+});
+
+test('a tab opened before another one saved a token doesn\'t clear it when it saves', async () => {
+  const adapter = tokenAdapter();
+  const early = createStore(adapter);
+  await early.load();
+  adapter.saved = 'github_pat_later';   // another tab, opened after, saves a token
+  early.update(s => { s.notes = 'edit'; });
+  await early.flush();
+  early.replace({ notes: 'from another tab' });   // setup finished elsewhere
+  await early.flush();
+  assert.equal(adapter.saved, 'github_pat_later');
+});
+
+test('Reset everything deletes the token even in a tab that never had it', async () => {
+  const adapter = tokenAdapter();
+  const early = createStore(adapter);
+  await early.load();
+  adapter.saved = 'github_pat_later';
+  early.replace(null, { keepToken: false });
+  await early.flush();
+  assert.equal(adapter.saved, '');
+});
+
+test('a token found by the chrome.storage check moves out, and the fresh state is what gets saved', async () => {
+  const fresh = withToken('github_pat_fresh', { notes: 'fresh' });
+  const adapter = tokenAdapter({ state: structuredClone(fresh) }, { notes: 'stale copy' });
+  const store = createStore(adapter);
+  await store.load();
+  await settle();
+  await store.flush();
+  assert.equal(store.get().notes, 'fresh');
+  assert.equal(store.get().prefs.github.token, 'github_pat_fresh');
+  assert.equal(adapter.saved, 'github_pat_fresh');
+  assert.equal(adapter.data.state.notes, 'fresh');
+  assert.equal(adapter.data.state.prefs.github.token, '');
+  assert.equal(adapter.copy.prefs.github.token, '');
+});

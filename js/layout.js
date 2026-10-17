@@ -433,8 +433,10 @@ export function normalizeLayout(raw, state) {
     const rect = { x: clamp(int(c.x, 0), 0, COLS - w), y: clamp(int(c.y, 0), 0, ROWS - h), w, h };
     return fits(layout, rect) ? rect : firstFree(layout, w, h) ?? firstFree(layout, ...min);
   };
+  // Only the widget types this page has: a saved type such as 'constructor' isn't one.
+  const typeOf = c => isObj(c) && typeof c.type === 'string' && Object.hasOwn(TYPES, c.type) && TYPES[c.type];
   const addPlain = (c, id = null) => {
-    const t = isObj(c) && TYPES[c.type];
+    const t = typeOf(c);
     if (!t || countOf(layout, c.type) >= t.max) return null;
     const rect = place(c, t.size, t.min);
     if (!rect) return null;
@@ -452,7 +454,7 @@ export function normalizeLayout(raw, state) {
     }
     const items = [];
     for (const it of Array.isArray(c.items) ? c.items : []) {
-      const t = isObj(it) && TYPES[it.type];
+      const t = typeOf(it);
       if (!t || countOf(layout, it.type) + items.filter(x => x.type === it.type).length >= t.max) continue;
       if (it.type === 'search' || items.length >= STACK_MAX) loose.push(it);
       else items.push({ id: ownId(it.id), type: it.type, settings: settingsOf(it) });
