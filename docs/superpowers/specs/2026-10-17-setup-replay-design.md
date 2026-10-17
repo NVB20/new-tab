@@ -54,6 +54,8 @@ the new tab and mention the replay.
 - Closing the tab mid-way resumes on the next new tab as a first run does (true of Run setup again
   today as well).
 - Esc folds the card into Resume setup; the hidden widgets stay hidden until it's resumed or skipped.
+- Another open tab still holds `done: true`, so if it saves something mid-way, this tab takes that
+  page and closes its card (setup's "finished in another tab" rule; Run setup again does the same).
 
 ## Checks
 

@@ -17,7 +17,11 @@ purpose, and how a new feature gets into it. Keep it current: the commit check b
 | A page saved before setup existed | Never on its own: it counts as set up |
 | A restored backup | Never on its own |
 | After Preferences → Backup → **Reset everything** | Opens again on the next new tab |
-| Anyone, any time | Preferences → Page → **Run setup again**, over the page as it is (nothing hidden) |
+| Anyone, any time | Preferences → Setup → **Run setup again**, over the page as it is (nothing hidden) |
+| Anyone, any time | Preferences → Setup → **Replay the first run**, staged as a new install sees it (the widgets clear, then come back at their steps); nothing is reset |
+
+Preferences search finds both under "setup", "onboarding", "tour", "tutorial", "walkthrough",
+"welcome" and "intro" (the buttons' `data-search`).
 
 The state key is `onboarding: { done, step }` in `store.js`. `step` is saved at every step, so
 closing the tab mid-way resumes there on the next new tab, without the opening.
@@ -113,7 +117,7 @@ to get value on the first day.
    user answers.
 4. **Update this document** (What setup covers, or Left out on purpose) and the README's First run
    section.
-5. **Check it** on a fresh profile, or with Preferences → Page → Run setup again.
+5. **Check it** on a fresh profile, or with Preferences → Setup → Replay the first run.
 
 ## The commit check
 

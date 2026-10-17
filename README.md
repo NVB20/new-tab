@@ -135,7 +135,8 @@ Preferences.
 
 - Esc folds the card into **Resume setup**. Closing the tab keeps your place: the next new tab
   carries on at the same step.
-- **Run setup again** is in Preferences → Page, over the page as it is.
+- Preferences → **Setup** has **Run setup again** (over the page as it is) and **Replay the first
+  run** (as a new install sees it: the page clears and comes back step by step; nothing is reset).
 - A page set up before this version doesn't see it, nor does a restored backup. **Reset
   everything** brings it back.
 

@@ -2,7 +2,7 @@
 // straight into the store, so the page behind the card changes as you go, and skipping keeps what
 // was chosen. On a first run the page starts nearly empty: the clock arrives at Name, the tiles at
 // Sites, everything else at Widgets. Loaded by main.js only while setup isn't done, or when
-// Preferences → Page runs it again.
+// Preferences → Setup runs it again, over the page as it is or as a first run shows it.
 //
 // Moves are noticed by watching the page (Jump's dialog opening, the search bar getting the cursor,
 // Layout mode starting), so those modules don't need to know about setup.
@@ -867,22 +867,23 @@ export function setupOnboarding(store, canvas, ctx) {
       const r = menu.getBoundingClientRect();
       if (lettersBehind()) rippleFrom(r.left + r.width / 2, r.top + r.height / 2);
     }
-    say(restored ? 'Backup restored. Setup is in Preferences → Page if you want it again.'
-      : skipped ? 'Setup skipped. It’s in Preferences → Page whenever you want it.'
-        : 'All set. Setup is in Preferences → Page if you want it again.');
+    say(restored ? 'Backup restored. Setup is in Preferences → Setup if you want it again.'
+      : skipped ? 'Setup skipped. It’s in Preferences → Setup whenever you want it.'
+        : 'All set. Setup is in Preferences → Setup if you want it again.');
   }
 
   return {
-    // again: from Preferences, over the page as it is (nothing hidden). Otherwise a first run,
-    // resumed at the step it stopped at; only the very start plays the opening.
-    async start({ again = false } = {}) {
+    // again: from Preferences, over the page as it is (nothing hidden); replay stages it as a
+    // first run shows it. Otherwise a first run, resumed at the step it stopped at; only the very
+    // start plays the opening.
+    async start({ again = false, replay = false } = {}) {
       if (open) {
         unfold();
         return;
       }
       open = true;
       if (again) store.update(s => { s.onboarding = { done: false, step: 'intro' }; }, ['onboarding']);
-      staged = !again;
+      staged = !again || replay;
       const saved = store.get().onboarding.step;
       step = STEPS.includes(saved) && saved !== 'done' ? saved : 'intro';
       if (!steps().includes(step)) step = neighbour(1) === 'done' ? 'intro' : neighbour(1);

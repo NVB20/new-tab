@@ -19,14 +19,14 @@ const lazy = load => {
 const jump = lazy(() => import('./jump.js').then(m => m.setupJump(store)));
 const prefs = lazy(() => import('./prefs.js').then(m => m.setupPrefs(store, {
   enterLayoutMode: () => layout().then(l => l.enter()),
-  runSetup: () => setup().then(s => s.start({ again: true })),
+  runSetup: (opts = {}) => setup().then(s => s.start({ again: true, ...opts })),
 })));
 const sidebar = lazy(() => import('./sidebar.js').then(m => m.setupSidebar()));
 const layout = lazy(() => import('./edit-mode.js').then(m => m.setupEditMode(store, canvas, ctx)));
 const ctx = { openPrefs: (id, anchor) => prefs().then(p => p.open(id, anchor)) };
 const openJump = () => jump().then(j => j.open());
-// First-run setup, and Preferences → Run setup again: a card over the page that builds it as you
-// answer. Loaded only when it's needed.
+// First-run setup, and Preferences → Setup's Run setup again and Replay the first run: a card over
+// the page that builds it as you answer. Loaded only when it's needed.
 const setup = lazy(() => import('./onboarding.js').then(m => m.setupOnboarding(store, canvas, {
   openJump,
   enterLayout: () => layout().then(l => l.enter()),

@@ -47,7 +47,8 @@ const OFFSET_KEY = 'newtab:prefs-offset';
 const KEEP_VISIBLE = 120;   // px of the panel that stay inside the window while dragging
 const SEARCH_DELAY_MS = 120;   // a search builds every section, so it waits for a pause in typing
 
-// enterLayoutMode() opens Layout mode and runSetup() first-run setup (the panel closes first).
+// enterLayoutMode() opens Layout mode and runSetup(opts) first-run setup (the panel closes first;
+// { replay: true } stages it as a first run shows it).
 export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null } = {}) {
   const prefs = () => store.get().prefs;
   // One setting of a widget copy on the canvas (see layout.js). Sliders and text fields call
@@ -202,9 +203,6 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
       sub(shown === 'image', imageRows(image)),
       title('Top bar'),
       toggle('Sidebar button', 'sidebar.enabled', 'Bookmarks, history and recently closed tabs'),
-      runSetup && title('Setup'),
-      runSetup && row('First-run setup', el('button', { type: 'button', class: 'btn', onclick: () => { dialog.close(); runSetup(); } }, 'Run setup again'),
-        'Your name, the look, sites, widgets and the moves worth knowing, over the page as it is'),
     ];
   }
 
@@ -513,6 +511,20 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     ];
   }
 
+  // The words people use for setup find these rows in a search too.
+  function setupSection() {
+    const run = (text, opts) => el('button', {
+      type: 'button', class: 'btn', 'data-search': 'onboarding tour tutorial walkthrough welcome intro',
+      onclick: () => { dialog.close(); runSetup(opts); },
+    }, text);
+    return [
+      title('Setup'),
+      el('p', { class: 'pref-hint pref-intro', text: 'The setup a new install opens with: your name, the look, sites, widgets and the moves worth knowing. What you pick changes this page.' }),
+      row('Run setup again', run('Run setup'), 'Over the page as it is'),
+      row('Replay the first run', run('Replay', { replay: true }), 'As a new install sees it: the page clears, then comes back step by step. Nothing is reset'),
+    ];
+  }
+
   // ---- actions ----
 
   async function uploadWallpaper(file) {
@@ -604,7 +616,8 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     { id: 'layout', label: 'Layout', icon: 'layout', build: layout },
     { id: 'github', label: 'GitHub', icon: 'branch', build: github },
     { id: 'backup', label: 'Backup', icon: 'database', build: backup },
-  ];
+    runSetup && { id: 'setup', label: 'Setup', icon: 'play', build: setupSection },
+  ].filter(Boolean);
   let current = 'page';
 
   const nav = el('nav', { class: 'prefs-nav', 'aria-label': 'Preference sections' });
@@ -687,12 +700,14 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
   // The panel spells colour and behaviour the British way; either spelling finds them.
   const fold = text => text.toLowerCase().replace(/colour/g, 'color').replace(/behaviour/g, 'behavior');
 
-  // Rows from every section that contain each word typed, under "Section · Group" titles.
+  // Rows from every section that contain each word typed, under "Section · Group" titles. A
+  // control's data-search holds other words it's found by.
   function results() {
     const words = fold(query).split(/\s+/);
     const matches = (node, group) => {
       const labels = [...node.querySelectorAll('[aria-label]')].map(n => n.ariaLabel);
-      const text = fold([group, node.textContent, ...labels].join(' '));
+      const extra = [...node.querySelectorAll('[data-search]')].map(n => n.dataset.search);
+      const text = fold([group, node.textContent, ...labels, ...extra].join(' '));
       return words.every(w => text.includes(w));
     };
     const label = row => row.querySelector('.pref-text > div, .pref-label > span')?.textContent ?? '';
