@@ -43,9 +43,14 @@ mountGroups(document.getElementById('groups'), store);
 const canvasRoot = document.getElementById('canvas');
 const canvas = mountCanvas(canvasRoot, store, ctx);
 if (firstRun) {
-  setup().then(s => s.start(), err => {
-    console.warn('Setup didn’t load.', err);
+  // Whatever goes wrong, the page itself must show.
+  setup().then(s => s.start()).catch(err => {
+    console.warn('Setup didn’t run.', err);
     document.body.classList.remove('ob-setup', 'ob-fresh');
+    for (const frame of canvas.frames().values()) {
+      frame.classList.remove('ob-hidden');
+      frame.inert = false;
+    }
   });
 }
 // The tiles draw their saved logos from the localStorage copy; reading the full set from
