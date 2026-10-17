@@ -19,6 +19,7 @@ import { hostOf, normalizeUrl, uid } from './util.js';
 import { addSavedIcons } from './icon-cache.js';
 import { shrinkImage } from './prefs.js';
 import { spellWord, rippleFrom, motionAllowed } from './onboarding-fx.js';
+import { ABOUT } from './widget-about.js';
 
 const STEPS = ['intro', 'name', 'look', 'sites', 'widgets', 'arrange', 'connect', 'moves', 'done'];
 const LAYOUT_MIN_WIDTH = 900;   // Layout mode's own minimum (edit-mode.js); the card is a sheet below it
@@ -31,11 +32,13 @@ const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524
 const THEMES = [['auto', 'Auto', 'auto'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon'], ['blue', 'Blue', 'drop'], ['github', 'GitHub', 'branch']];
 const BACKGROUNDS = [['ascii', 'ASCII'], ['none', 'Plain'], ['image', 'Image']];
 const NEAR = ['clock', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
+// The widgets setup offers, in its order, with their taglines. Keep it a literal: the commit check
+// (.claude/hooks/onboarding-check.mjs) reads these keys as the types setup offers.
 const WIDGETS = {
-  clock: 'Time and a greeting', search: 'Google and AI chats', tasks: 'To-dos with due dates',
-  notes: 'A scratch pad', markets: 'Coins, indexes, currencies', github: 'Your activity and PRs',
-  sports: 'Your teams’ games', website: 'Any site, live', claude: 'A box for long prompts',
-  marvel: 'The MCU in story order',
+  clock: ABOUT.clock.tagline, search: ABOUT.search.tagline, tasks: ABOUT.tasks.tagline,
+  notes: ABOUT.notes.tagline, markets: ABOUT.markets.tagline, github: ABOUT.github.tagline,
+  sports: ABOUT.sports.tagline, website: ABOUT.website.tagline, claude: ABOUT.claude.tagline,
+  marvel: ABOUT.marvel.tagline,
 };
 const CONNECTS = ['search', 'github', 'markets', 'sports', 'website'];
 const ENGINES = [['google', 'Google'], ['claude', 'Claude'], ['chatgpt', 'ChatGPT'], ['gemini', 'Gemini']];
