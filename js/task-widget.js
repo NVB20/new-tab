@@ -1,6 +1,6 @@
 // Tasks widget: tabs (All, Today, Upcoming, High), search, rows with a flag and a details tray
-// (task-row.js), an add bar that reads quick-add shorthand (task-parse.js), finished tasks folded
-// at the bottom of All, and drag to reorder.
+// (task-row.js), an add bar that reads quick-add shorthand (task-parse.js), ticked tasks that stay
+// in place until Clear, and drag to reorder.
 
 import { el, icon, showMenu, openDialog, field, widgetEmpty } from './ui.js';
 import { copyById, TYPES } from './layout.js';
@@ -110,24 +110,20 @@ export function mountTasks(root, store, copy) {
     searchButton.focus();
   }
 
-  // ---- list, empty line, Finished fold ----
+  // ---- list, empty line, Clear ----
 
   const list = el('ul', { class: 'task-list' });
   const empty = widgetEmpty();
-  const foldButton = el('button', {
-    type: 'button',
-    class: 'task-fold',
-    onclick: () => setSetting('showDone', !settings().showDone),
-  });
+  let shownDone = [];   // ids of the finished tasks this tab shows, for Clear
+  const doneCount = el('span');
   const clearButton = el('button', {
     type: 'button',
     class: 'link-btn',
     text: 'Clear',
-    title: 'Remove finished tasks (kept in history for a week)',
-    onclick: () => store.update(s => { clearDone(s, Date.now()); }),
+    title: 'Remove the finished tasks shown here (kept in history for a week)',
+    onclick: () => store.update(s => { clearDone(s, Date.now(), shownDone); }),
   });
-  const foldHead = el('div', { class: 'task-fold-head' }, foldButton, clearButton);
-  const doneList = el('ul', { class: 'task-list task-done-list' });
+  const clearRow = el('div', { class: 'task-clear-row' }, doneCount, clearButton);
 
   // ---- add bar ----
 
@@ -218,24 +214,23 @@ export function mountTasks(root, store, copy) {
     list,
     empty,
     el('label', { class: 'task-add' }, icon('plus', 16), input, flagButton, dateButton),
-    foldHead,
-    doneList);
+    clearRow);
 
   // ---- render ----
 
   function render() {
     const { tasks } = store.get();
-    const { view, showDone } = settings();
+    const { view } = settings();
     const now = Date.now();
     const today = dayKey(now);
     shownDay = today;
     const active = section.contains(document.activeElement) ? document.activeElement.dataset.focus : null;
 
-    const { open, finished } = viewTasks(tasks, view, searching ? query : '', today);
+    const shown = viewTasks(tasks, view, searching ? query : '', today);
+    shownDone = shown.filter(t => t.done).map(t => t.id);
     const ctx = { store, ui, render, now, today, draggable: !searching && view !== 'upcoming' };
     ui.rendering = true;
-    list.replaceChildren(...open.map(t => taskRow(t, ctx)), ...(searching ? finished.map(t => taskRow(t, ctx)) : []));
-    doneList.replaceChildren(...(!searching && showDone ? finished.map(t => taskRow(t, { ...ctx, draggable: false })) : []));
+    list.replaceChildren(...shown.map(t => taskRow(t, ctx)));
     ui.rendering = false;
     ui.rolledId = null;
 
@@ -249,15 +244,13 @@ export function mountTasks(root, store, copy) {
     count.hidden = !due.count;
     count.textContent = String(due.count);
     count.classList.toggle('overdue', due.overdue);
-    sortButton.hidden = view !== 'all' || open.length < 2;
+    sortButton.hidden = view !== 'all' || shown.length < 2;
 
-    // empty line and Finished fold
-    const nothing = searching ? !open.length && !finished.length : !open.length && view !== 'all';
-    empty.hidden = !nothing;
+    // empty line and Clear
+    empty.hidden = shown.length > 0 || (!searching && view === 'all');
     empty.textContent = searching ? 'No matches' : (EMPTY[view] ?? '');
-    foldHead.hidden = searching || view !== 'all' || !finished.length;
-    foldButton.setAttribute('aria-expanded', String(showDone));
-    foldButton.replaceChildren(icon('chevron', 12), `Finished (${finished.length})`);
+    clearRow.hidden = searching || !shownDone.length;
+    doneCount.textContent = `${shownDone.length} finished`;
 
     // focus: a control asked for (ui.focus), else whichever had it before the rebuild
     const want = ui.focus ?? active;
@@ -317,21 +310,15 @@ export function mountTasks(root, store, copy) {
 
   // ---- wiring ----
 
-  // A new view resets the add bar to that view's preset; other prefs changes only redraw when
-  // this copy's settings changed.
-  let conf = null;
+  // Of the prefs, only a new view redraws, and it resets the add bar to that view's preset.
   function onPrefs(state) {
     const own = copyById(state, copy.id);
     if (!own) return;
     section.classList.toggle('narrow', own.w < 3);
-    const next = JSON.stringify([own.settings.view, own.settings.showDone]);
-    if (next === conf) return;
-    conf = next;
-    if (own.settings.view !== shownView) {
-      shownView = own.settings.view;
-      draft = preset(shownView);
-      showDraft();
-    }
+    if (own.settings.view === shownView) return;
+    shownView = own.settings.view;
+    draft = preset(shownView);
+    showDraft();
     render();
   }
 

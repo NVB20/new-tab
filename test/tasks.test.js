@@ -66,6 +66,16 @@ test('clearDone moves finished tasks to the history and keeps the counts', () =>
   assert.deepEqual(s.taskStats, { '2026-10-15': 1 });
 });
 
+test('clearDone given ids clears only those finished tasks', () => {
+  const s = withTasks('a', 'b', 'c');
+  const [a, b, c] = s.tasks.map(t => t.id);
+  toggleTask(s, a, at(2026, 10, 16));
+  toggleTask(s, b, at(2026, 10, 16));
+  assert.equal(clearDone(s, at(2026, 10, 16), [b, c]), 1);   // c isn't finished, so it stays
+  assert.deepEqual(texts(s), ['a', 'c']);
+  assert.deepEqual(s.taskHistory.map(t => t.text), ['b']);
+});
+
 test('deleting a finished task keeps it counted and in the history; an unfinished one leaves no trace', () => {
   const s = empty();
   const a = addTask(s, 'done one', at(2026, 10, 15));
@@ -258,28 +268,29 @@ test('subtasks: add, tick, retype, empty retype deletes, delete', () => {
   assert.deepEqual(s.tasks[0].subtasks, []);
 });
 
-test('viewTasks: each view, and search across tasks and subtasks', () => {
-  const s = withTasks('overdue', 'today high', 'later', 'sooner', 'no date', 'done');
+test('viewTasks: each view with ticked tasks left in place, and search across tasks and subtasks', () => {
+  const s = withTasks('overdue', 'done today', 'today high', 'later', 'sooner', 'no date', 'done high');
   const byText = Object.fromEntries(s.tasks.map(t => [t.text, t.id]));
   setDue(s, byText.overdue, '2026-10-10');
+  setDue(s, byText['done today'], '2026-10-16');
   setDue(s, byText['today high'], '2026-10-16');
   setPriority(s, byText['today high'], 'high');
   setDue(s, byText.later, '2026-10-30');
   setDue(s, byText.sooner, '2026-10-20');
+  setDue(s, byText['done high'], '2026-10-25');
+  setPriority(s, byText['done high'], 'high');
   addSubtask(s, byText['no date'], 'Call the Bank');
-  toggleTask(s, byText.done, at(2026, 10, 16));
+  toggleTask(s, byText['done today'], at(2026, 10, 16));
+  toggleTask(s, byText['done high'], at(2026, 10, 16));
   const today = '2026-10-16';
-  const show = (view, query = '') => {
-    const { open, finished } = viewTasks(s.tasks, view, query, today);
-    return [open.map(t => t.text), finished.map(t => t.text)];
-  };
-  assert.deepEqual(show('all'), [['overdue', 'today high', 'later', 'sooner', 'no date'], ['done']]);
-  assert.deepEqual(show('today'), [['overdue', 'today high'], []]);
-  assert.deepEqual(show('upcoming'), [['sooner', 'later'], []]);
-  assert.deepEqual(show('high'), [['today high'], []]);
-  assert.deepEqual(show('today', 'bank'), [['no date'], []]);   // search ignores the view
-  assert.deepEqual(show('all', '  DON '), [[], ['done']]);
-  assert.deepEqual(show('all', 'zzz'), [[], []]);
+  const show = (view, query = '') => viewTasks(s.tasks, view, query, today).map(t => t.text);
+  assert.deepEqual(show('all'), ['overdue', 'done today', 'today high', 'later', 'sooner', 'no date', 'done high']);
+  assert.deepEqual(show('today'), ['overdue', 'done today', 'today high']);
+  assert.deepEqual(show('upcoming'), ['sooner', 'done high', 'later']);
+  assert.deepEqual(show('high'), ['today high', 'done high']);
+  assert.deepEqual(show('today', 'bank'), ['no date']);   // search ignores the view
+  assert.deepEqual(show('all', '  DON '), ['done today', 'done high']);
+  assert.deepEqual(show('all', 'zzz'), []);
 });
 
 test('todayCount counts unfinished tasks due today or earlier and flags overdue ones', () => {

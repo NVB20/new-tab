@@ -5,7 +5,7 @@
 
 import { el, icon } from './ui.js';
 import { WIDGETS } from './registry.js';
-import { TYPES, COLS, ROWS, activeLayout, countOf, plannedCopy } from './layout.js';
+import { TYPES, COLS, ROWS, activeLayout, countOf, plannedCopy, isStack } from './layout.js';
 import { ABOUT } from './widget-about.js';
 
 const PREVIEW_ID = 'preview';
@@ -31,8 +31,13 @@ function storeWithCopy(store, copy) {
 
 const sizeLabel = (copy, t, n) => `${copy.w} × ${copy.h} · ${t.max === 1 ? (n ? 'On the page' : 'Not on the page') : `${n} of ${t.max}`}`;
 
-// Why the chip can't add right now, or '' when it can.
-function whyNot(t, n, plan) {
+// Why the chip can't add right now, what makes room for it, or '' when it just fits.
+function whyNot(t, n, plan, layout) {
+  if (plan?.shrink) {
+    const giver = layout.widgets.find(c => c.id === plan.shrink.id);
+    const name = isStack(giver) ? 'The stack' : TYPES[giver.type].label;
+    return `To make room, ${name} gets ${plan.shrink.h < giver.h ? 'shorter' : 'narrower'}`;
+  }
   if (plan) return '';
   if (n >= t.max) return t.max === 1 ? `Only one ${t.label}, and it’s on the page` : `Up to ${t.max} ${t.label} widgets, all on the page`;
   return 'No room: shrink or remove a widget first';
@@ -95,7 +100,8 @@ export function createPreview(store, ctx, { pitch }) {
     const layout = activeLayout(s);
     const n = countOf(layout, type);
     const plan = plannedCopy(layout, type, s.groups, s.activeGroupId);
-    const copy = { id: PREVIEW_ID, ...(plan ?? { type, x: 0, y: 0, w: t.size[0], h: t.size[1], settings: t.defaults() }) };
+    const { shrink, ...planned } = plan ?? {};
+    const copy = { id: PREVIEW_ID, ...(plan ? planned : { type, x: 0, y: 0, w: t.size[0], h: t.size[1], settings: t.defaults() }) };
     const p = pitch();
     const w = Math.round(copy.w * p.x - p.gx);
     const h = Math.round(copy.h * p.y - p.gy);
@@ -104,7 +110,7 @@ export function createPreview(store, ctx, { pitch }) {
     head.replaceChildren(icon(t.icon, 16), el('b', { text: t.label }), el('span', { class: 'wp-size', text: sizeLabel(copy, t, n) }));
     tagline.textContent = ABOUT[type].tagline;
     about.textContent = ABOUT[type].about;
-    foot.textContent = whyNot(t, n, plan);
+    foot.textContent = whyNot(t, n, plan, layout);
     foot.hidden = !foot.textContent;
     box.style.width = `${Math.round(w * k)}px`;
     box.style.height = `${Math.round(h * k)}px`;

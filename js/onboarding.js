@@ -374,7 +374,7 @@ export function setupOnboarding(store, canvas, ctx) {
         el('ul', { class: 'ob-tips' }, [['Drag', ' to move'], ['Edges and corners', ' resize'], ['×', ' removes'], ['The tray', ' adds; hover to preview'], ['Onto another’s middle', ' stacks them']]
           .map(([b, text]) => el('li', {}, el('b', { text: b }), text))),
         hint(full
-          ? 'Every cell is taken on a new page. Drop a widget near a neighbour’s edge to swap them, or drag an edge in to make room.'
+          ? 'Every cell is taken on a new page, so adding from the tray shrinks the biggest widget to make room. Drop a widget near a neighbour’s edge to swap them.'
           : 'Drop a widget near a neighbour’s edge to swap them.'),
       ];
     },
