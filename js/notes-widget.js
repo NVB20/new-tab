@@ -14,7 +14,7 @@ export function mountNotes(root, store) {
       store.update(s => { s.notes = value; }, ['notes']);
     },
   });
-  root.append(el('section', { class: 'widget widget-notes' }, widgetHead('note', 'Notes'), notesArea));
+  root.append(el('section', { class: 'widget widget-notes' }, widgetHead('note', 'Notes'), el('div', { class: 'notes-scroll' }, notesArea)));
 
   // Don't overwrite the textarea while typing in it (it would move the cursor).
   const render = state => {

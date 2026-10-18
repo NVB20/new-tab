@@ -8,7 +8,7 @@
 // reading order in the DOM, so Tab and the narrow-window stack follow it.
 
 import { WIDGETS } from './registry.js';
-import { stackOrder, activeLayout, isStack, copyTitle } from './layout.js';
+import { COLS, stackOrder, activeLayout, isStack, copyTitle } from './layout.js';
 import { mountStackBar } from './stack-bar.js';
 import { el } from './ui.js';
 
@@ -72,6 +72,8 @@ export function mountCanvas(root, store, ctx) {
       }
       if (fresh) for (const fn of listeners) fn(m.frame, entry);
       m.frame.style.gridArea = gridArea(entry);
+      // A frame on the left half of the page has its scrollbar on its left edge.
+      m.frame.classList.toggle('scroll-left', 2 * entry.x + entry.w < COLS);
       m.frame.style.order = String(order.indexOf(entry.id));
     }
     // Only when the order changed: moving a frame in the DOM would blur anything focused in it.

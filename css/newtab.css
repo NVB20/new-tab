@@ -234,6 +234,19 @@ body.has-wallpaper .widget-frame { text-shadow: 0 1px 8px rgb(0 0 0 / 0.55); }
 /* The search bar keeps its height and sits in the middle of its frame. */
 .frame-search .widget-root { justify-content: center; }
 .widget-root > .widget-search { flex: none; overflow: visible; }
+/* A frame on the left half of the page (.scroll-left, canvas.js) has its scrollbars on its left
+   edge. Chrome draws a scroller's bar on its start side, so the scroller runs right to left and
+   what's in it back left to right. An element with its own dir keeps it, and a scroller inside
+   another (the tiles' grid) runs right to left too: the two rules weigh the same, so the second
+   wins. A narrow window has no scrollers in its frames. */
+@media (width > 900px) {
+  .scroll-left :is(.widget-root > .widget, .grid-wrap, .mv-scroll, .notes-scroll) > :where(:not([dir])) { direction: ltr; }
+  .scroll-left :is(.widget-root > .widget, .grid-wrap, .mv-scroll, .notes-scroll) { direction: rtl; }
+  /* The tiles' scroller is also their grid, whose columns would run right to left: .grid takes
+     over the columns, and sits in the middle of a taller block the way the rows did. */
+  .scroll-left .grid-wrap { display: flex; flex-direction: column; }
+  .scroll-left .grid { display: grid; grid-template-columns: inherit; gap: inherit; margin-block: auto; }
+}
 
 /* A stack (canvas.js, stack-bar.js): its widgets share one cell, each a size container of its own,
    and only the one in front shows; the others keep running at their real size. The switcher runs
@@ -815,9 +828,11 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   line-height: 1.5;
   field-sizing: content;
 }
-/* The pad fills its frame and scrolls inside it. */
+/* The pad fills its frame and grows with its text; .notes-scroll scrolls it under the head, so
+   the bar can change sides (.scroll-left) while the text keeps its own dir. */
 .widget-notes { display: flex; flex-direction: column; }
-.widget-notes .notes-input { flex: 1; min-height: 0; }
+.notes-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden auto; }
+.widget-notes .notes-input { flex: 1 0 auto; }
 
 .claude-box { display: flex; align-items: flex-end; gap: 8px; }
 .claude-input { min-height: 0; padding: 5px 0; }
