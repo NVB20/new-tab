@@ -1,6 +1,6 @@
 // Sports widget data: the teams a copy can follow, its settings, parsers for ESPN's site API
-// (NBA, NFL, soccer), 365Scores (Israeli clubs and national teams) and Jolpica F1, and the
-// timeline the widget draws. Pure (unit-tested in Node).
+// (NBA, NFL, soccer), 365Scores (Israeli clubs, national teams and any team found by search) and
+// Jolpica F1, the team search, and the timeline the widget draws. Pure (unit-tested in Node).
 
 import { MONTHS } from './feeds.js';
 import { onlyFrom } from './util.js';
@@ -45,52 +45,86 @@ export const NFL_TEAMS = teams([
 // Messi's teams.
 export const SOCCER_TEAMS = teams([[20232, 'MIA', 'Inter Miami'], [202, 'ARG', 'Argentina']]);
 
+// Teams whose games come from 365Scores, followed as '365:<id>' (its team ids are unique across
+// sports); kind is 'soccer' or 'basketball'.
+export const KINDS = ['soccer', 'basketball'];
+const teams365 = (kind, list) => teams(list).map(t => ({ ...t, kind }));
+
 // Israeli clubs of the 2026-27 season and the national teams, by their 365Scores ids (from
 // /web/standings, 2026-10-18). Ligat Ha'Al is soccer's top league, the Winner League basketball's.
-export const IL_SOCCER_CLUBS = teams([
+export const IL_SOCCER_CLUBS = teams365('soccer', [
   [559, 'BEI', 'Beitar Jerusalem'], [561, 'BNS', 'Bnei Sakhnin'], [579, 'HBS', 'Hapoel Beer Sheva'],
   [575, 'HHA', 'Hapoel Haifa'], [614, 'HJE', 'Hapoel Jerusalem'], [571, 'HPT', 'Hapoel Petah Tikva'],
   [574, 'HRG', 'Hapoel Ramat Gan'], [567, 'HTA', 'Hapoel Tel Aviv'], [606, 'ITB', 'Ironi Tiberias'],
   [563, 'IKS', 'Kiryat Shmona'], [562, 'MHA', 'Maccabi Haifa'], [560, 'NET', 'Maccabi Netanya'],
   [564, 'MPT', 'Maccabi Petah Tikva'], [566, 'MTA', 'Maccabi Tel Aviv'],
 ]);
-export const IL_BASKET_CLUBS = teams([
+export const IL_BASKET_CLUBS = teams365('basketball', [
   [632, 'HER', 'Bnei Hertzliya'], [27923, 'HBS', 'Hapoel Beer Sheva/Dimona'], [10884, 'HGE', 'Hapoel Galil Elion'],
   [91167, 'EMK', 'Hapoel HaEmek'], [633, 'HOL', 'Hapoel Holon'], [9900, 'EIL', 'Hapoel Ironi Eilat'],
   [634, 'JER', 'Hapoel Jerusalem'], [654, 'HTA', 'Hapoel Tel Aviv'], [641, 'ATA', 'Ironi Kiryat Ata'],
   [686, 'NES', 'Ironi Ness Ziona'], [652, 'ASH', 'Maccabi Ashdod'], [635, 'IRG', 'Maccabi Ironi Ramat Gan'],
   [640, 'RSH', 'Maccabi Rishon Lezion'], [631, 'MTA', 'Maccabi Tel Aviv'],
 ]);
-export const ISRAEL = { 'il-soccer': teams([[5034, 'ISR', 'Israel']])[0], 'il-basket': teams([[1728, 'ISR', 'Israel']])[0] };
-// The sports whose games come from 365Scores, and what they're called in a sentence.
-export const IL_SPORTS = { 'il-soccer': 'soccer', 'il-basket': 'basketball' };
+export const NATIONAL_TEAMS = [...teams365('soccer', [[5034, 'ISR', 'Israel']]), ...teams365('basketball', [[1728, 'ISR', 'Israel']])];
+// Teams ESPN already brings (Messi's), by their 365Scores id → their ESPN id; and 365Scores' NBA,
+// whose teams the NBA list has.
+export const ON_ESPN = { 54729: 'soccer:20232', 2378: 'soccer:202' };
+const NBA_365 = 103;
 
-const TEAMS = {
-  nba: NBA_TEAMS, nfl: NFL_TEAMS, soccer: SOCCER_TEAMS,
-  'il-soccer': [...IL_SOCCER_CLUBS, ISRAEL['il-soccer']], 'il-basket': [...IL_BASKET_CLUBS, ISRAEL['il-basket']],
-};
+const TEAMS = { nba: NBA_TEAMS, nfl: NFL_TEAMS, soccer: SOCCER_TEAMS, 365: [...IL_SOCCER_CLUBS, ...IL_BASKET_CLUBS, ...NATIONAL_TEAMS] };
 
 export const F1_SESSIONS = ['practice', 'sprint', 'qualifying', 'race'];
 export const F1_SESSION_LABELS = { practice: 'Practice', sprint: 'Sprint', qualifying: 'Qualifying', race: 'Race' };
 const DEFAULT_FOLLOW = ['soccer:20232', 'soccer:202', 'f1'];
 const DEFAULT_SESSIONS = ['sprint', 'qualifying', 'race'];
 
-// A followed id ('nba:13', 'soccer:202', 'il-basket:631') → { sport, id, abbr, name }; 'f1' and
-// unknown ids → null.
-export function teamOf(followId) {
+// A short name for a team that has none: the first three letters of its first word that has three.
+const shortName = name => (name.split(/\s+/).find(w => w.length >= 3) ?? name).slice(0, 3).toUpperCase();
+
+// A followed 365Scores team found by search, as a copy saves it ({ name, abbr, kind }), or null.
+function cleanTeam(t) {
+  if (t === null || typeof t !== 'object' || !KINDS.includes(t.kind)) return null;
+  const name = typeof t.name === 'string' ? t.name.trim().slice(0, 80) : '';
+  const abbr = typeof t.abbr === 'string' ? t.abbr.trim().slice(0, 8) : '';
+  return name ? { name, abbr: abbr || shortName(name), kind: t.kind } : null;
+}
+
+const isObject = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+// A followed id ('nba:13', 'soccer:202', '365:631') → { sport, id, abbr, name }, with kind for a
+// 365Scores team; 'f1' and unknown ids → null. found: the copy's teams found by search.
+export function teamOf(followId, found = {}) {
   const parts = String(followId).split(':');
   if (parts.length !== 2) return null;
   const [sport, id] = parts;
-  const team = Object.hasOwn(TEAMS, sport) ? TEAMS[sport].find(t => t.id === id) : null;
+  let team = Object.hasOwn(TEAMS, sport) ? TEAMS[sport].find(t => t.id === id) : null;
+  if (!team && sport === '365' && /^\d+$/.test(id) && isObject(found) && Object.hasOwn(found, id)) {
+    const saved = cleanTeam(found[id]);
+    team = saved && { id, ...saved };
+  }
   return team ? { sport, ...team } : null;
 }
 
-// A Sports copy's settings: follow (team ids as above, and 'f1'), the F1 sessions it shows, and
-// whether its editor has been opened. Unknown ids and sessions go; a missing field takes its default.
+// Israeli teams were followed as 'il-soccer:<id>' and 'il-basket:<id>' until 2026-10-18.
+const renamed = id => (typeof id === 'string' ? id.replace(/^il-(soccer|basket):/, '365:') : id);
+
+// A Sports copy's settings: follow (team ids as above, and 'f1'), the F1 sessions it shows,
+// whether its editor has been opened, and teams (the followed teams found by search that no list
+// has: { [365Scores id]: { name, abbr, kind } }). Unknown ids and sessions go; a missing field
+// takes its default.
 export function cleanSports(s = {}) {
-  const follow = Array.isArray(s.follow) ? [...new Set(s.follow.filter(id => id === 'f1' || teamOf(id)))] : [...DEFAULT_FOLLOW];
+  const found = isObject(s.teams) ? s.teams : {};
+  const follow = Array.isArray(s.follow)
+    ? [...new Set(s.follow.map(renamed).filter(id => id === 'f1' || teamOf(id, found)))]
+    : [...DEFAULT_FOLLOW];
   const f1Sessions = Array.isArray(s.f1Sessions) ? F1_SESSIONS.filter(x => s.f1Sessions.includes(x)) : [...DEFAULT_SESSIONS];
-  return { follow, f1Sessions, edited: s.edited === true };
+  const teams = {};
+  for (const id of follow) {
+    const [sport, team] = id.split(':');
+    if (sport === '365' && !teamOf(id)) teams[team] = cleanTeam(found[team]);
+  }
+  return { follow, f1Sessions, edited: s.edited === true, teams };
 }
 
 // ESPN's league slugs → the short name a soccer competition goes by in the list.
@@ -120,7 +154,7 @@ export const raceShort = name => String(name ?? '').replace('Grand Prix', 'GP').
 
 const STATES = ['pre', 'in', 'post'];
 const OFF = { STATUS_POSTPONED: 'Postponed', STATUS_CANCELED: 'Cancelled', STATUS_SUSPENDED: 'Suspended', STATUS_ABANDONED: 'Abandoned' };
-const LENGTH = { nba: 150, nfl: 210, soccer: 120, 'il-soccer': 120, 'il-basket': 120 };   // minutes a game usually takes
+const LENGTH = { nba: 150, nfl: 210, soccer: 120, 365: 120 };   // minutes a game usually takes
 const ESPN_SPORTS = new Set(['nba', 'nfl', 'soccer']);
 
 export const byStart = (a, b) => a.start - b.start || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -283,13 +317,14 @@ export function boardTtl(board, events, live, now) {
   return open.some(e => now < e.start + 2 * lengthOf(e)) ? 30e3 : 3600e3;
 }
 
-// ---- 365Scores: Israeli clubs and national teams ----
+// ---- 365Scores: Israeli clubs, national teams and any team found by search ----
 
-// Israeli competitions by 365Scores id → the short name they go by in the list; international
-// ones go by their name, the rest by the name 365Scores gives them.
-const IL_COMPETITIONS = {
+// Competitions by 365Scores id → the short name they go by in the list (Israel's, and England's
+// Premier League, whose name other countries' leagues share); international ones go by their
+// name, the rest by the name 365Scores gives them (LaLiga, Serie A, Bundesliga, Ligue 1, NBA).
+const COMPETITIONS_365 = {
   42: "Ha'Al", 43: 'Leumit', 49: 'State Cup', 546: 'Toto Cup', 6285: 'Super Cup',
-  47: 'Winner', 7202: 'Leumit', 51: 'State Cup', 609: 'Winner Cup', 8844: 'Super Cup',
+  47: 'Winner', 7202: 'Leumit', 51: 'State Cup', 609: 'Winner Cup', 8844: 'Super Cup', 7: 'EPL',
 };
 const NAMED_COMPETITIONS = [
   [/^UEFA Champions League/, 'UCL'], [/^UEFA Europa League/, 'UEL'], [/^UEFA Conference League/, 'UECL'],
@@ -297,7 +332,7 @@ const NAMED_COMPETITIONS = [
   [/^EuroLeague/i, 'EuroLeague'], [/^Eurocup/i, 'EuroCup'], [/^Basketball Champions League/, 'BCL'], [/Friendl/, 'Friendly'],
 ];
 export function competition365(id, name) {
-  if (Object.hasOwn(IL_COMPETITIONS, id)) return IL_COMPETITIONS[id];
+  if (Object.hasOwn(COMPETITIONS_365, id)) return COMPETITIONS_365[id];
   const base = String(name ?? '').split(' - ')[0].trim();
   return NAMED_COMPETITIONS.find(([pattern]) => pattern.test(base))?.[1] ?? base;
 }
@@ -307,23 +342,21 @@ const IMAGES = 'https://imagecache.365scores.com/image/upload/f_png,w_32,h_32,c_
 // A team's logo on 365Scores' image host, built from its id and image version alone.
 export const logo365 = (id, version) => (whole(id) && whole(version) ? `${IMAGES}/v${version}/Competitors/${id}` : '');
 
-// A game's page on 365scores.com; '' when an id isn't a number.
-export function link365(sport, game, competition) {
+// A game's page on 365scores.com; '' when an id isn't a number. kind: 'soccer' or 'basketball'.
+export function link365(kind, game, competition) {
   const home = game?.homeCompetitor;
   const away = game?.awayCompetitor;
   const comp = game?.competitionId;
   if (![game?.id, comp, home?.id, away?.id].every(whole)) return '';
   const slug = s => encodeURIComponent(String(s ?? ''));
-  return `https://www.365scores.com/${sport === 'il-basket' ? 'basketball' : 'football'}/match/${slug(competition?.nameForURL)}-${comp}/`
+  return `https://www.365scores.com/${kind === 'basketball' ? 'basketball' : 'football'}/match/${slug(competition?.nameForURL)}-${comp}/`
     + `${slug(home.nameForURL)}-${slug(away.nameForURL)}-${home.id}-${away.id}-${comp}#id=${game.id}`;
 }
 
-// 365Scores gives no short name for some teams: the first three letters of the first word that has three.
-function abbr365(c) {
-  if (c.symbolicName) return String(c.symbolicName);
-  const name = String(c.name ?? '');
-  return (name.split(/\s+/).find(w => w.length >= 3) ?? name).slice(0, 3).toUpperCase();
-}
+// 365Scores gives no short name for some teams.
+const abbr365 = c => (c.symbolicName ? String(c.symbolicName) : shortName(String(c.name ?? '')));
+// 365Scores' sport ids → the kinds the widget follows.
+const KIND_OF = { 1: 'soccer', 2: 'basketball' };
 
 function side365(c) {
   if (!whole(c?.id)) return null;
@@ -343,10 +376,10 @@ const OFF_365 = [[/postpon/i, 'Postponed'], [/cancel/i, 'Cancelled'], [/abandon/
 
 // What a live or finished game shows in place of its time: "63'", 'HT', 'Q2 0:31' (365Scores says
 // which by its display type: 1 the status, 2 the clock, 3 both); FT, FT-Pens, AET, Final, Final/OT.
-function detail365(g, state, sport) {
+function detail365(g, state, kind) {
   const status = String(g.statusText ?? '');
   if (state === 'post') {
-    if (sport === 'il-basket') return /OT/.test(status) ? 'Final/OT' : 'Final';
+    if (kind === 'basketball') return /OT/.test(status) ? 'Final/OT' : 'Final';
     return /penalt/i.test(status) ? 'FT-Pens' : /extra|\bAET\b|\bET\b/i.test(status) ? 'AET' : 'FT';
   }
   if (state !== 'in') return '';
@@ -357,40 +390,104 @@ function detail365(g, state, sport) {
   return short;
 }
 
-// One game from 365Scores → an event like an ESPN game's, or null when it lacks an id, a start or
-// a side. sport: 'il-soccer' or 'il-basket'; competition: its entry in the response's competitions.
-export function parse365Game(g, sport, competition) {
+// One game from 365Scores → an event like an ESPN game's (sport '365', and kind), or null when it
+// lacks an id, a start or a side, or is neither soccer nor basketball. competition: its entry in
+// the response's competitions.
+export function parse365Game(g, competition) {
   const start = Date.parse(g?.startTime);
   const home = side365(g?.homeCompetitor);
   const away = side365(g?.awayCompetitor);
-  if (!whole(g?.id) || !Number.isFinite(start) || !home || !away) return null;
+  const kind = Object.hasOwn(KIND_OF, g?.sportId) ? KIND_OF[g.sportId] : null;
+  if (!whole(g?.id) || !Number.isFinite(start) || !home || !away || !kind) return null;
   const off = OFF_365.find(([pattern]) => pattern.test(String(g.statusText ?? '')))?.[1] ?? null;
   const state = g.statusGroup === 3 ? 'in' : g.statusGroup === 4 ? 'post' : 'pre';
   const scored = state !== 'pre' && !off;
   return {
     id: `365:${g.id}`,
-    sport,
+    sport: '365',
+    kind,
     league: '',
-    tag: competition365(g.competitionId, competition?.name ?? g.competitionDisplayName) || (sport === 'il-basket' ? 'Basketball' : 'Soccer'),
+    tag: competition365(g.competitionId, competition?.name ?? g.competitionDisplayName) || (kind === 'basketball' ? 'Basketball' : 'Soccer'),
     start,
     timeValid: true,
     state,
-    detail: off ? '' : detail365(g, state, sport),
+    detail: off ? '' : detail365(g, state, kind),
     off,
     home: { ...home, score: scored ? home.score : null },
     away: { ...away, score: scored ? away.score : null },
     tv: '',
-    url: link365(sport, g, competition),
+    url: link365(kind, g, competition),
   };
 }
 
 // A team's games (/web/games/current: its last result, a game under way, its next five) → events,
 // or null when the response isn't a game list (games not a list, or none of them readable).
-export function parse365Games(json, sport) {
+export function parse365Games(json) {
   if (!Array.isArray(json?.games)) return null;
   const competitions = new Map((Array.isArray(json.competitions) ? json.competitions : []).map(c => [c?.id, c]));
-  const events = json.games.map(g => parse365Game(g, sport, competitions.get(g?.competitionId))).filter(Boolean);
+  const events = json.games.map(g => parse365Game(g, competitions.get(g?.competitionId))).filter(Boolean);
   return json.games.length && !events.length ? null : events;
+}
+
+// ---- searching for a team ----
+
+const KIND_LABEL = { soccer: 'Soccer', basketball: 'Basketball' };
+// Lower case, without accents or apostrophes: 'Atlético' and "Ha'Al" match 'atletico' and 'haal'.
+const fold = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ'’]/g, '').toLowerCase().trim();
+
+// A search result: id (what following it adds), name, meta (the muted line), logo, and team (what a
+// copy saves for a 365Scores team no list has).
+const result = (id, name, meta, logo = '', team = null) => ({ id, name, meta, logo, team });
+
+// Words of a name, each after a space: ' hapoel beer sheva dimona'.
+const words = s => ` ${fold(s).replace(/[^a-z0-9]+/g, ' ').trim()}`;
+
+// The fixed lists' teams with a word starting with the text ('lakers', 'maccabi tel') or whose
+// abbreviation is it, in list order.
+export function searchLists(text) {
+  const q = words(text).trim();
+  if (q.length < 2) return [];
+  const lists = [
+    ['nba', NBA_TEAMS, () => 'NBA'], ['nfl', NFL_TEAMS, () => 'NFL'], ['soccer', SOCCER_TEAMS, () => 'Messi'],
+    ['365', IL_SOCCER_CLUBS, () => "Ligat Ha'Al"], ['365', IL_BASKET_CLUBS, () => 'Winner League'],
+    ['365', NATIONAL_TEAMS, t => `National team · ${KIND_LABEL[t.kind]}`],
+  ];
+  return lists.flatMap(([sport, list, meta]) => list
+    .filter(t => words(t.name).includes(` ${q}`) || fold(t.abbr) === q)
+    .map(t => result(`${sport}:${t.id}`, t.name, meta(t))));
+}
+
+// What /web/search found → results, in 365Scores' order (the most followed first): soccer and
+// basketball teams it doesn't hide; Messi's teams as their ESPN ids, and none of its NBA teams
+// (the NBA list has them). null when the response isn't a search result.
+export function parse365Search(json) {
+  if (!Array.isArray(json?.competitors)) return null;
+  const countries = new Map((Array.isArray(json.countries) ? json.countries : []).map(c => [c?.id, String(c?.name ?? '')]));
+  const out = [];
+  for (const c of json.competitors) {
+    const kind = Object.hasOwn(KIND_OF, c?.sportId) ? KIND_OF[c.sportId] : null;
+    if (!kind || !whole(c.id) || c.hideOnSearch === true || c.mainCompetitionId === NBA_365 || !c.name) continue;
+    const logo = logo365(c.id, c.imageVersion);
+    if (Object.hasOwn(ON_ESPN, c.id)) {
+      out.push(result(ON_ESPN[c.id], teamOf(ON_ESPN[c.id]).name, 'Messi', logo));
+      continue;
+    }
+    const name = String(c.name).slice(0, 80);
+    const meta = [countries.get(c.countryId), KIND_LABEL[kind]].filter(Boolean).join(' · ');
+    out.push(result(`365:${c.id}`, name, meta, logo, { name, abbr: abbr365(c).slice(0, 8), kind }));
+  }
+  return out;
+}
+
+// The lists' matches first, then 365Scores' (a team both have takes 365Scores' logo), at most limit.
+export function mergeResults(listed, found, limit = 8) {
+  const byId = new Map(listed.map(r => [r.id, { ...r }]));
+  for (const r of found ?? []) {
+    const mine = byId.get(r.id);
+    if (mine) mine.logo ||= r.logo;
+    else byId.set(r.id, r);
+  }
+  return [...byId.values()].slice(0, limit);
 }
 
 // How long a team's saved 365Scores games stay fresh: 30 s while one may be under way (past its

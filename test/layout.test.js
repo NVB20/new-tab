@@ -350,7 +350,7 @@ test('Tasks: a view, cleaned to a valid one; the old Finished fold setting is dr
 });
 
 test('Sports: its own settings, never added to an old page, kept by Reset layout under Markets and GitHub', () => {
-  assert.deepEqual(TYPES.sports.defaults(), { follow: ['soccer:20232', 'soccer:202', 'f1'], f1Sessions: ['sprint', 'qualifying', 'race'], edited: false });
+  assert.deepEqual(TYPES.sports.defaults(), { follow: ['soccer:20232', 'soccer:202', 'f1'], f1Sessions: ['sprint', 'qualifying', 'race'], edited: false, teams: {} });
   assert.deepEqual(TYPES.sports.clean({ follow: ['nba:13', 'junk'] }).follow, ['nba:13']);
   assert.equal(TYPES.sports.max, 5);
   assert.equal(prefsSection('sports'), 'layout');

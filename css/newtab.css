@@ -489,6 +489,32 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .sp-chip:hover { color: var(--text); background: var(--hover); }
 .sp-chip[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); background: var(--accent-soft); }
 .sp-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The team search: its results follow on a click, with a check while followed. */
+.sp-search { padding: 7px 10px; font-size: 13px; }
+.sp-results { display: flex; flex-direction: column; margin-top: 4px; }
+.sp-results > .widget-note { margin: 4px 0 0; }
+.sp-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.sp-result:hover { background: var(--hover); }
+.sp-result:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sp-result-name { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sp-result-meta { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11.5px; color: var(--muted); }
+.sp-result > .icon { flex: none; color: var(--muted); }
+.sp-result[aria-pressed="true"], .sp-result[aria-pressed="true"] > .icon { color: var(--accent); }
+.sp-result[aria-pressed="true"] > .icon:nth-last-child(2), .sp-result[aria-pressed="false"] > .icon:last-child { display: none; }
 
 /* Contribution heatmap: past year, weeks as columns. */
 .gh-heatmap { display: block; margin: 0 0 4px; color: var(--muted); text-decoration: none; }
