@@ -131,8 +131,7 @@ export function mountEcon(root, store, copy) {
   }
 
   const shownNow = (events, now) => {
-    const s = settings();
-    return calendar(events, { levels: s.levels, markets: s.markets, now });
+    return calendar(events, { markets: settings().markets, now });
   };
 
   // What the body was last drawn from: a refresh that changes nothing shown leaves it alone. The
@@ -187,7 +186,7 @@ export function mountEcon(root, store, copy) {
     render();
   }
 
-  // ---- editor: importance and markets ----
+  // ---- editor: the importance levels each market shows ----
 
   let editing = false;
 
@@ -198,17 +197,20 @@ export function mountEcon(root, store, copy) {
     }, ['prefs']);
   }
 
-  // A row of toggles for settings()[key]; the last one on stays on. They flip in place, so the
-  // focus stays on the one pressed.
-  function chips(key, values, labels, name) {
-    const group = el('div', { class: 'sp-chips', role: 'group', 'aria-label': name });
+  const onCount = by => MARKETS.reduce((n, m) => n + by[m].length, 0);
+
+  // A row per market: its name, then High, Medium and Low as toggles. A market with none on isn't
+  // shown; the last one on, of all of them, stays on. They flip in place, so the focus stays on
+  // the one pressed.
+  function levelRows() {
+    const rows = el('div', { class: 'ec-levels' });
     const paint = () => {
-      const on = settings()[key];
-      for (const b of group.children) {
-        const pressed = on.includes(b.dataset.value);
-        const last = pressed && on.length === 1;
+      const by = settings().markets;
+      const lastOne = onCount(by) === 1;
+      for (const b of rows.querySelectorAll('.sp-chip')) {
+        const pressed = by[b.dataset.market].includes(b.dataset.level);
         b.setAttribute('aria-pressed', String(pressed));
-        if (last) {
+        if (pressed && lastOne) {
           b.setAttribute('aria-disabled', 'true');
           b.title = 'At least one stays on';
         } else {
@@ -216,28 +218,34 @@ export function mountEcon(root, store, copy) {
           b.removeAttribute('title');
         }
       }
+      for (const name of rows.querySelectorAll('.ec-market')) name.classList.toggle('off', !by[name.dataset.market].length);
     };
-    group.append(...values.map(v => el('button', {
-      type: 'button', class: 'sp-chip', text: labels[v], dataset: { value: v },
-      onclick: () => {
-        const on = settings()[key];
-        if (on.includes(v) && on.length === 1) return;
-        update(own => { own[key] = values.filter(x => (x === v ? !on.includes(v) : on.includes(x))); });
-        paint();
-      },
-    })));
+    for (const m of MARKETS) {
+      rows.append(
+        el('span', { class: 'ec-market', text: MARKET_LABELS[m], dataset: { market: m } }),
+        el('div', { class: 'sp-chips', role: 'group', 'aria-label': `${MARKET_LABELS[m]}: importance` }, LEVELS.map(level => el('button', {
+          type: 'button', class: 'sp-chip', text: LEVEL_LABELS[level], dataset: { market: m, level },
+          onclick: () => {
+            const by = settings().markets;
+            const on = by[m].includes(level);
+            if (on && onCount(by) === 1) return;
+            const next = LEVELS.filter(l => (l === level ? !on : by[m].includes(l)));
+            update(own => { own.markets = Object.fromEntries(MARKETS.map(x => [x, x === m ? next : [...by[x]]])); });
+            paint();
+          },
+        }))));
+    }
     paint();
-    return group;
+    return rows;
   }
 
   function renderEditor() {
     const link = el('a', { href: SOURCES[via()], rel: 'noopener', text: via(), ...(newTab() ? { target: '_blank' } : {}) });
     editor.replaceChildren(
-      widgetSub('Importance'),
-      chips('levels', LEVELS, LEVEL_LABELS, 'Importance'),
-      widgetSub('Markets'),
-      chips('markets', MARKETS, MARKET_LABELS, 'Markets'),
-      el('p', { class: 'widget-note', text: 'Israel: rate decisions and CPI count as High, GDP and unemployment as Medium. Holidays show whatever the importance.' }),
+      widgetSub('Importance by market'),
+      levelRows(),
+      el('p', { class: 'widget-note', text: 'A market with nothing on isn’t shown. Holidays show for every market shown.' }),
+      el('p', { class: 'widget-note', text: 'Israel: rate decisions and CPI count as High, GDP and unemployment as Medium.' }),
       el('p', { class: 'widget-note' }, 'Calendar: ', link, '. Times in your time zone.'));
   }
 

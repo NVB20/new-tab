@@ -95,8 +95,8 @@ export const TYPES = {
     defaults: () => cleanWeather({}),
     clean: s => cleanWeather(s),
   },
-  // levels: the importance levels shown ('high', 'medium', 'low'); markets: 'US', 'EU', 'IL'
-  // (econ.js). Holidays show whatever the levels.
+  // markets: { US, EU, IL }, each the importance levels shown ('high', 'medium', 'low'); a market
+  // with none isn't shown (econ.js). Holidays show for every market shown.
   econ: {
     label: 'Economic calendar', icon: 'calendar', size: [3, 5], min: [2, 3], max: 3,
     defaults: () => cleanEcon({}),

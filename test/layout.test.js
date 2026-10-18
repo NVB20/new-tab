@@ -467,10 +467,10 @@ test('Weather goes in the far column when the clock column is full, and is left 
 test('Economic calendar: up to three copies, markets and levels each, never on an old page, under Markets', () => {
   assert.equal(TYPES.econ.max, 3);
   assert.equal(prefsSection('econ'), 'layout');
-  assert.deepEqual(TYPES.econ.defaults(), { levels: ['high', 'medium'], markets: ['US', 'EU', 'IL'] });
-  assert.deepEqual(TYPES.econ.clean({ levels: ['low'], markets: [] }), { levels: ['low'], markets: ['US', 'EU', 'IL'] });
+  assert.deepEqual(TYPES.econ.defaults(), { markets: { US: ['high', 'medium'], EU: ['high', 'medium'], IL: ['high', 'medium'] } });
+  assert.deepEqual(TYPES.econ.clean({ levels: ['low'], markets: ['IL'] }), { markets: { US: [], EU: [], IL: ['low'] } });
   assert.equal(byType(defaultLayout(legacy())).econ, undefined);
-  assert.equal(copyTitle({ type: 'econ', settings: { levels: ['high'], markets: ['US', 'IL'] } }), 'Economic calendar · US, IL');
+  assert.equal(copyTitle({ type: 'econ', settings: { markets: { US: ['high'], EU: [], IL: ['low'] } } }), 'Economic calendar · US, IL');
   const l = { cols: COLS, rows: ROWS, widgets: [] };
   l.widgets = placeDefaults(l, ['clock', 'markets', 'econ', 'github', 'tiles']);
   const t = byType(l);

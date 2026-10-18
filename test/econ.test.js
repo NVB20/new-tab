@@ -43,11 +43,22 @@ const FF = [
 const events = parseTradingView(TV);
 const byId = id => events.find(e => e.id === id);
 
-test('settings keep known levels and markets in a fixed order; empty or broken goes back to the default', () => {
-  assert.deepEqual(cleanEcon({}), { levels: ['high', 'medium'], markets: ['US', 'EU', 'IL'] });
-  assert.deepEqual(cleanEcon({ levels: ['low', 'high', 'low', 'huge'], markets: ['IL', 'XX'] }), { levels: ['high', 'low'], markets: ['IL'] });
-  assert.deepEqual(cleanEcon({ levels: [], markets: 'US' }), { levels: ['high', 'medium'], markets: ['US', 'EU', 'IL'] });
-  assert.equal(marketsSummary(['US', 'IL']), 'US, IL');
+const ALL = ['high', 'medium', 'low'];
+const EVERY = { US: ALL, EU: ALL, IL: ALL };
+
+test('settings: the importance levels each market shows, known ones in a fixed order; nothing on anywhere is the default', () => {
+  const DEFAULT = { markets: { US: ['high', 'medium'], EU: ['high', 'medium'], IL: ['high', 'medium'] } };
+  assert.deepEqual(cleanEcon({}), DEFAULT);
+  assert.deepEqual(cleanEcon({ markets: { US: ['low', 'high', 'low', 'huge'], IL: 'all', XX: ['high'] } }), { markets: { US: ['high', 'low'], EU: [], IL: [] } });
+  assert.deepEqual(cleanEcon({ markets: { US: [], EU: [], IL: [] } }), DEFAULT);
+  assert.deepEqual(cleanEcon({ markets: 'US' }), DEFAULT);
+  assert.equal(marketsSummary({ US: ['high'], EU: [], IL: ['low'] }), 'US, IL');
+});
+
+test('settings from before importance per market: the one list of levels goes to each market listed', () => {
+  assert.deepEqual(cleanEcon({ levels: ['low', 'high'], markets: ['IL', 'XX'] }), { markets: { US: [], EU: [], IL: ['high', 'low'] } });
+  assert.deepEqual(cleanEcon({ levels: [], markets: ['US', 'EU'] }), { markets: { US: ['high', 'medium'], EU: ['high', 'medium'], IL: [] } });
+  assert.deepEqual(cleanEcon({ levels: ['high'], markets: [] }), cleanEcon({}));
 });
 
 test('the request covers yesterday to nine days on, in UTC days, for the three markets', () => {
@@ -128,7 +139,7 @@ test('ForexFactory: USA and Eurozone, its values as given, Holiday as a holiday,
 
 test('the calendar: today and the next 6 days by local day, filtered, all-day first, then by time', () => {
   const now = Date.parse('2026-10-18T13:00:00.000Z');   // 16:00 in Israel
-  const days = calendar(events, { levels: ['high', 'medium', 'low'], markets: ['US', 'EU', 'IL'], now, timeZone: TZ });
+  const days = calendar(events, { markets: EVERY, now, timeZone: TZ });
   assert.deepEqual(days.map(d => [d.day, d.label]), [['2026-10-18', 'Today'], ['2026-10-19', 'Tomorrow'], ['2026-10-20', 'Tue 20 Oct'], ['2026-10-21', 'Wed 21 Oct']]);
   // The CPI of the 15th is before today; the gas stocks of the 25th come after the 6 days.
   assert.deepEqual(days[0].events.map(e => e.id), ['9', '408077', '3', '4', '6']);
@@ -136,16 +147,20 @@ test('the calendar: today and the next 6 days by local day, filtered, all-day fi
   assert.ok(!days.flatMap(d => d.events).some(e => e.id === '2' || e.id === '11'));
 });
 
-test('the calendar shows a copy\'s markets and levels; holidays whatever the level', () => {
+test('the calendar shows each market at its own levels; holidays in every market shown, whatever the level', () => {
   const now = Date.parse('2026-10-18T13:00:00.000Z');
-  const days = calendar(events, { levels: ['high'], markets: ['US', 'IL'], now, timeZone: TZ });
-  assert.deepEqual(days.map(d => d.events.map(e => e.id)), [['4', '6'], ['7'], ['5'], ['1']]);
-  assert.deepEqual(calendar(events, { levels: ['low'], markets: ['EU'], now, timeZone: TZ }), []);
+  const ids = markets => calendar(events, { markets, now, timeZone: TZ }).map(d => d.events.map(e => e.id));
+  assert.deepEqual(ids({ US: ['high'], EU: [], IL: ['high'] }), [['4', '6'], ['7'], ['5'], ['1']]);
+  // The USA's High releases with all of Israel's Low ones (Tourist Arrivals), not its High ones.
+  assert.deepEqual(ids({ US: ['high'], EU: [], IL: ['low'] }), [['3', '4', '6'], ['7'], ['5']]);
+  assert.deepEqual(ids({ US: [], EU: ['low'], IL: [] }), []);
+  // A market that's off (or missing) shows nothing, not even its holidays.
+  assert.deepEqual(ids({ EU: ['medium'] }), [['9'], ['8']]);
 });
 
 test('each row\'s state: out, past, due, the next one, later, all day', () => {
   const now = Date.parse('2026-10-18T12:40:00.000Z');   // NFP out 10 min ago; the speech at 15:00 is next
-  const state = id => calendar(events, { levels: ['high', 'medium', 'low'], markets: ['US', 'EU', 'IL'], now, timeZone: TZ })
+  const state = id => calendar(events, { markets: EVERY, now, timeZone: TZ })
     .flatMap(d => d.events).find(e => e.id === id)?.state;
   assert.equal(state('4'), 'out');
   assert.equal(state('3'), 'out');
@@ -155,16 +170,16 @@ test('each row\'s state: out, past, due, the next one, later, all day', () => {
   assert.equal(state('7'), 'allday');
   // GDP 10 minutes after its time, with a forecast and no actual: due.
   const due = Date.parse('2026-10-18T10:10:00.000Z');
-  assert.equal(calendar(events, { levels: ['medium'], markets: ['IL'], now: due, timeZone: TZ })[0].events[0].state, 'due');
+  assert.equal(calendar(events, { markets: { IL: ['medium'] }, now: due, timeZone: TZ })[0].events[0].state, 'due');
   // A speech has no number to wait for: past as soon as it starts.
   const speech = Date.parse('2026-10-18T15:05:00.000Z');
-  assert.equal(calendar(events, { levels: ['high'], markets: ['US'], now: speech, timeZone: TZ })[0].events.find(e => e.id === '6').state, 'past');
+  assert.equal(calendar(events, { markets: { US: ['high'] }, now: speech, timeZone: TZ })[0].events.find(e => e.id === '6').state, 'past');
 });
 
 test('every event at the next time is next', () => {
   const twin = { ...byId('5'), id: '5b', title: 'Housing Starts' };
   const now = Date.parse('2026-10-19T09:00:00.000Z');
-  const days = calendar([...events, twin], { levels: ['high'], markets: ['US'], now, timeZone: TZ });
+  const days = calendar([...events, twin], { markets: { US: ['high'] }, now, timeZone: TZ });
   assert.deepEqual(days.find(d => d.day === '2026-10-20').events.map(e => [e.id, e.state]), [['5', 'next'], ['5b', 'next']]);
 });
 
@@ -178,7 +193,7 @@ test('the countdown: minutes, hours and minutes, then days', () => {
 });
 
 test('ask every minute while a number shown is due, hourly from ForexFactory, else every 15 minutes', () => {
-  const shown = calendar(events, { levels: ['medium'], markets: ['IL'], now: Date.parse('2026-10-18T10:05:00.000Z'), timeZone: TZ }).flatMap(d => d.events);
+  const shown = calendar(events, { markets: { IL: ['medium'] }, now: Date.parse('2026-10-18T10:05:00.000Z'), timeZone: TZ }).flatMap(d => d.events);
   assert.equal(econTtl(shown, Date.parse('2026-10-18T10:05:00.000Z')), MIN);
   assert.equal(econTtl(shown, Date.parse('2026-10-18T10:00:00.000Z') + DUE_MS + 1), 15 * MIN);
   assert.equal(econTtl([], 0, 'ForexFactory'), HOUR);

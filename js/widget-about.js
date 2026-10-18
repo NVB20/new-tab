@@ -48,7 +48,7 @@ export const ABOUT = {
   },
   econ: {
     tagline: 'Releases that move markets',
-    about: 'This week’s economic releases for the USA, the Eurozone and Israel, such as CPI, rate decisions and jobs reports, with the forecast and the number once it’s out. Pick the markets and the importance with ✎; each copy can show different ones.',
+    about: 'This week’s economic releases for the USA, the Eurozone and Israel, such as CPI, rate decisions and jobs reports, with the forecast and the number once it’s out. Pick the importance to show for each market with ✎ (say, everything for Israel and only High for the USA); each copy can show different ones.',
   },
   weather: {
     tagline: 'Now, by the hour, the week',

@@ -209,10 +209,11 @@ Add the **Economic calendar** widget in [Layout mode](#layout-mode) (or in setup
 where it goes under Markets). It lists the economic releases of today and the next six days: CPI,
 rate decisions, jobs reports, PMIs, central bankers' speeches and the like.
 
-- **Choose what's shown:** hover the widget and click **✎**. Under **Importance**, turn High,
-  Medium and Low on or off; under **Markets**, the USA, the Eurozone and Israel. One of each always
-  stays on. It starts with every market at High and Medium. Up to three copies can each show their
-  own (say, all of Israel in one and the USA's High releases in another).
+- **Choose what's shown:** hover the widget and click **✎**. Under **Importance by market**, each
+  of the USA, the Eurozone and Israel has its own High, Medium and Low; turn on what you want to
+  see for that market (say, everything for Israel and only High for the USA). A market with nothing
+  on isn't shown, and the last one on stays on. It starts with every market at High and Medium. Up
+  to three copies can each show their own.
 - **A row:** the time, the market (`US`, `EU`, `IL`), the importance as three dots (red for High,
   amber for Medium), the release and the period it covers, and under it the forecast (**f**) and
   the previous number (**p**).

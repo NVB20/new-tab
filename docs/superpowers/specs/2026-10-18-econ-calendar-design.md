@@ -78,15 +78,18 @@ USA, Eurozone and Israel; High, Medium and Low. Up to three copies, each with it
 
 ## Editor (✎)
 
-- **Importance:** High, Medium, Low chips; **Markets:** USA, Eurozone, Israel chips. Each a toggle;
-  the last one on in a row can't be turned off.
-- A note: "Israel: rate decisions and CPI count as High, GDP and unemployment as Medium." and
-  "Calendar: TradingView", linked.
+- **Importance by market** (asked for after the first build): a row per market, its name then
+  High, Medium and Low chips, each a toggle. A market with none on isn't shown (its name reads
+  "· off"); the last chip on, of all of them, can't be turned off.
+- Notes: a market with nothing on isn't shown, holidays show for every market shown; "Israel: rate
+  decisions and CPI count as High, GDP and unemployment as Medium."; "Calendar: TradingView", linked.
 
 ## Settings and layout
 
-- The copy's settings: `{ levels: ['high', 'medium'], markets: ['US', 'EU', 'IL'] }`, cleaned by
-  `cleanEcon` (known values, each once, in a fixed order; an empty list goes back to the default).
+- The copy's settings: `{ markets: { US: ['high', 'medium'], EU: […], IL: […] } }`, each market's
+  importance levels, cleaned by `cleanEcon` (known levels, each once, in a fixed order; a missing
+  market has none; nothing on anywhere goes back to the default, High and Medium everywhere). The
+  first build's `{ levels, markets: ['US', …] }` becomes those levels for each market listed.
 - Type `econ`, label "Economic calendar", icon `calendar`. Size 3 × 5, minimum 2 × 3, up to 3
   copies. Copy title: "Economic calendar · US, EU, IL".
 - Preferences → Layout → Economic calendar: "Markets and importance: use ✎ on the widget".

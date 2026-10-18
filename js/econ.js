@@ -35,19 +35,27 @@ const minus = s => s.replace(/^-/, '−');
 
 // ---- settings ----
 
-// Known values, each once, in LEVELS / MARKETS order; an empty or broken list is the default.
-function pick(list, known, fallback) {
-  const got = Array.isArray(list) ? known.filter(k => list.includes(k)) : [];
-  return got.length ? got : [...fallback];
+// Known levels, each once, in LEVELS order.
+const levelsIn = list => (Array.isArray(list) ? LEVELS.filter(l => list.includes(l)) : []);
+
+// { markets: { US: levels, EU: levels, IL: levels } }: the importance levels each market shows; a
+// market with none isn't shown, and one missing (say, added later) has none. With nothing on
+// anywhere, every market shows High and Medium. Settings from before importance per market were
+// one list of levels for the markets listed: { levels, markets: ['US', …] }.
+export function cleanEcon(s) {
+  const markets = {};
+  if (Array.isArray(s?.markets)) {
+    const levels = levelsIn(s.levels).length ? levelsIn(s.levels) : DEFAULT_LEVELS;
+    for (const m of MARKETS) markets[m] = s.markets.includes(m) ? [...levels] : [];
+  } else {
+    for (const m of MARKETS) markets[m] = isObj(s?.markets) ? levelsIn(s.markets[m]) : [];
+  }
+  if (!MARKETS.some(m => markets[m].length)) for (const m of MARKETS) markets[m] = [...DEFAULT_LEVELS];
+  return { markets };
 }
 
-export const cleanEcon = s => ({
-  levels: pick(s?.levels, LEVELS, DEFAULT_LEVELS),
-  markets: pick(s?.markets, MARKETS, MARKETS),
-});
-
-// 'US, EU, IL', for the copy's title.
-export const marketsSummary = markets => markets.join(', ');
+// The markets shown: 'US, EU, IL', for the copy's title.
+export const marketsSummary = markets => MARKETS.filter(m => markets[m]?.length).join(', ');
 
 // ---- TradingView ----
 
@@ -203,12 +211,14 @@ const byWhen = (a, b) =>
   || RANK[a.level] - RANK[b.level] || a.title.localeCompare(b.title);
 
 // A copy's rows by local day, today and the next 6 ([{ day, label, events }], days with nothing
-// shown left out): its markets, its levels, and holidays in its markets whatever the level.
-export function calendar(events, { levels, markets, now, timeZone, days = DAYS }) {
+// shown left out): each market at its own levels (markets: { US: levels, … }), and holidays in
+// every market shown, whatever the level.
+export function calendar(events, { markets, now, timeZone, days = DAYS }) {
   const today = dayKey(now, timeZone);
   const last = plusDays(today, days - 1);
+  const levelsOf = e => markets[e.market] ?? [];
   const shown = events
-    .filter(e => markets.includes(e.market) && (e.kind === 'holiday' || levels.includes(e.level)))
+    .filter(e => levelsOf(e).length && (e.kind === 'holiday' || levelsOf(e).includes(e.level)))
     .map(e => ({ e, day: e.allDay ? e.day : dayKey(e.at, timeZone) }))
     .filter(({ day }) => day >= today && day <= last);
   const ahead = shown.filter(({ e }) => !e.allDay && e.at > now).map(({ e }) => e.at);

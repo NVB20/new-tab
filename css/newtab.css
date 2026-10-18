@@ -1121,9 +1121,13 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .ec-row.holiday .ec-title { color: var(--muted); }
 .ec-now { height: 0; margin: 3px 0; border-top: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); }
 
-/* Editor: the importance and market chips. */
+/* Editor: a row per market, its name and its importance chips; a market with none on reads off. */
 .ec-editor > .widget-sub:first-child { margin-top: 0; }
-.ec-editor .sp-chips + .widget-note { margin-top: 12px; }
+.ec-levels { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px 10px; }
+.ec-market { font-size: 12.5px; white-space: nowrap; }
+.ec-market.off { color: var(--muted); }
+.ec-market.off::after { content: ' · off'; }
+.ec-editor .ec-levels + .widget-note { margin-top: 12px; }
 .ec-editor .widget-note + .widget-note { margin-top: 6px; }
 .ec-editor a { color: inherit; }
 .ec-editor .sp-chip[aria-disabled="true"] { cursor: default; }
