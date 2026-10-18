@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, NATIONAL_TEAMS, ON_ESPN,
   teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
-  competition365, logo365, link365, parse365Game, parse365Games, teamTtl, searchLists, parse365Search, mergeResults,
+  competition365, logo365, link365, parse365Game, parse365Games, teamTtl, searchLists, parse365Search, mergeResults, teamLogo,
   parseEspnEvent, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
   parseF1Season, parseF1Last, raceAwaitingResult, parseOpenF1Season, openF1RaceKey, parseOpenF1Podium,
   rowState, resultFor, followedSide, dayKey, dayLabel, formatTime, isNight, longDay, timeline,
@@ -741,7 +741,9 @@ test('timeline: a derby between two followed clubs is one row, from either club\
 // ---- searching for a team ----
 
 test('searchLists finds the lists\' teams by name or exact abbreviation, without minding case or accents', () => {
-  assert.deepEqual(searchLists('lakers'), [{ id: 'nba:13', name: 'Los Angeles Lakers', meta: 'NBA', logo: '', team: null }]);
+  assert.deepEqual(searchLists('lakers'), [{
+    id: 'nba:13', name: 'Los Angeles Lakers', meta: 'NBA', logo: 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/lal.png&w=40&h=40', team: null,
+  }]);
   assert.deepEqual(searchLists('chiefs').map(r => r.id), ['nfl:12']);
   assert.deepEqual(searchLists('mta').map(r => [r.id, r.meta]), [['365:566', "Ligat Ha'Al"], ['365:631', 'Winner League']]);
   assert.deepEqual(searchLists('ISRAEL').map(r => [r.id, r.meta]), [['365:5034', 'National team · Soccer'], ['365:1728', 'National team · Basketball']]);
@@ -752,6 +754,16 @@ test('searchLists finds the lists\' teams by name or exact abbreviation, without
   assert.deepEqual(searchLists('dimona').map(r => r.id), ['365:27923']);   // Hapoel Beer Sheva/Dimona
   assert.deepEqual(searchLists('m'), []);
   assert.deepEqual(searchLists(' '), []);
+});
+
+test('teamLogo: ESPN\'s resized logo for NBA and NFL teams, 365Scores\' for the rest, none for F1', () => {
+  assert.equal(teamLogo('nba:26'), 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nba/500/utah.png&w=40&h=40');
+  assert.equal(teamLogo('nfl:12'), 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/kc.png&w=40&h=40');
+  assert.equal(teamLogo('soccer:20232'), `${IMG}/Competitors/54729`);   // Inter Miami, by its 365Scores id
+  assert.equal(teamLogo('soccer:202'), `${IMG}/Competitors/2378`);
+  assert.equal(teamLogo('365:631'), `${IMG}/Competitors/631`);
+  assert.equal(teamLogo('365:131'), `${IMG}/Competitors/131`);   // a team found by search
+  for (const id of ['f1', 'nba:999', '365:x', '365:1/../2', 'soccer:1', 'constructor:1', '']) assert.equal(teamLogo(id), '', id);
 });
 
 // /web/search's answer to "real madrid", "lakers" and "argentina" (2026-10-18), trimmed.
@@ -792,8 +804,10 @@ test('mergeResults: the lists\' matches first, one row per team, 365Scores\' log
   const merged = mergeResults(listed, parse365Search(SEARCH));
   assert.deepEqual(merged.map(r => r.id), ['soccer:202', '365:131', '365:204', '365:82460']);
   assert.equal(merged[0].meta, 'Messi');
-  assert.equal(merged[0].logo, `${IMG}/v1/Competitors/2378`);
-  assert.equal(listed[0].logo, '');   // the lists' own results are left alone
+  assert.equal(merged[0].logo, `${IMG}/Competitors/2378`);   // the list's own
+  const bare = [{ ...listed[0], logo: '' }];
+  assert.equal(mergeResults(bare, parse365Search(SEARCH))[0].logo, `${IMG}/v1/Competitors/2378`);
+  assert.equal(bare[0].logo, '');   // the lists' results are left alone
   assert.deepEqual(mergeResults(listed, null).map(r => r.id), ['soccer:202']);
   const many = Array.from({ length: 12 }, (_, i) => ({ id: `365:${i}`, name: `T${i}`, meta: '', logo: '', team: null }));
   assert.equal(mergeResults([], many).length, 8);
