@@ -33,12 +33,12 @@ const PRETICK = 6;   // most visited sites ticked to start with, when the group 
 const ACCENTS = ['#d97757', '#2563eb', '#10a37f', '#8b5cf6', '#e5484d', '#f5a524'];
 const THEMES = [['auto', 'Auto', 'auto'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon'], ['blue', 'Blue', 'drop'], ['github', 'GitHub', 'branch']];
 const BACKGROUNDS = [['ascii', 'ASCII'], ['none', 'Plain'], ['image', 'Image']];
-const NEAR = ['clock', 'weather', 'countdown', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
+const NEAR = ['clock', 'weather', 'gcal', 'countdown', 'tasks', 'notes', 'claude', 'marvel'];   // the clock column (layout.js)
 // The widgets setup offers, in its order, with their taglines. Keep it a literal: the commit check
 // (.claude/hooks/onboarding-check.mjs) reads these keys as the types setup offers.
 const WIDGETS = {
   clock: ABOUT.clock.tagline, weather: ABOUT.weather.tagline, search: ABOUT.search.tagline, tasks: ABOUT.tasks.tagline,
-  notes: ABOUT.notes.tagline, countdown: ABOUT.countdown.tagline, markets: ABOUT.markets.tagline, econ: ABOUT.econ.tagline, github: ABOUT.github.tagline,
+  gcal: ABOUT.gcal.tagline, notes: ABOUT.notes.tagline, countdown: ABOUT.countdown.tagline, markets: ABOUT.markets.tagline, econ: ABOUT.econ.tagline, github: ABOUT.github.tagline,
   sports: ABOUT.sports.tagline, website: ABOUT.website.tagline, claude: ABOUT.claude.tagline,
   marvel: ABOUT.marvel.tagline,
 };
@@ -563,12 +563,12 @@ export function setupOnboarding(store, canvas, ctx) {
       return;
     }
     // As Preferences imports it: tiles, groups and settings come over; the layout, the GitHub
-    // token, tasks and notes stay. Setup carries on at Widgets.
+    // token, the calendars, tasks and notes stay. Setup carries on at Widgets.
     const apply = () => {
-      const { tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { layout: kept, github } } = structuredClone(store.get());
+      const { tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { layout: kept, github, gcal } } = structuredClone(store.get());
       const block = copiesOf(kept).find(c => c.type === 'tiles' && c.settings.group === null);
       if (block) block.settings.columns = imported.prefs.columns;
-      store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, countdowns, onboarding: { done: false, step: 'widgets' }, prefs: { ...imported.prefs, layout: kept, github } });
+      store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, countdowns, onboarding: { done: false, step: 'widgets' }, prefs: { ...imported.prefs, layout: kept, github, gcal } });
       sources = null;
       go('widgets');
     };

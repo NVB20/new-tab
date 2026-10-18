@@ -1213,6 +1213,96 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   .ec-row { column-gap: 5px; grid-template-areas: "time tag dots title title" ". . . vals right"; }
 }
 
+/* ---------- Google Calendar ---------- */
+
+/* Two calendars or more: a chip each under the head, its colour dot filled while it shows here.
+   Then the days: a row is the time, the calendar's colour bar, the title (its link covers the
+   row), and after it "until 14:30" or "in 25 m" and Join. A 12-hour clock needs a wider time. */
+.widget-gcal { --gc-time: 44px; }
+.widget-gcal.h12 { --gc-time: 60px; }
+.gc-chips { margin-bottom: 8px; }
+.gc-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.gc-chip[aria-pressed="true"] { color: var(--text); border-color: color-mix(in srgb, var(--c) 55%, var(--border)); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.gc-chip[aria-pressed="false"] .gc-dot { background: none; box-shadow: inset 0 0 0 1.5px var(--c); }
+.gc-chip[aria-disabled="true"] { cursor: default; }
+.gc-chip .icon { color: var(--danger); }
+.gc-day { margin: 10px 0 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.gc-list > .gc-day:first-child { margin-top: 0; }
+.gc-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--gc-time) 3px minmax(0, 1fr);
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  align-items: center;
+  column-gap: 8px;
+  margin: 0 -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.gc-row:hover { background: var(--hover); }
+.gc-row:focus-visible, .gc-row:has(.gc-title:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.gc-time { overflow: hidden; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.gc-bar { align-self: stretch; min-height: 14px; border-radius: 2px; background: var(--c); }
+.gc-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; outline: none; }
+a.gc-title::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.gc-until { white-space: nowrap; font-size: 12px; color: var(--muted); }
+.gc-next { white-space: nowrap; font-size: 12px; color: var(--accent); }
+.gc-join { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: 6px; color: var(--muted); font-size: 11.5px; font-weight: 600; text-decoration: none; }
+.gc-join:hover { color: var(--text); background: var(--hover); }
+.gc-join.soon { padding: 2px 8px 2px 6px; color: #fff; background: var(--accent); }
+.gc-join.soon:hover { color: #fff; background: var(--accent); filter: brightness(1.08); }
+.gc-join:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Today's rows that went by; the one going on, tinted in its calendar's colour. */
+.gc-row.past { opacity: 0.55; }
+.gc-row.now { background: color-mix(in srgb, var(--c) 13%, transparent); }
+.gc-row.now:hover { background: color-mix(in srgb, var(--c) 18%, transparent); }
+.gc-row.now .gc-title { font-weight: 600; }
+.gc-row.next .gc-time { color: var(--accent); }
+.gc-now { height: 0; margin: 3px 0; border-top: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+.gc-none { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.gc-body > .widget-note:first-child { margin-top: 0; }
+.gc-body > .btn { margin-top: 8px; }
+.widget-gcal .widget-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Editor: a row per calendar (its colour, its name, what's wrong, remove), then the link box. */
+.gc-editor > .widget-sub:first-child { margin-top: 0; }
+.gc-cals { display: flex; flex-direction: column; gap: 6px; }
+.gc-cal { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.gc-swatch { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--c); cursor: pointer; }
+.gc-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gc-cal .pref-input { width: auto; min-width: 0; padding: 5px 9px; font-size: 13px; }
+.gc-cal .icon-btn { width: 28px; height: 28px; border-radius: 7px; }
+.gc-cal-status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--danger); }
+.gc-cal-status:empty { display: none; }
+.gc-add { display: flex; gap: 6px; }
+.gc-add .pref-input { flex: 1; width: auto; min-width: 0; padding: 7px 10px; font-size: 13px; }
+.gc-add .btn { padding: 7px 14px; }
+.gc-add-note { margin-top: 6px; }
+.gc-help { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.gc-help summary { cursor: pointer; width: fit-content; }
+.gc-help summary:hover { color: var(--text); }
+.gc-help ol { margin: 6px 0 0; padding-left: 18px; line-height: 1.55; }
+.gc-help a { color: inherit; }
+.gc-help .widget-note { margin-top: 6px; }
+.gc-editor .widget-note + .widget-sub { margin-top: 14px; }
+
+/* In the hover card: the calendar as a pill in its colour, then the place and the call. */
+.gc-pill { color: var(--text); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.gc-card-line { display: flex; align-items: flex-start; gap: 7px; color: var(--muted); }
+.gc-card-line .icon { flex: none; margin-top: 1px; }
+.gc-card-line span { min-width: 0; overflow-wrap: anywhere; }
+.ec-card .gc-card-about { white-space: pre-line; -webkit-line-clamp: 6; }
+
+/* Narrow: the title keeps the room; the tint says it's on now, the card says until when. */
+@container (max-width: 260px) {
+  .gc-until, .gc-join span { display: none; }
+  .gc-join.soon { padding: 2px 5px; }
+  .gc-row { column-gap: 6px; }
+}
+
 /* ---------- Tiles ---------- */
 
 /* Laid out by .grid-wrap. */

@@ -652,3 +652,12 @@ test('a token found by the chrome.storage check moves out, and the fresh state i
   assert.equal(adapter.data.state.prefs.github.token, '');
   assert.equal(adapter.copy.prefs.github.token, '');
 });
+
+test('the Google calendars are the page\'s: cleaned on load, none by default, never their links', () => {
+  assert.deepEqual(normalizeState({}).prefs.gcal, { calendars: [] });
+  const s = normalizeState({
+    prefs: { gcal: { calendars: [{ id: 'a1', name: ' Work ', color: '#039be5', url: 'https://calendar.google.com/x.ics' }, { id: 'a1' }, 'x'] } },
+  });
+  assert.deepEqual(s.prefs.gcal, { calendars: [{ id: 'a1', name: 'Work', color: '#039be5' }] });
+  assert.deepEqual(normalizeState({ prefs: { gcal: { calendars: 'nope' } } }).prefs.gcal, { calendars: [] });
+});

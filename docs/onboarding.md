@@ -51,8 +51,9 @@ Details per step:
   Preferences does and setup carries on at Widgets; a New Tab backup restores the whole page and
   ends setup.
 - **Widgets:** on a page still in its default places, every tick re-flows the page
-  (`placeDefaults`). Weather and then Countdown go under the clock; when the clock column is full
-  they go in the other column (Countdown first), and when both are, setup says there's no room.
+  (`placeDefaults`). Weather, Google Calendar and then Countdown go under the clock; when the clock
+  column is full they go in the other column (Countdown first, then Google Calendar), and when both
+  are, setup says there's no room.
   The Economic calendar goes under Markets, and the same way into the clock column when its own
   is full. Once something was arranged by hand, a tick adds a copy where it fits (or
   where the biggest widget makes room by shrinking, as the Layout mode tray does) and an untick
@@ -83,7 +84,7 @@ Throughout:
 | Clock: name, 24/12-hour | Name |
 | Theme, accent, background (ASCII, plain, picture) | Look |
 | Tiles from history, the bookmarks bar, Speed Dial 2, a backup | Sites |
-| Every widget type: Clock, Weather, Search bar, Tasks, Notes, Countdown, Markets, Economic calendar, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
+| Every widget type: Clock, Weather, Search bar, Tasks, Google Calendar, Notes, Countdown, Markets, Economic calendar, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
 | Layout mode: drag, resize, swap, remove, the tray and its previews | Arrange, Moves |
 | Widget stacks (a tip: drop onto another's middle) | Arrange |
 | Search bar engines (Google, Claude, ChatGPT, Gemini) | Connect |
@@ -100,6 +101,7 @@ Throughout:
 | Feature | Why it isn't in setup |
 | --- | --- |
 | GitHub access token | A credential: it belongs in Preferences → GitHub, with its how-to |
+| Google Calendar's secret iCal addresses | A credential, like the token: pasted in the widget's ✎, with its how-to; an empty widget says what it shows and has Add a calendar |
 | Groups, a tab's own layout | Home is enough to start; right-clicking a tab shows them when needed |
 | Folders made by dropping a tile on a tile | Learned by doing; the README covers it |
 | What's in Tasks, Notes, Countdown and Marvel | Used, not configured (an empty Countdown says so and has Add one) |

@@ -55,6 +55,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **Economic calendar** | This week's releases for the USA, the Eurozone and Israel (CPI, rate decisions, jobs reports, …) with the forecast, the previous and the number once it's out, filtered by importance; up to three, each with its own markets. |
+| **Google Calendar** | Today's events and the next two weeks' from your Google calendars, merged, each in its colour, with what's on now, what's next and a Join button for calls; chips choose which calendars each of up to two widgets shows. |
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to three copies can split them up. |
 | **Sports** | Your NBA, NFL and Israeli teams' games (Ligat Ha'Al and Winner League clubs, the national teams), any soccer or basketball team you search for, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to two, each with its own address and zoom. |
@@ -238,6 +239,45 @@ nothing. While TradingView can't be reached it comes from
 [ForexFactory](https://www.forexfactory.com/calendar)'s weekly feed (at most once an hour): the
 USA and the Eurozone only, to Saturday, with forecasts but no actual numbers, and the widget says
 so. If neither answers, it keeps the last calendar it had and says how old it is.
+
+## Google Calendar
+
+Add the **Google Calendar** widget in [Layout mode](#layout-mode) (or in setup's Widgets step,
+where it goes under the clock). It lists today's events and the next two weeks', from as many of
+your Google calendars as you add, merged into one list, each in its colour. It only reads: click
+an event and Google Calendar opens on it.
+
+- **Add a calendar:** in [Google Calendar's settings](https://calendar.google.com/calendar/r/settings),
+  click the calendar under **Settings for my calendars**, and in **Integrate calendar** copy
+  **Secret address in iCal format**. Hover the widget, click **✎**, paste it and press **Add**.
+  Chrome asks once for access to calendar.google.com. The name comes from Google; in ✎ you can
+  rename a calendar, click its dot for another colour, or remove it. Up to ten calendars, shared by
+  up to two widgets. Any other iCal address (Outlook, iCloud) works too.
+- **The secret address is a password:** anyone who has it can see the calendar. It stays in this
+  extension on this computer, out of backups and sync. If it ever leaks, **Reset** next to it in
+  Google Calendar makes a new one; then remove the calendar here and add the new address. Removing
+  the last calendar on calendar.google.com gives Chrome's access to it back (unless a Website
+  widget shows it).
+- **Chips:** with two calendars or more, a chip for each sits under the title; click one to hide
+  or show that calendar in this widget (another copy can show a different set). The last one shown
+  stays on.
+- **A row:** the time, a bar in the calendar's colour and the title. All-day events come first; an
+  event over several days shows on each, as "All day" or, on its last day, "–14:00". Today is
+  always there ("Nothing today" when it's empty), then each day with something, up to 13 days on.
+- **Now and next:** the event going on is tinted in its colour and says until when; the next one
+  counts down ("in 25 m"); today's events that ended are dimmed, above a line where the rest begin.
+- **Join:** an event with a Google Meet, Zoom, Teams or Webex link has a camera button that opens
+  the call, a filled **Join** from 10 minutes before it starts until it ends. *Open links in a new
+  tab* applies to it and to the events.
+- **Hover a row** (or Tab to it) for its card beside the widget: the calendar, when it is (and how
+  long until or since), the place, the call and the description. Esc closes it.
+- Events you declined and cancelled ones don't show. Times are in your computer's time zone and
+  follow the Clock's 12/24-hour setting.
+
+Each calendar is fetched at most every 10 minutes, shared by every copy and open tab. While Google
+can't be reached the widget keeps the last events it had and says how old they are. If an address
+stops working (it was reset, or the calendar deleted), the calendar's chip shows ⚠ and the widget
+says to add the new address.
 
 ## GitHub
 
@@ -674,11 +714,13 @@ list the coin), and are sent the same thing:
 | Background (a pasted image link) | the host of that link | whenever a new tab opens |
 | Search bar | `google.com`, `claude.ai`, `chatgpt.com` or `gemini.google.com`, opened like any link | only when you press Enter |
 | Website | the site you put in it, exactly as a tab would, with your cookies for that site | whenever a new tab opens, and as you use it |
+| Google Calendar | `calendar.google.com` (each calendar's secret iCal address you add; another iCal address goes to its own host); no cookies | every 10 min while visible, and once when you add it |
 
 Remove a widget in Layout mode and it stops fetching. Setup's site suggestions read Chrome's
 history and bookmarks on this computer; nothing about them is sent anywhere. **Reset everything**
 also deletes what the widgets saved from those requests (e.g. private GitHub data, the weather's
-place) and Ask messages still waiting for their chat site. A backup file is plain JSON: keep it
+place, your calendars' events), your calendars' secret addresses, and Ask messages still waiting
+for their chat site. A backup file is plain JSON: keep it
 somewhere private, and restore only backups you made. A restored backup can't bring in tiles that
 run script (`javascript:`, `data:`) or a wallpaper that's a link.
 
@@ -713,6 +755,12 @@ run script (`javascript:`, `data:`) or a wallpaper that's a link.
   [Economic calendar](#economic-calendar). It needs the extension reloaded once after updating
   (Chrome grants the two new sites only then); until then it says so, with a Reload button. On a
   page that isn't the extension (a local preview) it loads nothing.
+- Google Calendar: it only reads; events are added and changed in Google Calendar. It reads each
+  calendar's secret iCal address, so a work account whose Google Workspace admin turned those
+  addresses off can't be added (the Website widget can still show Google Calendar itself). The
+  addresses aren't in backups: on another computer, paste them again. A repeating event made by an
+  app that writes rules Google doesn't (say, "the last workday of the month") shows only its first
+  time.
 - Backup sources aren't exact copies. MET Norway gives chances of rain only in the Nordic
   countries, and today's high and low from the current hour on; for a city it has never had a
   forecast for, it takes your computer's time zone (or, far away, one guessed from the longitude).

@@ -10,6 +10,7 @@ import { VIEWS as TASK_VIEWS } from './tasks.js';
 import { SHOWS as MARVEL_SHOWS } from './marvel.js';
 import { cleanWeather } from './weather.js';
 import { cleanEcon, marketsSummary } from './econ.js';
+import { cleanGcal } from './gcal.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -101,6 +102,13 @@ export const TYPES = {
     label: 'Economic calendar', icon: 'calendar', size: [3, 5], min: [2, 3], max: 3,
     defaults: () => cleanEcon({}),
     clean: s => cleanEcon(s),
+  },
+  // hidden: the calendars (ids in prefs.gcal.calendars, see gcal.js) the copy's chips turned off.
+  // The calendars are the page's, not the copy's.
+  gcal: {
+    label: 'Google Calendar', icon: 'agenda', size: [3, 5], min: [2, 3], max: 2,
+    defaults: () => cleanGcal({}),
+    clean: s => cleanGcal(s),
   },
   // show: the countdown (an id in state.countdowns, see countdown.js) the copy shows, or 'next'
   // for whichever ends soonest. The countdowns are the page's, not the copy's.
@@ -329,12 +337,12 @@ export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.
 
 // The clock column, top to bottom. Marvel goes here: the other column's four minimums already
 // take all 12 rows.
-const NEAR = { clock: 4, weather: 4, countdown: 3, tasks: 4, notes: 4, claude: 2, marvel: 6 };
+const NEAR = { clock: 4, weather: 4, gcal: 5, countdown: 3, tasks: 4, notes: 4, claude: 2, marvel: 6 };
 const FAR = { markets: 5, econ: 5, github: 7, sports: 5, website: 6 };   // the other column
 // Types that came after both columns' minimums filled all 12 rows: one goes in the other column
 // when its own is full, and is left out when both are. The first moves first, so Weather keeps
 // its place under the clock longest.
-const SPARE = ['countdown', 'weather', 'econ'];
+const SPARE = ['countdown', 'gcal', 'weather', 'econ'];
 const fitsColumn = types => types.reduce((n, t) => n + TYPES[t].min[1], 0) <= ROWS;
 
 // The types each column takes: a spare that doesn't fit in its own column moves to the other.
@@ -686,5 +694,6 @@ export function copyTitle(copy, groups = []) {
   }
   if (copy.type === 'weather') return `${label} · ${copy.settings.place?.name ?? 'no place'}`;
   if (copy.type === 'econ') return `${label} · ${marketsSummary(copy.settings.markets)}`;
+  if (copy.type === 'gcal' && copy.settings.hidden.length) return `${label} · ${copy.settings.hidden.length} hidden`;
   return label;
 }

@@ -10,6 +10,7 @@ import {
   canFrameSites, framingNeedsReload, reloadExtension, extensionId, hasSiteAccess, requestSiteAccess, releaseSiteAccess, onSiteAccessChange,
   currentTabId, setFrameRules, frameRulesNow, dropSharedFrameRules, syncFrameScript, faviconUrl, openUrl,
 } from './chrome-api.js';
+import { linkDomains } from './gcal-links.js';
 
 const RECONFIGURE_MS = 800;   // wait for typing to stop before loading a changed address
 // Everything a site needs, except navigating the new tab page away.
@@ -46,10 +47,12 @@ async function syncSites(store) {
   await Promise.all([syncRules(), syncFrameScript(framePatterns(domains))]);
 }
 
-// A removed copy's site: Chrome's access to it goes back once no layout shows it.
+// A removed copy's site: Chrome's access to it goes back once no layout shows it and no Google
+// Calendar link is on it.
 async function releaseSite(store, url) {
   const site = siteUrl(url);
-  if (site && !layoutDomains(store).includes(siteDomain(site))) await releaseSiteAccess(sitePattern(site));
+  const domain = site && siteDomain(site);
+  if (site && !layoutDomains(store).includes(domain) && !linkDomains().includes(domain)) await releaseSiteAccess(sitePattern(site));
 }
 
 // On every new tab, with or without a Website widget: header rules left from when they held in

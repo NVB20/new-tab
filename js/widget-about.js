@@ -46,6 +46,10 @@ export const ABOUT = {
     tagline: 'The MCU in story order',
     about: 'Every MCU film, series, short and special in the order the story happens, with the next one to watch highlighted. Tick what you’ve watched as you go.',
   },
+  gcal: {
+    tagline: 'Your agenda, two weeks ahead',
+    about: 'Today’s events and the next two weeks’ from your Google calendars, merged, each in its colour, with what’s on now, what’s next and a Join button for calls. Add a calendar’s secret iCal address with ✎; chips choose which calendars each copy shows.',
+  },
   econ: {
     tagline: 'Releases that move markets',
     about: 'This week’s economic releases for the USA, the Eurozone and Israel, such as CPI, rate decisions and jobs reports, with the forecast and the number once it’s out. Pick the importance to show for each market with ✎ (say, everything for Israel and only High for the USA); each copy can show different ones.',

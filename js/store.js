@@ -7,6 +7,7 @@ import { isDay, PRIORITIES, REPEATS } from './tasks.js';
 import { defaultLayout, normalizeLayout, normalizeLayouts } from './layout.js';
 import { cleanWatched } from './marvel.js';
 import { cleanCountdowns } from './countdown.js';
+import { cleanCalendars } from './gcal.js';
 
 export const DEFAULT_PREFS = {
   theme: 'dark',
@@ -29,6 +30,9 @@ export const DEFAULT_PREFS = {
   // adds private repos' commits, issues and PRs, is saved apart from the state (see pickAdapter)
   // and is never exported in backups.
   github: { user: '', token: '' },
+  // The Google Calendar widgets' calendars, [{ id, name, color }] (gcal.js), one list for every
+  // copy. Their links are kept apart, on this computer only (gcal-links.js).
+  gcal: { calendars: [] },
   // The widget copies on the 12 × 12 canvas (see layout.js). null here: defaultState and
   // normalizeState fill it in.
   layout: null,
@@ -180,6 +184,7 @@ export function normalizeState(raw) {
     if (typeof token === 'string' && !s.prefs.github.token) s.prefs.github.token = token;
   }
   s.prefs.layouts = normalizeLayouts(rp.layouts, s);
+  s.prefs.gcal = { calendars: cleanCalendars(rp.gcal?.calendars) };
   // The username was each GitHub copy's own setting (or the old widget's) before they shared one.
   const copies = Array.isArray(rp.layout?.widgets) ? rp.layout.widgets : [];
   const user = [...copies.map(c => c?.settings?.user), rp.widgets?.github?.user].find(u => typeof u === 'string' && u.trim());

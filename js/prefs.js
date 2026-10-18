@@ -12,6 +12,7 @@ import { cityField } from './city-search.js';
 import { iconsFor, addSavedIcons, clearSavedIcons } from './icon-cache.js';
 import { sweep } from './net.js';
 import { hasChrome, clearChatHandoffs } from './chrome-api.js';
+import { forgetLinks } from './gcal-links.js';
 
 // The GitHub widget's parts as Preferences → GitHub lists them.
 const PART_NAMES = {
@@ -379,6 +380,8 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
         return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
       case 'econ':
         return [row('Markets and importance', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'gcal':
+        return [row('Calendars', el('span'), 'Use ✎ on the widget to add them; its chips choose which show')];
       case 'weather':
         return [
           row('City', cityField({
@@ -619,12 +622,12 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     }
     const message = `Import ${imported.tiles.length} tiles in ${imported.groups.length} group${imported.groups.length === 1 ? '' : 's'} from Speed Dial 2? This replaces your current tiles, groups and settings. Tasks, task history and notes are kept.`;
     if (!await confirmDialog(message, { title: 'Import from Speed Dial 2', confirmLabel: 'Import' })) return;
-    // The layout and the token stay; only the export's column count goes to the block that
+    // The layout, the token and the calendars stay; only the export's column count goes to the block that
     // follows the tabs. Blocks pinned to the old groups go back to following the tabs on load.
-    const { tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { layout, github } } = structuredClone(store.get());
+    const { tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { layout, github, gcal } } = structuredClone(store.get());
     const block = copiesOf(layout).find(c => c.type === 'tiles' && c.settings.group === null);
     if (block) block.settings.columns = imported.prefs.columns;
-    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { ...imported.prefs, layout, github } });
+    store.replace({ ...imported, tasks, taskHistory, taskStats, notes, marvel, countdowns, prefs: { ...imported.prefs, layout, github, gcal } });
     redraw();
   }
 
@@ -633,9 +636,10 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
     store.replace(null, { keepToken: false });
     await store.setWallpaper('');
     await clearSavedIcons();
-    // What the widgets fetched (private GitHub data, the weather's place) and Ask messages that
-    // never reached their chat site go too.
+    // What the widgets fetched (private GitHub data, the weather's place, calendars), the calendars'
+    // links and Ask messages that never reached their chat site go too.
     sweep('', () => false);
+    await forgetLinks();
     await clearChatHandoffs();
     show('page');
   }

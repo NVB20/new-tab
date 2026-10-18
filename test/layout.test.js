@@ -464,6 +464,40 @@ test('Weather goes in the far column when the clock column is full, and is left 
   assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
 });
 
+test('Google Calendar: up to two copies, each with its hidden calendars, never on an old page, under Weather', () => {
+  assert.equal(TYPES.gcal.max, 2);
+  assert.equal(prefsSection('gcal'), 'layout');
+  assert.deepEqual(TYPES.gcal.defaults(), { hidden: [] });
+  assert.deepEqual(TYPES.gcal.clean({ hidden: ['a1', 'a1', 3] }), { hidden: ['a1'] });
+  assert.equal(byType(defaultLayout(legacy())).gcal, undefined);
+  assert.equal(copyTitle({ type: 'gcal', settings: { hidden: [] } }), 'Google Calendar');
+  assert.equal(copyTitle({ type: 'gcal', settings: { hidden: ['a1', 'b2'] } }), 'Google Calendar · 2 hidden');
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'weather', 'gcal', 'markets', 'tiles']);
+  const t = byType(l);
+  assert.equal(t.gcal.x, 0);
+  assert.equal(t.gcal.y, t.weather.y + t.weather.h);
+  assert.ok(t.gcal.h >= TYPES.gcal.min[1]);
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  assert.ok(atDefaultPlaces(l));
+});
+
+test('Google Calendar moves to the other column before Weather does, and is left out when both are full', () => {
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'tasks', 'notes', 'claude', 'weather', 'gcal', 'markets', 'tiles']);
+  let t = byType(l);
+  assert.equal(t.gcal.x, 9);
+  assert.equal(t.weather.x, 0);
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  assert.ok(atDefaultPlaces(l));
+  const near = ['clock', 'tasks', 'notes', 'claude', 'marvel'];
+  const far = ['markets', 'github', 'sports', 'website'];
+  l.widgets = placeDefaults(l, [...near, ...far, 'gcal', 'tiles']);
+  t = byType(l);
+  assert.equal(t.gcal, undefined);
+  assert.deepEqual(Object.keys(t).sort(), [...near, ...far, 'tiles'].sort());
+});
+
 test('Economic calendar: up to three copies, markets and levels each, never on an old page, under Markets', () => {
   assert.equal(TYPES.econ.max, 3);
   assert.equal(prefsSection('econ'), 'layout');

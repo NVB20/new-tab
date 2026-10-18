@@ -34,8 +34,10 @@ No manifest change, no reload, nothing new in the store's install warning.
   Live Server preview (no `chrome`) nothing is stored or fetched: "The calendar loads in the
   extension."
 - **Adding** (✎): paste the link (`webcal://` becomes `https://`; http(s) only, no user name or
-  password). Add asks Chrome for the site first (the prompt needs the click), then fetches it once:
-  not a calendar → "That link isn't a calendar" and nothing is kept. The name is the feed's
+  password). A Google link that isn't an iCal address (the calendar's page, its embed URL) is
+  refused before anything is asked: "That's a link to Google Calendar itself". Add asks Chrome for
+  the site first (the prompt needs the click), then fetches it once: not a calendar → "That link
+  isn't a calendar", a 4xx → "doesn't know that link"; nothing is kept, and the access goes back. The name is the feed's
   `X-WR-CALNAME` (else the host), the colour the next of 8; both can be changed.
 - **Removing** a calendar (✎, after a confirm) deletes its link and cached events, and gives the
   site's access back unless another calendar link or a Website widget still uses that site.
@@ -91,13 +93,15 @@ No manifest change, no reload, nothing new in the store's install warning.
   each, as "All day" or, on its last day, "–14:00".
 - **Now and next:** an event going on has an accent bar and "until 14:30"; the first event ahead
   says "in 25 m"; today's events that ended are dimmed, with a line where the ones ahead start.
-- **Join:** an event with a meeting link that hasn't ended gets a Join button (filled from 10 min
-  before it starts until it ends). It opens the call; Open links in a new tab applies, as to the
+- **Join:** an event with a meeting link that hasn't ended gets a camera button, a filled "Join"
+  from 10 min before it starts until it ends. Under 260px wide, Join and "until 14:30" go (the tint
+  and the card still say it). It opens the call; Open links in a new tab applies, as to the
   event link.
 - **Hover card** (econ-card.js, now shared): the calendar as a pill, the title, when (time range,
   long date, how long until or since), the place, the meeting link's site, the description
   (clamped). Rows are focusable: Tab opens it, Esc closes it.
-- **Empty:** no calendars: "Add a Google calendar" with Add, which opens ✎.
+- **Empty:** no calendars: "Your Google Calendar agenda shows here." and **Add a calendar**, which
+  opens ✎ with the cursor in the link box.
 
 ## Editor (✎)
 
@@ -114,7 +118,8 @@ No manifest change, no reload, nothing new in the store's install warning.
 - `gcal: { label: 'Google Calendar', size: [3, 5], min: [2, 3], max: 2 }`. In the default places
   it goes under the clock (after Weather), and is the first to move to the other column when the
   clock column is full, as `SPARE` does for Countdown.
-- Setup's Widgets step offers it; Connect doesn't ask for a link (a credential, like the GitHub
+- A Speed Dial 2 import (Preferences and setup) keeps the calendars, as it keeps the layout.
+- Setup's Widgets step offers it (after Tasks); Connect doesn't ask for a link (a credential, like the GitHub
   token: it belongs in ✎ with its how-to), so it goes under "Left out on purpose".
 
 ## README

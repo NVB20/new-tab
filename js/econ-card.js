@@ -1,6 +1,7 @@
-// The Economic calendar's hover card: one per page, beside the widget with an arrow at the row it
-// tells about (above or below the row when neither side has room). The widget fills it
-// (econ-widget.js); the pointer and the keyboard focus open it.
+// The hover card of the Economic calendar and Google Calendar widgets: one per page, beside the
+// widget with an arrow at the row it tells about (above or below the row when neither side has
+// room). The widget fills it (econ-widget.js, gcal-widget.js); the pointer and the keyboard focus
+// open it.
 
 import { el } from './ui.js';
 
