@@ -70,8 +70,16 @@ USA, Eurozone and Israel; High, Medium and Low. Up to three copies, each with it
   no actual yet shows "Due" for 15 min, then nothing.
 - **Holidays:** one all-day row ("Holiday · Yom Kippur"), no dots, for the copy's markets, whatever
   its importance filter.
-- **Hover a row:** the full title, the period, the source (e.g. "Central Bureau of Statistics") and
-  TradingView's description.
+- **Hover a row** (asked for "more modern" after the first build, in place of the browser's
+  tooltip): a card (`js/econ-card.js`, one per page, styled like the Layout tray's preview card)
+  beside the widget on the side with room, its arrow at the row; over or under the row when
+  neither side has room. Pills for the market and the importance; the title and period; the time,
+  date and "in 2 h" / "6h ago"; Actual, Forecast and Previous in three cells (each as wide as its
+  number), with "Above / Below / In line with the forecast"; the description (5 lines at most);
+  the source and "via TradingView". It opens after the pointer rests 300 ms, moves at once to the
+  next row, closes when the pointer leaves, on scroll, on resize and with ✎; Tab to a row
+  (rows are focusable) opens it, Esc closes it. A redraw (every minute) keeps it on the same
+  release. No `title` tooltips are left on the rows.
 - **Narrow (under 260px, a container query):** the title has the first line to itself and the
   number (or countdown) moves to the end of the second; no period and no previous.
 - **Nothing to show:** "Nothing for these filters this week", with Change filters (opens ✎).

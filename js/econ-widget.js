@@ -9,6 +9,7 @@ import { timeAgo } from './feeds.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import { hasChrome, sessionRuleReady, hasHostAccess, reloadExtension } from './chrome-api.js';
 import { formatTime, longDay } from './sports.js';
+import { showCard, hideCard, cardRow } from './econ-card.js';
 import {
   LEVELS, MARKETS, LEVEL_LABELS, MARKET_LABELS, SOURCES, FF_FEED, TV_HOST, tvUrl, originRule, isOriginRule,
   parseTradingView, parseForexFactory, calendar, untilLabel, econTtl,
@@ -69,33 +70,58 @@ export function mountEcon(root, store, copy) {
       [1, 2, 3].map(i => el('i', { class: i <= DOTS[level] ? 'on' : null })));
   }
 
-  // The hover text: the title and period, market, importance and when, the source, the description.
-  function about(e) {
-    const when = e.allDay ? longDay(Date.parse(`${e.day}T12:00:00Z`), 'UTC') : `${longDay(e.at)}, ${timeOf(e)}`;
-    const what = e.kind === 'holiday' ? 'Holiday' : `${LEVEL_LABELS[e.level]} importance`;
-    return [`${e.title}${e.period ? ` · ${e.period}` : ''}`, `${MARKET_LABELS[e.market]} · ${what} · ${when}`, e.source, e.about]
-      .filter(Boolean).join('\n');
+  const arrow = move => (move ? el('span', { class: `ec-move ${move}`, text: move === 'up' ? '▲' : '▼' }) : null);
+
+  // The hover card (econ-card.js): the market and importance, the release and when (with how long
+  // until or since), the actual, forecast and previous with how the actual compares, what the
+  // indicator measures, and who publishes it.
+  function cardContent(e, now) {
+    const holiday = e.kind === 'holiday';
+    const pills = el('div', { class: 'ec-card-pills' },
+      el('span', { class: 'ec-pill' }, el('b', { text: e.market }), MARKET_LABELS[e.market]),
+      holiday ? el('span', { class: 'ec-pill', text: 'Holiday' })
+        : el('span', { class: `ec-pill ${e.level}` }, dots(e.level), `${LEVEL_LABELS[e.level]} importance`));
+    const date = e.allDay ? longDay(Date.parse(`${e.day}T12:00:00Z`), 'UTC') : longDay(e.at);
+    const ago = timeAgo(e.at, now);
+    const relative = e.allDay ? 'All day' : e.at > now ? untilLabel(e.at, now) : ago === 'now' ? 'just now' : `${ago} ago`;
+    const when = el('p', { class: 'ec-card-when' },
+      e.allDay ? null : el('b', { text: timeOf(e) }), e.allDay ? null : ' · ', date, el('span', { class: 'ec-card-rel', text: ` · ${relative}` }));
+    const numbers = !holiday && (e.actual || e.forecast || e.previous || e.state === 'due');
+    const cell = (label, value, cls = '') => el('div', { class: `ec-num ${cls}` },
+      el('span', { class: 'ec-num-label', text: label }), el('span', { class: 'ec-num-value' }, value || '—'));
+    const actual = e.actual ? [e.actual, arrow(e.move)] : e.state === 'due' ? 'Due' : '';
+    const against = e.forecast ? 'forecast' : 'previous';
+    const compare = !e.actual ? '' : e.move ? `${e.move === 'up' ? 'Above' : 'Below'} the ${against}` : e.forecast || e.previous ? `In line with the ${against}` : '';
+    const from = [e.source, `via ${via()}`].filter(Boolean).join(' · ');
+    return [
+      pills,
+      el('p', { class: 'ec-card-title' }, e.title, e.period ? el('span', { class: 'ec-card-period', text: ` · ${e.period}` }) : null),
+      when,
+      numbers ? el('div', { class: 'ec-nums' },
+        cell('Actual', actual, `actual${e.state === 'due' ? ' due' : ''}`), cell('Forecast', e.forecast), cell('Previous', e.previous)) : null,
+      compare ? el('p', { class: 'ec-card-compare', text: compare }) : null,
+      e.about ? el('p', { class: 'ec-card-about', text: e.about }) : null,
+      el('p', { class: 'ec-card-from', text: from }),
+    ].filter(Boolean);
   }
 
   // Out: the actual, ▲ or ▼ against the forecast (or the previous); next: the countdown; due: Due.
   function outcome(e, now) {
-    if (e.state === 'out') {
-      const against = e.forecast ? 'forecast' : 'previous';
-      return el('b', { class: 'ec-actual' }, e.actual, e.move ? el('span', {
-        class: `ec-move ${e.move}`, text: e.move === 'up' ? '▲' : '▼', title: `${e.move === 'up' ? 'Above' : 'Below'} the ${against}`,
-      }) : null);
-    }
+    if (e.state === 'out') return el('b', { class: 'ec-actual' }, e.actual, arrow(e.move));
     if (e.state === 'next') return el('span', { class: 'ec-until', text: untilLabel(e.at, now) });
     if (e.state === 'due') return el('span', { class: 'ec-due', text: 'Due' });
     return null;
   }
 
+  let shown = new Map();   // the rows drawn, by event id → the event
+
   function row(e, now) {
     const holiday = e.kind === 'holiday';
     const right = outcome(e, now);
-    const values = [['f', e.forecast, 'Forecast'], ['p', e.previous, 'Previous']].filter(([, v]) => v)
-      .map(([k, v, label]) => el('span', { class: `ec-${k}`, title: label }, el('i', { text: k }), v));
-    return el('div', { class: `ec-row ${e.state}${holiday ? ' holiday' : ''}`, title: about(e) },
+    const values = [['f', e.forecast], ['p', e.previous]].filter(([, v]) => v)
+      .map(([k, v]) => el('span', { class: `ec-${k}` }, el('i', { text: k }), v));
+    shown.set(e.id, e);
+    return el('div', { class: `ec-row ${e.state}${holiday ? ' holiday' : ''}`, tabindex: '0', dataset: { id: e.id } },
       el('span', { class: 'ec-time', text: timeOf(e) }),
       el('span', { class: 'ec-tag', text: e.market }),
       holiday ? el('span', { class: 'ec-dots' }) : dots(e.level),
@@ -138,6 +164,8 @@ export function mountEcon(root, store, copy) {
   // minute matters too: the countdowns, and rows going by.
   let drawn = '';
 
+  const rowFor = id => body.querySelector(`.ec-row[data-id="${CSS.escape(id)}"]`);
+
   function render() {
     const s = settings();
     const now = Date.now();
@@ -145,7 +173,19 @@ export function mountEcon(root, store, copy) {
     const next = JSON.stringify([s, version, loaded, access, hour24(), Math.floor(now / 60e3)]);
     if (next === drawn) return;
     drawn = next;
+    // The rows are drawn anew: the card and the focus move to the same release's new row.
+    const open = ownCard();
+    const focused = body.contains(document.activeElement) ? document.activeElement.dataset?.id : null;
+    draw(now);
+    const again = open ? rowFor(open.dataset.id) : null;
+    if (again) openCard(again);
+    else if (open) hideCard(open);
+    if (focused) rowFor(focused)?.focus({ preventScroll: true });
+  }
+
+  function draw(now) {
     section.classList.toggle('h12', !hour24());
+    shown = new Map();
     if (!hasChrome) {
       body.replaceChildren(widgetEmpty('The calendar loads in the extension.'));
       return;
@@ -162,6 +202,70 @@ export function mountEcon(root, store, copy) {
       problem(),
     ].filter(Boolean));
   }
+
+  // ---- the hover card ----
+
+  const HOVER_MS = 300;   // the pointer rests this long on a row before its card opens
+  const LEAVE_MS = 80;    // time to reach the next row, where the card moves at once
+  let showTimer = 0;
+  let hideTimer = 0;
+
+  // The row of this widget the card is open for, or null.
+  function ownCard() {
+    const open = cardRow();
+    return open && body.contains(open) ? open : null;
+  }
+
+  function openCard(target) {
+    const e = shown.get(target.dataset.id);
+    if (e) showCard(target, cardContent(e, Date.now()));
+  }
+
+  function closeCard() {
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    const open = ownCard();
+    if (open) hideCard(open);
+  }
+
+  const rowOf = ev => ev.target.closest?.('.ec-row') ?? null;
+
+  body.addEventListener('pointerover', ev => {
+    const target = rowOf(ev);
+    if (!target || ev.pointerType === 'touch') return;
+    clearTimeout(hideTimer);
+    clearTimeout(showTimer);
+    if (ownCard() === target) return;
+    if (ownCard()) openCard(target);
+    else showTimer = setTimeout(() => { if (target.isConnected) openCard(target); }, HOVER_MS);
+  });
+  body.addEventListener('pointerout', ev => {
+    const target = rowOf(ev);
+    if (!target || target.contains(ev.relatedTarget)) return;
+    clearTimeout(showTimer);
+    hideTimer = setTimeout(() => { if (!target.matches(':focus-visible')) hideCard(target); }, LEAVE_MS);
+  });
+  // The keyboard: Tab to a row opens its card, Esc closes it.
+  body.addEventListener('focusin', ev => {
+    const target = rowOf(ev);
+    if (target?.matches(':focus-visible')) {
+      clearTimeout(hideTimer);
+      openCard(target);
+    }
+  });
+  body.addEventListener('focusout', ev => {
+    const target = rowOf(ev);
+    if (target && !target.contains(ev.relatedTarget)) hideCard(target);
+  });
+  body.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && ownCard()) {
+      closeCard();
+      ev.stopPropagation();
+    }
+  });
+  // It points at a row, so it goes when the rows move.
+  section.addEventListener('scroll', closeCard, { passive: true });
+  addEventListener('resize', closeCard);
 
   // ---- loading ----
 
@@ -251,6 +355,7 @@ export function mountEcon(root, store, copy) {
 
   function setEditing(on) {
     editing = on;
+    closeCard();
     section.classList.toggle('editing', on);
     editButton.replaceChildren(icon(on ? 'check' : 'edit', 15));
     editButton.title = on ? 'Done' : 'Choose markets and importance';
@@ -285,8 +390,10 @@ export function mountEcon(root, store, copy) {
   return {
     destroy() {
       seq++;
+      closeCard();
       clearInterval(interval);
       document.removeEventListener('visibilitychange', refresh);
+      removeEventListener('resize', closeCard);
       unsubscribe();
     },
   };

@@ -1098,6 +1098,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   font-variant-numeric: tabular-nums;
 }
 .ec-row:hover { background: var(--hover); }
+.ec-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .ec-time { grid-area: time; overflow: hidden; white-space: nowrap; font-size: 12px; color: var(--muted); }
 .ec-tag { grid-area: tag; font-size: 10px; font-weight: 600; letter-spacing: 0.03em; color: var(--muted); }
 .ec-dots { grid-area: dots; display: inline-flex; gap: 2px; }
@@ -1133,6 +1134,74 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .ec-editor .sp-chip[aria-disabled="true"] { cursor: default; }
 
 .widget-econ .widget-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The hover card (econ-card.js): beside the widget, its arrow at the row (or over or under the
+   row when neither side has room). The market and importance as pills, the release and when, the
+   numbers in three cells, what it measures, and who publishes it. */
+.ec-card {
+  position: fixed;
+  z-index: 46;
+  width: 320px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 12.5px;
+  line-height: 1.4;
+  pointer-events: none;
+  animation: ec-card-in 0.14s ease-out;
+}
+.ec-card.moving { animation: none; }
+.ec-card[data-side="right"] { --from: -4px 0; }
+.ec-card[data-side="left"] { --from: 4px 0; }
+.ec-card[data-side="above"] { --from: 0 4px; }
+.ec-card[data-side="below"] { --from: 0 -4px; }
+@keyframes ec-card-in { from { opacity: 0; translate: var(--from, 0 4px); } }
+.ec-card::before {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 0 solid var(--border);
+  background: var(--surface);
+  rotate: 45deg;
+}
+.ec-card[data-side="right"]::before { left: 0; top: var(--arrow); translate: -50% -50%; border-width: 0 0 1px 1px; }
+.ec-card[data-side="left"]::before { right: 0; top: var(--arrow); translate: 50% -50%; border-width: 1px 1px 0 0; }
+.ec-card[data-side="below"]::before { top: 0; left: var(--arrow); translate: -50% -50%; border-width: 1px 0 0 1px; }
+.ec-card[data-side="above"]::before { bottom: 0; left: var(--arrow); translate: -50% 50%; border-width: 0 1px 1px 0; }
+.ec-card p { margin: 0; }
+.ec-card-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.ec-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; background: var(--hover); color: var(--muted); font-size: 11.5px; }
+.ec-pill b { color: var(--text); font-size: 10.5px; font-weight: 650; letter-spacing: 0.04em; }
+.ec-pill.high { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+.ec-pill.medium { color: #e09412; background: color-mix(in srgb, #f5a524 16%, transparent); }
+.ec-card-title { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.ec-card-period { color: var(--muted); font-weight: 400; }
+.ec-card .ec-card-when { margin-top: -4px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ec-card-when b { color: var(--text); font-weight: 600; }
+.ec-card-rel { color: var(--accent); }
+/* Each cell as wide as its number, the room left shared out: "−$3,985M ▲" fits whole. */
+.ec-nums { display: grid; grid-template-columns: repeat(3, auto); gap: 1px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--border); }
+.ec-num { display: flex; flex-direction: column; gap: 1px; padding: 7px 9px 8px; background: var(--surface); }
+.ec-num-label { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.ec-num-value { white-space: nowrap; font-size: 14.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ec-num.actual .ec-num-value { font-weight: 700; }
+.ec-num.due .ec-num-value { color: var(--accent); }
+.ec-num .ec-move { margin-left: 4px; font-size: 10px; }
+.ec-card .ec-card-compare { margin-top: -3px; color: var(--muted); font-size: 11.5px; }
+.ec-card-about { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); }
+.ec-card-from { padding-top: 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+@media (prefers-reduced-motion: reduce) {
+  .ec-card { animation: none; }
+}
 
 /* Narrow: the title has the first line to itself, the number moves to the end of the second; no
    period and no previous. */

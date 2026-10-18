@@ -226,8 +226,11 @@ rate decisions, jobs reports, PMIs, central bankers' speeches and the like.
   the importance.
 - **Israel:** TradingView rates almost every Israeli release Low, CPI included. Here the Bank of
   Israel's rate decisions and CPI count as High, GDP and unemployment as Medium.
-- Times are in your computer's time zone and follow the Clock's 12/24-hour setting. Hover a row for
-  the source (e.g. Central Bureau of Statistics) and what the indicator measures.
+- Times are in your computer's time zone and follow the Clock's 12/24-hour setting.
+- **Hover a row** (or Tab to it) for its card beside the widget: the market and importance, when it
+  is or was (and how long until or since), the actual, forecast and previous side by side with how
+  the actual compares, what the indicator measures, and who publishes it (e.g. Central Bureau of
+  Statistics). Moving to the next row moves the card; Esc closes it.
 
 The calendar comes from [TradingView](https://www.tradingview.com/economic-calendar/), fetched at
 most every 15 minutes and shared by every copy and open tab, so changing a copy's filters fetches
