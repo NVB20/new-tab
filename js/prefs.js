@@ -377,6 +377,8 @@ export function setupPrefs(store, { enterLayoutMode = () => {}, runSetup = null 
         return [row('Products', el('span'), 'Use ✎ on the widget to choose them')];
       case 'sports':
         return [row('Teams and F1', el('span'), 'Use ✎ on the widget to choose them')];
+      case 'econ':
+        return [row('Markets and importance', el('span'), 'Use ✎ on the widget to choose them')];
       case 'weather':
         return [
           row('City', cityField({

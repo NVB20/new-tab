@@ -192,7 +192,8 @@ export async function currentTabId() {
   return can.tabs ? (await c.tabs.getCurrent())?.id ?? null : null;
 }
 
-// Every session rule Chrome holds (the Website widgets' header rules, each scoped to one tab).
+// Every session rule Chrome holds (the Website widgets' header rules, each scoped to one tab, and
+// the Economic calendar's, see sessionRuleReady).
 export async function frameRulesNow() {
   if (!canFrameSites) return [];
   return c.declarativeNetRequest.getSessionRules();
@@ -210,6 +211,52 @@ export async function dropSharedFrameRules(maxId) {
   if (!canFrameSites) return;
   const old = (await c.declarativeNetRequest.getDynamicRules()).filter(r => r.id <= maxId).map(r => r.id);
   if (old.length) await c.declarativeNetRequest.updateDynamicRules({ removeRuleIds: old });
+}
+
+// ---- Economic calendar: a request header rule for the extension's own requests ----
+
+const canSetHeaders = hasChrome && !!c.declarativeNetRequest;
+const ready = new Map();   // rule name → the promise of it being in place, once per page
+
+// Puts a session rule in place unless Chrome holds it already (it lasts until the browser closes,
+// across every tab): isOurs(rule) recognises it, make(extensionId, id) writes it with the lowest
+// id no rule holds. Two tabs may pick the same id at once; Chrome refuses the later, which looks
+// again. Resolves false outside the extension or when it couldn't, and is tried again next time.
+export function sessionRuleReady(name, isOurs, make) {
+  if (!canSetHeaders) return Promise.resolve(false);
+  if (!ready.has(name)) {
+    ready.set(name, (async () => {
+      for (let tries = 3; tries > 0; tries--) {
+        const rules = await c.declarativeNetRequest.getSessionRules();
+        if (rules.some(isOurs)) return true;
+        const taken = new Set(rules.map(r => r.id));
+        let id = 1;
+        while (taken.has(id)) id++;
+        try {
+          await c.declarativeNetRequest.updateSessionRules({ addRules: [make(c.runtime.id, id)] });
+          return true;
+        } catch {
+          // another tab took that id just now
+        }
+      }
+      return false;
+    })().catch(() => false).then(ok => {
+      if (!ok) ready.delete(name);
+      return ok;
+    }));
+  }
+  return ready.get(name);
+}
+
+// Whether Chrome has granted the manifest's access to a host, e.g. 'https://example.com/*'. A
+// host added to the manifest is granted only once the extension is reloaded.
+export async function hasHostAccess(pattern) {
+  if (!hasChrome || !c.permissions) return false;
+  try {
+    return await c.permissions.contains({ origins: [pattern] });
+  } catch {
+    return false;
+  }
 }
 
 // content/site-frame.js, which tells a Website widget the page its frame is on, runs on the

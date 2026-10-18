@@ -464,6 +464,38 @@ test('Weather goes in the far column when the clock column is full, and is left 
   assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
 });
 
+test('Economic calendar: up to three copies, markets and levels each, never on an old page, under Markets', () => {
+  assert.equal(TYPES.econ.max, 3);
+  assert.equal(prefsSection('econ'), 'layout');
+  assert.deepEqual(TYPES.econ.defaults(), { levels: ['high', 'medium'], markets: ['US', 'EU', 'IL'] });
+  assert.deepEqual(TYPES.econ.clean({ levels: ['low'], markets: [] }), { levels: ['low'], markets: ['US', 'EU', 'IL'] });
+  assert.equal(byType(defaultLayout(legacy())).econ, undefined);
+  assert.equal(copyTitle({ type: 'econ', settings: { levels: ['high'], markets: ['US', 'IL'] } }), 'Economic calendar · US, IL');
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', 'markets', 'econ', 'github', 'tiles']);
+  const t = byType(l);
+  assert.equal(t.econ.x, 9);
+  assert.equal(t.econ.y, t.markets.y + t.markets.h);
+  assert.ok(t.github.y > t.econ.y);
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  assert.ok(atDefaultPlaces(l));
+});
+
+test('The Economic calendar goes in the clock column when the far one is full, and is left out when both are', () => {
+  const near = ['clock', 'tasks', 'notes', 'claude', 'marvel'];
+  const far = ['markets', 'github', 'sports', 'website'];
+  const l = { cols: COLS, rows: ROWS, widgets: [] };
+  l.widgets = placeDefaults(l, ['clock', ...far, 'econ', 'tiles']);
+  let t = byType(l);
+  assert.equal(t.econ.x, 0);
+  assert.ok(l.widgets.every(c => c.y + c.h <= ROWS));
+  assert.ok(atDefaultPlaces(l));
+  l.widgets = placeDefaults(l, [...near, ...far, 'econ', 'tiles']);
+  t = byType(l);
+  assert.equal(t.econ, undefined);
+  assert.deepEqual(Object.keys(t).sort(), [...near, ...far, 'tiles'].sort());
+});
+
 test('Countdown: up to three copies, one countdown each (Next up to start), never on an old page, under the clock', () => {
   assert.equal(TYPES.countdown.max, 3);
   assert.equal(prefsSection('countdown'), null);

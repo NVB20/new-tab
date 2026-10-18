@@ -46,6 +46,10 @@ export const ABOUT = {
     tagline: 'The MCU in story order',
     about: 'Every MCU film, series, short and special in the order the story happens, with the next one to watch highlighted. Tick what you’ve watched as you go.',
   },
+  econ: {
+    tagline: 'Releases that move markets',
+    about: 'This week’s economic releases for the USA, the Eurozone and Israel, such as CPI, rate decisions and jobs reports, with the forecast and the number once it’s out. Pick the markets and the importance with ✎; each copy can show different ones.',
+  },
   weather: {
     tagline: 'Now, by the hour, the week',
     about: 'A city’s weather now, the next hours and the week ahead, from Open-Meteo. Pick the city and °C or °F with ✎; each copy can show a different city.',

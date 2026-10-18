@@ -9,6 +9,7 @@ import { siteUrl, siteDomain } from './website.js';
 import { VIEWS as TASK_VIEWS } from './tasks.js';
 import { SHOWS as MARVEL_SHOWS } from './marvel.js';
 import { cleanWeather } from './weather.js';
+import { cleanEcon, marketsSummary } from './econ.js';
 
 export const COLS = 12;
 export const ROWS = 12;
@@ -93,6 +94,13 @@ export const TYPES = {
     label: 'Weather', icon: 'cloud-sun', size: [3, 4], min: [2, 2], max: 3,
     defaults: () => cleanWeather({}),
     clean: s => cleanWeather(s),
+  },
+  // levels: the importance levels shown ('high', 'medium', 'low'); markets: 'US', 'EU', 'IL'
+  // (econ.js). Holidays show whatever the levels.
+  econ: {
+    label: 'Economic calendar', icon: 'calendar', size: [3, 5], min: [2, 3], max: 3,
+    defaults: () => cleanEcon({}),
+    clean: s => cleanEcon(s),
   },
   // show: the countdown (an id in state.countdowns, see countdown.js) the copy shows, or 'next'
   // for whichever ends soonest. The countdowns are the page's, not the copy's.
@@ -322,11 +330,11 @@ export const stackOrder = widgets => [...widgets].sort((a, b) => a.y - b.y || a.
 // The clock column, top to bottom. Marvel goes here: the other column's four minimums already
 // take all 12 rows.
 const NEAR = { clock: 4, weather: 4, countdown: 3, tasks: 4, notes: 4, claude: 2, marvel: 6 };
-const FAR = { markets: 5, github: 7, sports: 5, website: 6 };   // the other column
+const FAR = { markets: 5, econ: 5, github: 7, sports: 5, website: 6 };   // the other column
 // Types that came after both columns' minimums filled all 12 rows: one goes in the other column
 // when its own is full, and is left out when both are. The first moves first, so Weather keeps
 // its place under the clock longest.
-const SPARE = ['countdown', 'weather'];
+const SPARE = ['countdown', 'weather', 'econ'];
 const fitsColumn = types => types.reduce((n, t) => n + TYPES[t].min[1], 0) <= ROWS;
 
 // The types each column takes: a spare that doesn't fit in its own column moves to the other.
@@ -677,5 +685,6 @@ export function copyTitle(copy, groups = []) {
     return `${label} · ${url ? siteDomain(url) : 'no address'}`;
   }
   if (copy.type === 'weather') return `${label} · ${copy.settings.place?.name ?? 'no place'}`;
+  if (copy.type === 'econ') return `${label} · ${marketsSummary(copy.settings.markets)}`;
   return label;
 }

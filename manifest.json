@@ -34,7 +34,9 @@
     "https://github.com/*",
     "https://api.github.com/*",
     "https://*.speeddial2.com/*",
-    "https://query1.finance.yahoo.com/*"
+    "https://query1.finance.yahoo.com/*",
+    "https://economic-calendar.tradingview.com/*",
+    "https://nfs.faireconomy.media/*"
   ],
   "optional_host_permissions": [
     "*://*/*"

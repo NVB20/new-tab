@@ -52,7 +52,9 @@ Details per step:
   ends setup.
 - **Widgets:** on a page still in its default places, every tick re-flows the page
   (`placeDefaults`). Weather and then Countdown go under the clock; when the clock column is full
-  they go in the other column (Countdown first), and when both are, setup says there's no room. Once something was arranged by hand, a tick adds a copy where it fits (or
+  they go in the other column (Countdown first), and when both are, setup says there's no room.
+  The Economic calendar goes under Markets, and the same way into the clock column when its own
+  is full. Once something was arranged by hand, a tick adds a copy where it fits (or
   where the biggest widget makes room by shrinking, as the Layout mode tray does) and an untick
   removes it; nothing else moves. Setup works on the layout of the tab you're on.
 - **Connect:** search engines (one always stays on), the Weather city (a type-ahead box: matches list
@@ -81,7 +83,7 @@ Throughout:
 | Clock: name, 24/12-hour | Name |
 | Theme, accent, background (ASCII, plain, picture) | Look |
 | Tiles from history, the bookmarks bar, Speed Dial 2, a backup | Sites |
-| Every widget type: Clock, Weather, Search bar, Tasks, Notes, Countdown, Markets, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
+| Every widget type: Clock, Weather, Search bar, Tasks, Notes, Countdown, Markets, Economic calendar, GitHub, Sports, Website, Claude, Marvel (Tiles always on) | Widgets |
 | Layout mode: drag, resize, swap, remove, the tray and its previews | Arrange, Moves |
 | Widget stacks (a tip: drop onto another's middle) | Arrange |
 | Search bar engines (Google, Claude, ChatGPT, Gemini) | Connect |
@@ -103,6 +105,7 @@ Throughout:
 | What's in Tasks, Notes, Countdown and Marvel | Used, not configured (an empty Countdown says so and has Add one) |
 | Clock faces, tile style and size, plain background colour, blur and dim | Taste, adjusted later in Preferences |
 | Markets segments and order, GitHub parts, Sports F1 sessions, Website zoom | Each widget's ✎ or its group in Preferences |
+| Economic calendar markets and importance | Its ✎; the defaults (every market, High and Medium) work on day one |
 | The sidebar, Preferences search | Found from the top bar |
 
 Setup has seven steps and should stay at about that. A feature goes in only if a new user needs it

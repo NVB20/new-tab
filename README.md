@@ -54,6 +54,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles, and stack up to three widgets in one spot. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
+| **Economic calendar** | This week's releases for the USA, the Eurozone and Israel (CPI, rate decisions, jobs reports, …) with the forecast, the previous and the number once it's out, filtered by importance; up to three, each with its own markets. |
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to three copies can split them up. |
 | **Sports** | Your NBA, NFL and Israeli teams' games (Ligat Ha'Al and Winner League clubs, the national teams), Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to two, each with its own address and zoom. |
@@ -201,6 +202,38 @@ While a source is down the widget carries on from another, so the rows keep movi
 | Currency pairs | Frankfurter (the ECB's rates) | the ECB itself, then currency-api's market rates for the last two days |
 
 A source that doesn't answer is skipped by every tab for 10 minutes, then asked first again.
+
+## Economic calendar
+
+Add the **Economic calendar** widget in [Layout mode](#layout-mode) (or in setup's Widgets step,
+where it goes under Markets). It lists the economic releases of today and the next six days: CPI,
+rate decisions, jobs reports, PMIs, central bankers' speeches and the like.
+
+- **Choose what's shown:** hover the widget and click **✎**. Under **Importance**, turn High,
+  Medium and Low on or off; under **Markets**, the USA, the Eurozone and Israel. One of each always
+  stays on. It starts with every market at High and Medium. Up to three copies can each show their
+  own (say, all of Israel in one and the USA's High releases in another).
+- **A row:** the time, the market (`US`, `EU`, `IL`), the importance as three dots (red for High,
+  amber for Medium), the release and the period it covers, and under it the forecast (**f**) and
+  the previous number (**p**).
+- **Once it's out** the number shows on the right in bold, with ▲ or ▼ against the forecast (or the
+  previous one when there's no forecast). The arrows don't say good or bad: a higher number isn't
+  always better news. Today's rows that went by are dimmed, above a line where the rest begin.
+- **The next release** counts down ("in 2 h 14 m"). Just after its time, while its number isn't in
+  yet, a release says **Due**, and the widget checks every minute until it is.
+- **Holidays** (Yom Kippur, Thanksgiving, …) show as one all-day row for your markets, whatever
+  the importance.
+- **Israel:** TradingView rates almost every Israeli release Low, CPI included. Here the Bank of
+  Israel's rate decisions and CPI count as High, GDP and unemployment as Medium.
+- Times are in your computer's time zone and follow the Clock's 12/24-hour setting. Hover a row for
+  the source (e.g. Central Bureau of Statistics) and what the indicator measures.
+
+The calendar comes from [TradingView](https://www.tradingview.com/economic-calendar/), fetched at
+most every 15 minutes and shared by every copy and open tab, so changing a copy's filters fetches
+nothing. While TradingView can't be reached it comes from
+[ForexFactory](https://www.forexfactory.com/calendar)'s weekly feed (at most once an hour): the
+USA and the Eurozone only, to Saturday, with forecasts but no actual numbers, and the widget says
+so. If neither answers, it keeps the last calendar it had and says how old it is.
 
 ## GitHub
 
@@ -620,6 +653,7 @@ list the coin), and are sent the same thing:
 | Markets (coins) | `api.bybit.com` (public market data) [`data-api.binance.vision`, then `www.okx.com`] | every 30 s while visible; sparklines every 5 min |
 | Markets (indexes, commodities) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) [`query1.finance.yahoo.com`] | every 30 s while visible; sparklines every 5 min |
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) [`data-api.ecb.europa.eu`, then currency-api on `cdn.jsdelivr.net` or `currency-api.pages.dev`] | once an hour |
+| Economic calendar | `economic-calendar.tradingview.com` (the releases of the USA, the Eurozone and Israel from yesterday to 9 days on) [`nfs.faireconomy.media`, ForexFactory's weekly feed] | every 15 min while visible, every minute while a release shown is due (hourly from `nfs.faireconomy.media`) |
 | GitHub | `api.github.com`, and `github.com` for the heatmap [`github-contributions-api.jogruber.de`, with your username] | once an hour, or when you press Refresh |
 | Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores) [`site.web.api.espn.com`]; team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
 | Sports (Israeli teams) | `webws.365scores.com` (schedules, scores; the team's id); team logos from `imagecache.365scores.com` | every 6 hours; every 30 s while one of your games is on |
@@ -660,6 +694,14 @@ run script (`javascript:`, `data:`) or a wallpaper that's a link.
   and says ESPN is unreachable. F1 "live" follows the timetable, not live timing (there is no free
   live timing). 365Scores' API (Israeli teams) is unofficial in the same way. The Ligat Ha'Al and
   Winner League clubs to choose from are the 2026-27 season's.
+- Economic calendar: TradingView's calendar API is unofficial, and answers only requests that come
+  with its own site as their origin. A session rule sets that origin on this extension's own
+  requests to that one address, nothing else, and is gone when Chrome closes. TradingView could
+  stop that at any time; the widget then shows ForexFactory's weekly feed (no Israel, no actual
+  numbers). The importance levels are TradingView's, except Israel's, raised as described under
+  [Economic calendar](#economic-calendar). It needs the extension reloaded once after updating
+  (Chrome grants the two new sites only then); until then it says so, with a Reload button. On a
+  page that isn't the extension (a local preview) it loads nothing.
 - Backup sources aren't exact copies. MET Norway gives chances of rain only in the Nordic
   countries, and today's high and low from the current hour on; for a city it has never had a
   forecast for, it takes your computer's time zone (or, far away, one guessed from the longitude).

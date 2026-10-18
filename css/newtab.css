@@ -1035,6 +1035,67 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   .cd-fill { transition: none; }
 }
 
+/* ---------- Economic calendar ---------- */
+
+/* The week by day. A row: the time, the market, the importance dots, the title, and on the right
+   the number once it's out, the countdown to the next one or Due; the forecast and the previous
+   on a line under the title. A 12-hour clock needs a wider time. */
+.widget-econ { --ec-time: 44px; }
+.widget-econ.h12 { --ec-time: 58px; }
+.ec-day { margin: 10px 0 2px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.ec-list > .ec-day:first-child { margin-top: 0; }
+.ec-row {
+  display: grid;
+  grid-template-columns: var(--ec-time) 16px 16px minmax(0, 1fr) auto;
+  grid-template-areas: "time tag dots title right" ". . . vals vals";
+  align-items: baseline;
+  column-gap: 6px;
+  margin: 0 -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.ec-row:hover { background: var(--hover); }
+.ec-time { grid-area: time; overflow: hidden; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.ec-tag { grid-area: tag; font-size: 10px; font-weight: 600; letter-spacing: 0.03em; color: var(--muted); }
+.ec-dots { grid-area: dots; display: inline-flex; gap: 2px; }
+.ec-dots i { width: 4px; height: 4px; border-radius: 50%; background: color-mix(in srgb, var(--text) 18%, transparent); }
+.ec-dots.high i.on { background: var(--down); }
+.ec-dots.medium i.on { background: #f5a524; }
+.ec-dots.low i.on { background: var(--muted); }
+.ec-title { grid-area: title; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ec-period { color: var(--muted); }
+.ec-right { grid-area: right; white-space: nowrap; text-align: right; }
+.ec-actual { font-weight: 650; }
+.ec-move { margin-left: 3px; font-size: 9px; color: var(--muted); }
+.ec-until { font-size: 12px; color: var(--accent); }
+.ec-due { font-size: 11px; font-weight: 600; color: var(--accent); }
+.ec-vals { grid-area: vals; display: flex; gap: 10px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.ec-vals i { margin-right: 3px; font-style: normal; opacity: 0.7; }
+/* Today's rows that went by: those with a number keep it readable. */
+.ec-row.past { opacity: 0.55; }
+.ec-row.out > :not(.ec-right) { opacity: 0.62; }
+.ec-row.next .ec-time { color: var(--accent); }
+.ec-row.holiday .ec-title { color: var(--muted); }
+.ec-now { height: 0; margin: 3px 0; border-top: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+
+/* Editor: the importance and market chips. */
+.ec-editor > .widget-sub:first-child { margin-top: 0; }
+.ec-editor .sp-chips + .widget-note { margin-top: 12px; }
+.ec-editor .widget-note + .widget-note { margin-top: 6px; }
+.ec-editor a { color: inherit; }
+.ec-editor .sp-chip[aria-disabled="true"] { cursor: default; }
+
+.widget-econ .widget-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Narrow: the title has the first line to itself, the number moves to the end of the second; no
+   period and no previous. */
+@container (max-width: 260px) {
+  .ec-period, .ec-p { display: none; }
+  .ec-row { column-gap: 5px; grid-template-areas: "time tag dots title title" ". . . vals right"; }
+}
+
 /* ---------- Tiles ---------- */
 
 /* Laid out by .grid-wrap. */

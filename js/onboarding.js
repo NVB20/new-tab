@@ -38,7 +38,7 @@ const NEAR = ['clock', 'weather', 'countdown', 'tasks', 'notes', 'claude', 'marv
 // (.claude/hooks/onboarding-check.mjs) reads these keys as the types setup offers.
 const WIDGETS = {
   clock: ABOUT.clock.tagline, weather: ABOUT.weather.tagline, search: ABOUT.search.tagline, tasks: ABOUT.tasks.tagline,
-  notes: ABOUT.notes.tagline, countdown: ABOUT.countdown.tagline, markets: ABOUT.markets.tagline, github: ABOUT.github.tagline,
+  notes: ABOUT.notes.tagline, countdown: ABOUT.countdown.tagline, markets: ABOUT.markets.tagline, econ: ABOUT.econ.tagline, github: ABOUT.github.tagline,
   sports: ABOUT.sports.tagline, website: ABOUT.website.tagline, claude: ABOUT.claude.tagline,
   marvel: ABOUT.marvel.tagline,
 };
