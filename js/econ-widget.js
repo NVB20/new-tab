@@ -53,7 +53,10 @@ export function mountEcon(root, store, copy) {
   let result = null;     // { data: events, at, via, error }
   let loaded = false;
   let version = 0;       // bumped with every new result
-  let access = true;     // Chrome has granted the manifest's TradingView access (not until a reload)
+  // Chrome grants a manifest's new sites only when the extension is reloaded. Until then a fetch
+  // can only fail, and feed() would hold that failure back from the first try after the reload.
+  const granted = hasChrome ? hasHostAccess(`https://${TV_HOST}/*`) : Promise.resolve(false);
+  let access = true;     // what granted said, once it has
 
   // ---- the list ----
 
@@ -114,7 +117,7 @@ export function mountEcon(root, store, copy) {
   }
 
   function problem() {
-    if (result?.error && !access) {
+    if (!access) {
       return el('p', { class: 'widget-note' }, 'Reload the extension to load the calendar. ',
         el('button', { type: 'button', class: 'link-btn', text: 'Reload', onclick: reloadExtension }));
     }
@@ -150,7 +153,7 @@ export function mountEcon(root, store, copy) {
     }
     const events = result?.data;
     if (!events) {
-      body.replaceChildren(result?.error ? problem() : widgetEmpty(loaded ? 'Nothing on the calendar' : 'Loading…'));
+      body.replaceChildren(result?.error || !access ? problem() : widgetEmpty(loaded ? 'Nothing on the calendar' : 'Loading…'));
       return;
     }
     const days = shownNow(events, now);
@@ -167,6 +170,12 @@ export function mountEcon(root, store, copy) {
   async function load(force = false) {
     if (!hasChrome) return;
     const my = ++seq;
+    access = await granted;
+    if (my !== seq) return;
+    if (!access) {
+      render();
+      return;
+    }
     const saved = peek(KEY);
     const now = Date.now();
     const ttl = force ? 0 : econTtl(saved?.data ? shownNow(saved.data, now).flatMap(d => d.events) : [], now, saved?.via);
@@ -262,12 +271,6 @@ export function mountEcon(root, store, copy) {
   loaded = !!hit;
   render();
   load();
-  if (hasChrome) {
-    hasHostAccess(`https://${TV_HOST}/*`).then(ok => {
-      access = ok;
-      render();
-    });
-  }
   const interval = setInterval(refresh, REFRESH_MS);
   document.addEventListener('visibilitychange', refresh);
 
