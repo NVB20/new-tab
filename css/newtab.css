@@ -1267,7 +1267,7 @@ a.gc-title::after { content: ''; position: absolute; inset: 0; border-radius: in
 .gc-body > .btn { margin-top: 8px; }
 .widget-gcal .widget-head > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Editor: a row per calendar (its colour, its name, what's wrong, remove), then the link box. */
+/* Editor: a row per calendar (its colour, its name, what's wrong, remove), then Add a calendar. */
 .gc-editor > .widget-sub:first-child { margin-top: 0; }
 .gc-cals { display: flex; flex-direction: column; gap: 6px; }
 .gc-cal { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
@@ -1277,17 +1277,62 @@ a.gc-title::after { content: ''; position: absolute; inset: 0; border-radius: in
 .gc-cal .icon-btn { width: 28px; height: 28px; border-radius: 7px; }
 .gc-cal-status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--danger); }
 .gc-cal-status:empty { display: none; }
-.gc-add { display: flex; gap: 6px; }
-.gc-add .pref-input { flex: 1; width: auto; min-width: 0; padding: 7px 10px; font-size: 13px; }
-.gc-add .btn { padding: 7px 14px; }
-.gc-add-note { margin-top: 6px; }
-.gc-help { margin-top: 10px; font-size: 12px; color: var(--muted); }
-.gc-help summary { cursor: pointer; width: fit-content; }
-.gc-help summary:hover { color: var(--text); }
-.gc-help ol { margin: 6px 0 0; padding-left: 18px; line-height: 1.55; }
-.gc-help a { color: inherit; }
-.gc-help .widget-note { margin-top: 6px; }
-.gc-editor .widget-note + .widget-sub { margin-top: 14px; }
+.gc-add-btn { margin-top: 12px; padding: 7px 14px; }
+.gc-editor .gc-add-btn + .widget-note { margin-top: 12px; }
+
+/* Add a calendar (gcal-add.js): numbered steps, their numbers the drawing's badges; the drawing
+   of Google's settings page in the page's colours; the paste box, glowing when you come back. */
+.dlg.gc-add-dlg { width: min(480px, calc(100vw - 32px)); }
+.gc-steps { counter-reset: step; display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; line-height: 1.45; }
+.gc-steps > li { counter-increment: step; position: relative; padding-left: 32px; }
+.gc-steps > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.gc-steps b { font-weight: 600; }
+.gc-steps .btn { margin-top: 8px; text-decoration: none; }
+.gc-shot { margin-top: 10px; }
+.gc-shot svg { display: block; width: 100%; height: auto; font-family: var(--font); }
+.gc-shot text { font-size: 9.5px; fill: var(--text); }
+.gc-shot .s-frame { fill: var(--surface-2); stroke: var(--border); }
+.gc-shot .s-line { fill: none; stroke: var(--border); }
+.gc-shot .s-muted { fill: var(--muted); }
+.gc-shot .s-label { font-size: 8.5px; font-weight: 600; fill: var(--muted); }
+.gc-shot .s-head { font-size: 11px; font-weight: 600; }
+.gc-shot .s-strong { font-weight: 600; }
+.gc-shot .s-faint { font-size: 8.5px; fill: var(--muted); opacity: 0.65; }
+.gc-shot .s-field { fill: var(--surface); stroke: var(--border); }
+.gc-shot .s-field-hl { stroke: var(--accent); stroke-width: 1.5; }
+.gc-shot .s-hl { fill: var(--accent-soft); }
+.gc-shot .s-dot { fill: #039be5; }
+.gc-shot .s-copy { fill: var(--accent-soft); stroke: var(--accent); }
+.gc-shot .s-icon { fill: none; stroke: var(--accent); stroke-width: 1.2; }
+.gc-shot .s-badge { fill: var(--accent); }
+.gc-shot .s-badge-n { font-size: 9.5px; font-weight: 700; fill: #fff; text-anchor: middle; }
+.gc-paste { display: flex; gap: 6px; margin-top: 8px; }
+.gc-paste .pref-input { flex: 1; width: auto; min-width: 0; font-size: 13px; }
+.gc-paste .pref-input.gc-ready { animation: gc-ready 1.6s ease-out; }
+@keyframes gc-ready { from { box-shadow: 0 0 0 6px var(--accent-soft); border-color: var(--accent); } }
+.gc-status { min-height: 1.45em; margin: 6px 0 0; font-size: 12.5px; color: var(--muted); }
+.gc-status.hint { color: var(--accent); font-weight: 600; }
+.gc-status.bad { color: var(--danger); }
+.gc-status.good { color: var(--up); font-weight: 600; }
+.dlg-message.gc-fine { font-size: 12px; line-height: 1.45; }
+@media (prefers-reduced-motion: reduce) {
+  .gc-paste .pref-input.gc-ready { animation: none; }
+}
+
 
 /* In the hover card: the calendar as a pill in its colour, then the place and the call. */
 .gc-pill { color: var(--text); background: color-mix(in srgb, var(--c) 16%, transparent); }

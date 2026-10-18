@@ -2,7 +2,9 @@
 
 Date: 2026-10-18
 Status: approved (answers: see the agenda, read-only; every calendar merged into one list, with
-chips in the widget to filter it; now/next, Join buttons and a hover card; our own iCal parser)
+chips in the widget to filter it; now/next, Join buttons and a hover card; our own iCal parser).
+Revised: adding a calendar is a guided window that opens Google Calendar's settings and adds on
+paste (answer: the guided window, not "Sign in with Google").
 
 A new widget type, **Google Calendar**, lists today's events and the next two weeks' from one or
 more Google calendars, merged, each in its colour. Chips under the head hide or show a calendar in
@@ -33,12 +35,8 @@ No manifest change, no reload, nothing new in the store's install warning.
   computer); **Reset everything** deletes them and gives back the access they were granted. On the
   Live Server preview (no `chrome`) nothing is stored or fetched: "The calendar loads in the
   extension."
-- **Adding** (✎): paste the link (`webcal://` becomes `https://`; http(s) only, no user name or
-  password). A Google link that isn't an iCal address (the calendar's page, its embed URL) is
-  refused before anything is asked: "That's a link to Google Calendar itself". Add asks Chrome for
-  the site first (the prompt needs the click), then fetches it once: not a calendar → "That link
-  isn't a calendar", a 4xx → "doesn't know that link"; nothing is kept, and the access goes back. The name is the feed's
-  `X-WR-CALNAME` (else the host), the colour the next of 8; both can be changed.
+- **Adding:** through the Add a calendar window (below). The name is the feed's `X-WR-CALNAME`
+  (else the host), the colour the next of 8; both can be changed in ✎.
 - **Removing** a calendar (✎, after a confirm) deletes its link and cached events, and gives the
   site's access back unless another calendar link or a Website widget still uses that site.
   Website's own release checks the calendar links too.
@@ -101,17 +99,45 @@ No manifest change, no reload, nothing new in the store's install warning.
   long date, how long until or since), the place, the meeting link's site, the description
   (clamped). Rows are focusable: Tab opens it, Esc closes it.
 - **Empty:** no calendars: "Your Google Calendar agenda shows here." and **Add a calendar**, which
-  opens ✎ with the cursor in the link box.
+  opens the window.
 
 ## Editor (✎)
 
 - **Calendars:** a row each: the colour (a click takes the next of 8), the name (saved as you
   type), the state when it's not fine, and Remove.
-- **Add a calendar:** the link box and Add, and how to find the link: Google Calendar → ⚙
-  Settings → the calendar under "Settings for my calendars" → Integrate calendar → "Secret address
-  in iCal format". A note: anyone with the link can see the calendar; it stays on this computer,
-  not in backups.
+- **Add a calendar** opens the window (or, at 10, says that's the most). A note: anyone with a
+  secret address can see the calendar; it stays on this computer, not in backups.
 - Preferences → Layout lists each copy with "Calendars: use ✎ on the widget".
+
+## Adding a calendar (`js/gcal-add.js`)
+
+Revised the same day: users didn't know where the secret address is. A window (the page's dialog)
+walks through it in four numbered steps:
+
+1. **Open Google Calendar settings** (a button; `calendar.google.com/calendar/r/settings`, always a
+   new tab, so this one stays).
+2. Under **Settings for my calendars**, click your calendar.
+3. Scroll to **Integrate calendar** and click the copy button next to **Secret address in iCal
+   format**. A drawing of that page (an inline SVG in the page's colours) marks the calendar and
+   the copy button with the steps' numbers, 2 and 3, and shows the public address above it.
+4. **Come back and paste it.** Coming back to the tab (focus or visibility) puts the cursor in the
+   box with a glow and "Now paste it here: Ctrl+V" (⌘V on a Mac). A paste adds at once; Enter or
+   Add adds what was typed. "Added Work." and the window closes after 1.2 s.
+
+The calendar's ID or URL can't be deep-linked without knowing the account, and reading the
+clipboard on return would need the `clipboardRead` permission, so the paste does it.
+
+Checks before anything is asked (`pasteProblem`, `isPublicAddress` in gcal.js): an address that
+looks like an email is the **Calendar ID** ("further down, under Integrate calendar"); a link to
+Google Calendar itself (its page, embed or settings) says so; anything else that isn't a web
+address says what to copy. `webcal://` becomes `https://`; http(s) only, no user name or password;
+up to 10; the same address twice is refused. Then Chrome's prompt for the site, in the paste or
+click that asked (a user gesture), then one fetch: not a calendar → "That address doesn't give a
+calendar"; a 4xx on the public address → "this calendar isn't public, copy the secret address just
+below it"; another 4xx → "Google doesn't know that address"; unreachable → "Check the connection".
+Nothing is kept from a failed add, and the access goes back. A footnote: the address is a
+password and stays on this computer; a work or school admin may have turned it off; Outlook and
+iCloud work the same way.
 
 ## Layout and setup
 

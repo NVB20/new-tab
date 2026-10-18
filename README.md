@@ -247,12 +247,16 @@ where it goes under the clock). It lists today's events and the next two weeks',
 your Google calendars as you add, merged into one list, each in its colour. It only reads: click
 an event and Google Calendar opens on it.
 
-- **Add a calendar:** in [Google Calendar's settings](https://calendar.google.com/calendar/r/settings),
-  click the calendar under **Settings for my calendars**, and in **Integrate calendar** copy
-  **Secret address in iCal format**. Hover the widget, click **✎**, paste it and press **Add**.
-  Chrome asks once for access to calendar.google.com. The name comes from Google; in ✎ you can
-  rename a calendar, click its dot for another colour, or remove it. Up to ten calendars, shared by
-  up to two widgets. Any other iCal address (Outlook, iCloud) works too.
+- **Add a calendar:** press **Add a calendar** on the widget (or in its **✎**). A window walks you
+  through it: **Open Google Calendar settings** opens them in a new tab; there, click your calendar
+  under **Settings for my calendars**, scroll to **Integrate calendar** and click the copy button
+  next to **Secret address in iCal format** (a drawing in the window shows where). Come back to the
+  new tab and paste: the calendar is added at once. Chrome asks once for access to
+  calendar.google.com. Paste the Calendar ID, the public address of a calendar that isn't public,
+  or a link to Google Calendar itself, and the window says what to copy instead.
+- **Your calendars:** the name comes from Google; in ✎ you can rename a calendar, click its dot for
+  another colour, or remove it. Up to ten calendars, shared by up to two widgets. Any other iCal
+  address (Outlook, iCloud) works too.
 - **The secret address is a password:** anyone who has it can see the calendar. It stays in this
   extension on this computer, out of backups and sync. If it ever leaks, **Reset** next to it in
   Google Calendar makes a new one; then remove the calendar here and add the new address. Removing

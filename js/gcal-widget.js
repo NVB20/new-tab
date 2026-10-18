@@ -1,34 +1,23 @@
 // Google Calendar widget: today's events and the next two weeks' from the page's calendars
 // (gcal.js), merged, each in its colour. Each calendar is fetched from its secret iCal link
 // (gcal-links.js) through the request cache, shared by every copy and tab; a copy's chips only
-// hide calendars. ✎ swaps the list for the calendars: add, rename, recolour, remove.
+// hide calendars. Add a calendar opens a window that walks through finding its link (gcal-add.js);
+// ✎ swaps the list for the calendars: rename, recolour, remove, add.
 
 import { el, icon, widgetHead, widgetSub, widgetEmpty, confirmDialog } from './ui.js';
-import { feed, fetchText, peek, sweep } from './net.js';
+import { feed, peek, sweep } from './net.js';
 import { timeAgo } from './feeds.js';
-import { uid } from './util.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import { hasChrome, hasSiteAccess, requestSiteAccess, onSiteAccessChange } from './chrome-api.js';
 import { siteDomain, sitePattern } from './website.js';
 import { formatTime, longDay, dayKey, dayLabel } from './sports.js';
 import { untilLabel } from './econ.js';
 import { showCard, hideCard, cardRow } from './econ-card.js';
-import { linkOf, setLink, dropLink, releaseLinkSite, onLinksChange } from './gcal-links.js';
-import {
-  MAX_CALENDARS, TTL_MS, NOT_A_CALENDAR, calendarUrl, googleCalendarId, notIcalLink, parseCalendar, agenda, joinState, failureOf, nextColor, colorAfter,
-} from './gcal.js';
+import { linkOf, dropLink, releaseLinkSite, onLinksChange, calendarKey, fetchCalendar } from './gcal-links.js';
+import { openAddCalendar } from './gcal-add.js';
+import { MAX_CALENDARS, TTL_MS, googleCalendarId, agenda, joinState, failureOf, colorAfter } from './gcal.js';
 
 const REFRESH_MS = 60e3;   // now and next move on; the cache answers until TTL_MS has passed
-const FETCH_MS = 15e3;     // an old calendar's feed can be a few MB
-
-const keyOf = id => `gcal:${id}`;
-
-// A calendar's feed, read into its events, or an error when the link answers something else.
-async function fetchCalendar(url) {
-  const cal = parseCalendar(await fetchText(url, {}, FETCH_MS), { url });
-  if (!cal) throw new Error(NOT_A_CALENDAR);
-  return cal;
-}
 
 // Who a meeting link is with: 'Google Meet', 'Zoom', 'Microsoft Teams', 'Webex', else its site.
 function meetingName(url) {
@@ -234,7 +223,7 @@ export function mountGcal(root, store, copy) {
     if (!calendars().length) {
       body.replaceChildren(
         widgetEmpty('Your Google Calendar agenda shows here. '),
-        el('button', { type: 'button', class: 'btn', text: 'Add a calendar', onclick: () => setEditing(true) }));
+        el('button', { type: 'button', class: 'btn', onclick: addCalendar }, icon('plus', 15), 'Add a calendar'));
       return;
     }
     const any = shownCalendars().some(c => results.get(c.id)?.data);
@@ -356,7 +345,7 @@ export function mountGcal(root, store, copy) {
       const url = linkOf(c.id);
       if (!url) return [c.id, { missing: true }];
       if (!await hasSiteAccess(sitePattern(url))) return [c.id, { noAccess: true, url }];
-      return [c.id, await feed(keyOf(c.id), force ? 0 : TTL_MS, () => fetchCalendar(url))];
+      return [c.id, await feed(calendarKey(c.id), force ? 0 : TTL_MS, () => fetchCalendar(url))];
     }));
     if (my !== seq) return;
     results = new Map(got);
@@ -369,7 +358,7 @@ export function mountGcal(root, store, copy) {
   // What's saved, at once: the cache answers before anything is fetched.
   function fromCache() {
     results = new Map(calendars().flatMap(c => {
-      const hit = peek(keyOf(c.id));
+      const hit = peek(calendarKey(c.id));
       return hit ? [[c.id, { data: hit.data, at: hit.at }]] : [];
     }));
     loaded = calendars().every(c => results.has(c.id));
@@ -406,7 +395,7 @@ export function mountGcal(root, store, copy) {
       }
     }, ['prefs']);
     dropLink(c.id);
-    sweep(keyOf(c.id), key => key !== keyOf(c.id));
+    sweep(calendarKey(c.id), key => key !== calendarKey(c.id));
     if (url) await releaseLinkSite(url, store.get());
     renderEditor();
   }
@@ -442,62 +431,10 @@ export function mountGcal(root, store, copy) {
     }
   }
 
-  function addForm() {
-    const input = el('input', {
-      type: 'text', class: 'pref-input', placeholder: 'https://calendar.google.com/calendar/ical/…/basic.ics', maxLength: 2000,
-      spellcheck: false, autocomplete: 'off', 'aria-label': 'Secret address in iCal format',
-    });
-    const button = el('button', { type: 'submit', class: 'btn', text: 'Add' });
-    const note = el('p', { class: 'widget-note gc-add-note', 'aria-live': 'polite' });
-    const say = text => {
-      note.textContent = text;
-      note.hidden = !text;
-    };
-    say('');
-    // Chrome's prompt needs this click, so it's asked before anything is awaited.
-    async function add() {
-      const url = calendarUrl(input.value);
-      if (!url) return say('That isn’t a web address. Paste the calendar’s secret address in iCal format.');
-      if (notIcalLink(url)) return say('That’s a link to Google Calendar itself. Copy the “Secret address in iCal format” (it ends in .ics).');
-      if (calendars().length >= MAX_CALENDARS) return say(`Up to ${MAX_CALENDARS} calendars.`);
-      if (calendars().some(c => linkOf(c.id) === url)) return say('That calendar is here already.');
-      const asking = requestSiteAccess(sitePattern(url));
-      button.disabled = true;
-      say('Checking the link…');
-      try {
-        if (!await asking) return say(`Chrome needs access to ${siteDomain(url)} to read the calendar. Press Add to be asked again.`);
-        const id = uid();
-        const r = await feed(keyOf(id), 0, () => fetchCalendar(url));
-        if (!r.data) {
-          sweep(keyOf(id), key => key !== keyOf(id));
-          await releaseLinkSite(url, store.get());
-          if (r.error?.message === NOT_A_CALENDAR) return say('That link isn’t a calendar. Copy the “Secret address in iCal format” (it ends in .ics).');
-          return say(failureOf(r.error) === 'gone' ? `${siteDomain(url)} doesn’t know that link. Check you copied all of it.` : `Couldn’t reach ${siteDomain(url)}. Try again.`);
-        }
-        setLink(id, url);
-        store.update(s => {
-          const list = s.prefs.gcal.calendars;
-          list.push({ id, name: r.data.name || siteDomain(url), color: nextColor(list) });
-        }, ['prefs']);
-        input.value = '';
-        say('');
-        renderEditor();
-      } finally {
-        button.disabled = false;
-      }
-    }
-    const form = el('form', { class: 'gc-add', onsubmit: ev => { ev.preventDefault(); add(); } }, input, button);
-    return [form, note];
-  }
-
-  function help() {
-    return el('details', { class: 'gc-help' },
-      el('summary', { text: 'Where’s the link?' }),
-      el('ol', {},
-        el('li', {}, 'Open ', el('a', { href: 'https://calendar.google.com/calendar/r/settings', rel: 'noopener', target: '_blank', text: 'Google Calendar’s settings' }), '.'),
-        el('li', { text: 'Under “Settings for my calendars”, click the calendar.' }),
-        el('li', { text: 'In “Integrate calendar”, copy “Secret address in iCal format”.' })),
-      el('p', { class: 'widget-note', text: 'Any other iCal link (Outlook, iCloud) works too.' }));
+  // The window that walks through adding one; the editor then lists it.
+  async function addCalendar() {
+    await openAddCalendar(store);
+    if (editing) renderEditor();
   }
 
   function renderEditor() {
@@ -506,9 +443,9 @@ export function mountGcal(root, store, copy) {
       widgetSub('Calendars'),
       list.length ? el('div', { class: 'gc-cals' }, list.map(calendarRow)) : widgetEmpty('None yet.'),
       list.length > 1 ? el('p', { class: 'widget-note', text: 'The chips on the widget hide or show a calendar in that widget only.' }) : null,
-      widgetSub('Add a calendar'),
-      hasChrome ? addForm() : widgetEmpty('Calendars are added in the extension.'),
-      help(),
+      !hasChrome ? widgetEmpty('Calendars are added in the extension.')
+        : list.length >= MAX_CALENDARS ? widgetEmpty(`That’s ${MAX_CALENDARS}, the most there can be.`)
+          : el('button', { type: 'button', class: 'btn gc-add-btn', onclick: addCalendar }, icon('plus', 15), 'Add a calendar'),
       el('p', { class: 'widget-note', text: 'Anyone with a secret address can see that calendar. It stays on this computer: not in backups, not synced.' }),
     ].flat().filter(Boolean));
   }
@@ -524,12 +461,8 @@ export function mountGcal(root, store, copy) {
     body.hidden = on;
     drawChips();
     editor.hidden = !on;
-    if (on) {
-      renderEditor();
-      editor.querySelector('.gc-add input')?.focus({ preventScroll: true });
-    } else {
-      editor.replaceChildren();
-    }
+    if (on) renderEditor();
+    else editor.replaceChildren();
   }
 
   setEditing(false);
