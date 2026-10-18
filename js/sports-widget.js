@@ -1,16 +1,18 @@
-// Sports widget: the followed NBA and NFL teams' games, Messi's (Inter Miami, Argentina) and the
-// chosen F1 sessions in one list by day, with live scores and a day of results. Schedules come
-// from ESPN's site API (its web host while the first is down) and Jolpica F1 (OpenF1 while it's
-// down) through the request cache, shared by every copy and tab.
+// Sports widget: the followed NBA, NFL and Israeli teams' games, Messi's (Inter Miami, Argentina)
+// and the chosen F1 sessions in one list by day, with live scores and a day of results. Schedules
+// come from ESPN's site API (its web host while the first is down), 365Scores (Israeli clubs and
+// national teams) and Jolpica F1 (OpenF1 while it's down) through the request cache, shared by
+// every copy and tab.
 
 import { el, icon, widgetHead, widgetSub, widgetEmpty } from './ui.js';
 import { feed, fetchJson, peek, sweep } from './net.js';
 import { timeAgo } from './feeds.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
-  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, F1_SESSIONS, F1_SESSION_LABELS, teamOf, schedulePath, parseSchedule, nextPhases, joinParts,
-  parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl, etDay, parseF1Season, parseF1Last, raceAwaitingResult,
-  parseOpenF1Season, openF1RaceKey, parseOpenF1Podium, timeline, resultFor, formatTime, isNight, longDay,
+  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, ISRAEL, IL_SPORTS, F1_SESSIONS, F1_SESSION_LABELS,
+  teamOf, schedulePath, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl,
+  etDay, parse365Games, teamTtl, parseF1Season, parseF1Last, raceAwaitingResult, parseOpenF1Season, openF1RaceKey,
+  parseOpenF1Podium, timeline, resultFor, formatTime, isNight, longDay,
 } from './sports.js';
 
 // ESPN's site API answers the same on its web host.
@@ -18,6 +20,7 @@ const ESPN = [
   ['ESPN', 'https://site.api.espn.com/apis/site/v2/sports'],
   ['ESPN web', 'https://site.web.api.espn.com/apis/site/v2/sports'],
 ];
+const S365 = 'https://webws.365scores.com/web/games/current/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=6';
 const JOLPICA = 'https://api.jolpi.ca/ergast/f1';
 const OPENF1 = 'https://api.openf1.org/v1';
 const HOUR = 3600e3;
@@ -32,10 +35,14 @@ const F1_SEASON = `${KEY}:f1:season`;
 const F1_LAST = `${KEY}:f1:last`;
 const liveKey = b => `${KEY}:live:${b.path}:${b.day}`;
 
-// The cache keys a followed id reads: a team's schedule (soccer: upcoming games and results), or F1's season.
+const from365 = id => id !== 'f1' && Object.hasOwn(IL_SPORTS, teamOf(id).sport);
+
+// The cache keys a followed id reads: a team's schedule (soccer: upcoming games and results; an
+// Israeli team: its games on 365Scores), or F1's season.
 function sourceKeys(id) {
   if (id === 'f1') return [F1_SEASON];
   const { sport, id: team } = teamOf(id);
+  if (from365(id)) return [`${KEY}:365:${team}`];
   return sport === 'soccer' ? [`${KEY}:soccer:${team}:next`, `${KEY}:soccer:${team}:last`] : [`${KEY}:team:${sport}:${team}`];
 }
 
@@ -67,6 +74,13 @@ async function loadSource(id) {
   if (id === 'f1') return feed(F1_SEASON, F1_TTL, f1Season);
   const { sport, id: team } = teamOf(id);
   const [key, lastKey] = sourceKeys(id);
+  if (from365(id)) {
+    // Its games are fresh for 6 hours, 30 s while one of them may be under way (teamTtl).
+    return feed(key, teamTtl(peek(key)?.data ?? [], Date.now()), [{
+      name: '365Scores',
+      load: async () => trimmed(must(parse365Games(await fetchJson(`${S365}&competitors=${team}`), sport), '365Scores')),
+    }]);
+  }
   const path = schedulePath(sport, team);
   const schedule = async from => must(parseSchedule(await fetchJson(from), sport), 'ESPN');
   if (sport === 'soccer') {
@@ -211,17 +225,25 @@ export function mountSports(root, store, copy) {
     return parts.join(', ');
   }
 
-  const row = e => el('a', { class: `sp-row ${e.status}`, 'aria-label': label(e), ...linkProps(e.url || 'https://www.espn.com/') },
+  const siteOf = e => (Object.hasOwn(IL_SPORTS, e.sport) ? 'https://www.365scores.com/' : 'https://www.espn.com/');
+  const row = e => el('a', { class: `sp-row ${e.status}`, 'aria-label': label(e), ...linkProps(e.url || siteOf(e)) },
     el('span', { class: 'sp-tag', text: e.tag }), matchup(e), when(e));
 
   // ---- list ----
 
-  const what = id => (id === 'f1' ? 'the F1 calendar' : `the schedule for ${teamOf(id).name}`);
+  // 'the schedule for Maccabi Tel Aviv (basketball)': Israeli clubs share names across sports.
+  function what(id) {
+    if (id === 'f1') return 'the F1 calendar';
+    const team = teamOf(id);
+    return `the schedule for ${team.name}${from365(id) ? ` (${IL_SPORTS[team.sport]})` : ''}`;
+  }
+  const hostOf = id => (id === 'f1' ? 'Jolpica and OpenF1' : from365(id) ? '365Scores' : 'ESPN');
 
   // A line per source that failed: how old the data shown is, or what couldn't load.
   function problems(follow) {
     const lines = [];
-    for (const [host, ids] of [['ESPN', follow.filter(id => id !== 'f1')], ['Jolpica and OpenF1', follow.filter(id => id === 'f1')]]) {
+    for (const host of ['ESPN', '365Scores', 'Jolpica and OpenF1']) {
+      const ids = follow.filter(id => hostOf(id) === host);
       const failed = ids.filter(id => sources.get(id)?.error);
       const stale = failed.filter(id => sources.get(id).data);
       if (stale.length) {
@@ -252,7 +274,7 @@ export function mountSports(root, store, copy) {
     }
     const days = timeline(applyLive(events(), live), { follow: s.follow, f1Sessions: s.f1Sessions, now: Date.now() });
     const empty = loaded && nothingLoaded(s.follow);
-    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl):/.test(id));
+    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl|il-soccer|il-basket):/.test(id));
     const lines = problems(s.follow);
     const next = JSON.stringify([days, loaded, empty, hint, lines.map(p => p.textContent), podium, hour24(), prefs().openInNewTab]);
     if (next === drawn) return;
@@ -261,7 +283,7 @@ export function mountSports(root, store, copy) {
       ? days.flatMap(d => [el('div', { class: 'sp-day', text: d.label }), ...d.events.map(row)])
       : empty ? [] : [widgetEmpty(loaded ? 'No games scheduled yet' : 'Loading…')]));
     notes.replaceChildren(...lines,
-      ...(hint ? [el('p', { class: 'widget-note' }, pickLink('Pick your NBA and NFL teams'))] : []));
+      ...(hint ? [el('p', { class: 'widget-note' }, pickLink('Pick your teams'))] : []));
   }
 
   // ---- editor: ✎ swaps the list for team buttons; changes apply as they're made ----
@@ -308,6 +330,10 @@ export function mountSports(root, store, copy) {
       widgetSub('NBA'), el('div', { class: 'sp-chips' }, NBA_TEAMS.map(t => teamChip('nba', t))),
       widgetSub('NFL'), el('div', { class: 'sp-chips' }, NFL_TEAMS.map(t => teamChip('nfl', t))),
       widgetSub('Messi'), el('div', { class: 'mk-checks' }, SOCCER_TEAMS.map(t => check(`soccer:${t.id}`, t.name))),
+      widgetSub("Ligat Ha'Al"), el('div', { class: 'sp-chips' }, IL_SOCCER_CLUBS.map(t => teamChip('il-soccer', t))),
+      widgetSub('Winner League'), el('div', { class: 'sp-chips' }, IL_BASKET_CLUBS.map(t => teamChip('il-basket', t))),
+      widgetSub('Israel'), el('div', { class: 'mk-checks' },
+        check(`il-soccer:${ISRAEL['il-soccer'].id}`, 'Soccer'), check(`il-basket:${ISRAEL['il-basket'].id}`, 'Basketball')),
       widgetSub('Formula 1'), el('div', { class: 'mk-checks' }, check('f1', 'Follow F1')),
       el('div', { class: 'sp-chips' }, F1_SESSIONS.map(sessionChip)));
   }

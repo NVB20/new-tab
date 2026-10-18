@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
+  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, ISRAEL, IL_SPORTS,
+  teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
+  competition365, logo365, link365, parse365Game, parse365Games, teamTtl,
   parseEspnEvent, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
   parseF1Season, parseF1Last, raceAwaitingResult, parseOpenF1Season, openF1RaceKey, parseOpenF1Podium,
   rowState, resultFor, followedSide, dayKey, dayLabel, formatTime, isNight, longDay, timeline,
@@ -537,4 +539,169 @@ test('a soccer league slug that would bend a scoreboard address is dropped', () 
   };
   assert.equal(parseEspnEvent(e, 'soccer', 'usa.1').league, 'usa.1');
   assert.equal(parseEspnEvent(e, 'soccer', '../../x?y').league, '');
+});
+
+// ---- 365Scores: Israeli clubs and national teams ----
+
+test('the Israeli lists hold 14 clubs each, every id and abbreviation once, and the national teams', () => {
+  for (const list of [IL_SOCCER_CLUBS, IL_BASKET_CLUBS]) {
+    assert.equal(list.length, 14);
+    assert.equal(new Set(list.map(t => t.id)).size, 14);
+    assert.equal(new Set(list.map(t => t.abbr)).size, 14);
+  }
+  assert.deepEqual(teamOf('il-basket:631'), { sport: 'il-basket', id: '631', abbr: 'MTA', name: 'Maccabi Tel Aviv' });
+  assert.equal(teamOf('il-soccer:559').name, 'Beitar Jerusalem');
+  assert.deepEqual(teamOf(`il-soccer:${ISRAEL['il-soccer'].id}`), { sport: 'il-soccer', id: '5034', abbr: 'ISR', name: 'Israel' });
+  assert.equal(teamOf(`il-basket:${ISRAEL['il-basket'].id}`).id, '1728');
+  assert.equal(teamOf('il-soccer:631'), null);   // the basketball club's id
+  assert.deepEqual(Object.keys(IL_SPORTS), ['il-soccer', 'il-basket']);
+  assert.deepEqual(cleanSports({ follow: ['il-soccer:566', 'il-basket:631', 'il-basket:5034', 'il-soccer:1'] }).follow,
+    ['il-soccer:566', 'il-basket:631']);
+});
+
+// 365Scores games as /web/games/current and /web/games/allscores sent them on 2026-10-18, trimmed
+// to the fields the parser reads (live and other leagues' games show the states).
+const c365 = (id, name, symbolicName, score, imageVersion, nameForURL, isWinner = false) => ({ id, name, symbolicName, score, isWinner, imageVersion, nameForURL });
+const g365 = (id, competitionId, competitionDisplayName, startTime, [statusGroup, statusText, shortStatusText, displayType = 0, gameTimeDisplay = ''], home, away) => ({
+  id, competitionId, competitionDisplayName, startTime, statusGroup, statusText, shortStatusText,
+  gameTimeAndStatusDisplayType: displayType, gameTimeDisplay, homeCompetitor: home, awayCompetitor: away,
+});
+const SCHEDULED = [2, 'Scheduled', 'Sched.'];
+const mtaAta = g365(4829925, 47, 'Winner League', '2026-10-18T17:55:00+00:00', SCHEDULED,
+  c365(631, 'Maccabi Tel Aviv', 'MTA', -1, 3, 'maccabi-tel-aviv'), c365(641, 'Ironi Kiryat Ata', 'ATA', -1, 4, 'elizor-kiryat-ata'));
+const dubaiHta = g365(4798426, 569, 'EuroLeague', '2026-10-30T16:00:00+00:00', SCHEDULED,
+  c365(83343, 'BC Dubai', null, -1, 3, 'bc-dubai'), c365(654, 'Hapoel Tel Aviv', 'HTA', -1, 4, 'hapoel-tel-aviv'));
+const totoFinal = g365(4815899, 546, 'Toto League Cup - Final', '2026-10-29T18:30:00+00:00', SCHEDULED,
+  c365(566, 'Maccabi Tel Aviv', 'MTA', -1, 11, 'maccabi-tel-aviv'), c365(567, 'Hapoel Tel Aviv', 'HTA', -1, 5, 'hapoel-tel-aviv'));
+const onPens = g365(4807672, 546, 'Toto League Cup - Placement Playoffs', '2026-08-17T17:00:00+00:00', [4, 'After Penalties', 'After Penalties', 1],
+  c365(574, 'Hapoel Ramat Gan', 'HRG', 3, 3, 'hapoel-ramat-gan'), c365(559, 'Beitar Jerusalem', 'BEI', 3, 2, 'beitar-jerusalem', true));
+const secondHalf = g365(4739615, 147, 'J1 League', '2026-10-18T07:00:00+00:00', [3, '2nd Half', '2nd Half', 2, "63'"],
+  c365(9133, 'Machida Zelvia', 'MAC', 1, 1, 'machida-zelvia'), c365(2168, 'Fukuoka', 'AVI', 0, 1, 'fukuoka'));
+const halfTime = g365(4652570, 618, 'K League 1', '2026-10-18T07:30:00+00:00', [3, 'Halftime', 'HT', 1, "45'"],
+  c365(9822, 'Pohang Steelers', 'POH', 0, 1, 'pohang-steelers'), c365(11471, 'FC Anyang', 'ANY', 0, 1, 'fc-anyang'));
+const quarter = g365(4816265, 401, 'Korean Basketball League - Regular Season', '2026-10-18T07:30:00+00:00', [3, 'Q2', 'Q2', 3, '00:31'],
+  c365(10727, 'Anyang KGC', null, 36, 2, 'anyang-kgc'), c365(6850, 'KCC Egis', null, 40, 2, 'kcc-egis'));
+const overtime = g365(4862461, 8042, 'Liga Argentina de Básquetbol - North Conference', '2026-10-18T00:30:00+00:00', [4, 'Final/OT', 'Final/OT', 1],
+  c365(49951, 'Comunicaciones Mercedes', null, 92, 3, 'comunicaciones-mercedes', true), c365(79320, 'Asociacion El Ceibo', null, 88, 4, 'asociacion-el-ceibo'));
+const ended = g365(4632644, 113, 'Brasileirão Série A', '2026-10-18T00:00:00+00:00', [4, 'Ended', 'Ended', 1],
+  c365(1225, 'São Paulo', 'SAO', 1, 9, 'sao-paulo', true), c365(1227, 'Vasco da Gama', 'VAS', 0, 7, 'vasco-da-gama'));
+const postponed = g365(4754011, 7741, 'Segunda RFEF ', '2026-10-18T10:00:00+00:00', [4, 'Postponed', 'Post.', 1],
+  c365(57341, 'CF Intercity', 'ICA', -1, 2, 'cf-intercity'), c365(17982, 'Real Murcia Imperial', null, -1, 1, 'real-murcia-imperial'));
+const IMG = 'https://imagecache.365scores.com/image/upload/f_png,w_32,h_32,c_limit,q_auto:eco,dpr_2,d_Competitors:default1.png';
+
+test('parse365Games reads a team\'s games: tags, short names, logos and links to the game on 365scores.com', () => {
+  const json = { competitions: [{ id: 47, name: 'Winner League', nameForURL: 'winner-league' }, { id: 569, name: 'EuroLeague', nameForURL: 'euroleague' }], games: [mtaAta, dubaiHta] };
+  const [mta, dubai] = parse365Games(json, 'il-basket');
+  assert.deepEqual(mta, {
+    id: '365:4829925', sport: 'il-basket', league: '', tag: 'Winner', start: Date.parse('2026-10-18T17:55:00Z'), timeValid: true,
+    state: 'pre', detail: '', off: null,
+    home: { id: '631', abbr: 'MTA', name: 'Maccabi Tel Aviv', logo: `${IMG}/v3/Competitors/631`, score: null, winner: false },
+    away: { id: '641', abbr: 'ATA', name: 'Ironi Kiryat Ata', logo: `${IMG}/v4/Competitors/641`, score: null, winner: false },
+    tv: '', url: 'https://www.365scores.com/basketball/match/winner-league-47/maccabi-tel-aviv-elizor-kiryat-ata-631-641-47#id=4829925',
+  });
+  assert.equal(dubai.tag, 'EuroLeague');
+  assert.equal(dubai.home.abbr, 'DUB');   // 365Scores gives BC Dubai no short name
+  assert.equal(dubai.home.name, 'BC Dubai');
+});
+
+test('parse365Games: a cup game decided on penalties is over, level, and won by the side 365Scores names', () => {
+  const [derby, pens] = parse365Games({ competitions: [{ id: 546, name: 'Toto League Cup', nameForURL: 'toto-league-cup' }], games: [totoFinal, onPens] }, 'il-soccer');
+  assert.equal(derby.tag, 'Toto Cup');
+  assert.equal(derby.url, 'https://www.365scores.com/football/match/toto-league-cup-546/maccabi-tel-aviv-hapoel-tel-aviv-566-567-546#id=4815899');
+  assert.equal(pens.state, 'post');
+  assert.equal(pens.detail, 'FT-Pens');
+  assert.deepEqual([pens.home.score, pens.away.score, pens.away.winner], ['3', '3', true]);
+  assert.equal(resultFor(pens, 'away'), 'W');
+  assert.equal(resultFor(pens, 'home'), 'L');
+});
+
+test('parse365Game reads live and finished games: the minute, half time, quarter and clock, FT and Final/OT', () => {
+  const read = (g, sport) => parse365Game(g, sport, null);
+  const live = read(secondHalf, 'il-soccer');
+  assert.deepEqual([live.state, live.detail, live.home.score, live.away.score], ['in', "63'", '1', '0']);
+  assert.equal(live.tag, 'J1 League');   // no entry in competitions: the game's own name
+  assert.equal(read(halfTime, 'il-soccer').detail, 'HT');
+  const q2 = read(quarter, 'il-basket');
+  assert.deepEqual([q2.state, q2.detail, q2.home.abbr, q2.away.abbr], ['in', 'Q2 0:31', 'ANY', 'KCC']);
+  assert.equal(q2.tag, 'Korean Basketball League');
+  const ot = read(overtime, 'il-basket');
+  assert.deepEqual([ot.state, ot.detail, ot.home.score, ot.home.winner, ot.home.abbr], ['post', 'Final/OT', '92', true, 'COM']);
+  const ft = read(ended, 'il-soccer');
+  assert.deepEqual([ft.state, ft.detail, ft.home.score, ft.away.score], ['post', 'FT', '1', '0']);
+  assert.equal(resultFor(ft, 'home'), 'W');
+});
+
+test('parse365Game: a postponed game comes among the finished ones, and reads as postponed with no score', () => {
+  const g = parse365Game(postponed, 'il-soccer', null);
+  assert.equal(g.off, 'Postponed');
+  assert.equal(g.detail, '');
+  assert.deepEqual([g.home.score, g.away.score], [null, null]);
+  assert.equal(g.tag, 'Segunda RFEF');
+  assert.equal(rowState(g, NOW), 'off');
+  assert.equal(resultFor(g, 'home'), '');
+});
+
+test('parse365Games returns null for a response that is not a game list, so it never replaces saved data', () => {
+  assert.equal(parse365Games({}, 'il-soccer'), null);
+  assert.equal(parse365Games({ games: 'x' }, 'il-soccer'), null);
+  assert.equal(parse365Games({ games: [{ id: 'x' }, null] }, 'il-soccer'), null);
+  assert.deepEqual(parse365Games({ games: [] }, 'il-soccer'), []);
+  assert.deepEqual(parse365Games({ games: [mtaAta, { id: 1 }] }, 'il-basket').map(e => e.id), ['365:4829925']);
+  assert.equal(parse365Game({ ...mtaAta, startTime: 'soon' }, 'il-basket', null), null);
+  assert.equal(parse365Game({ ...mtaAta, homeCompetitor: { id: '631' } }, 'il-basket', null), null);
+});
+
+test('competition365: Israeli competitions by id, international ones by name, the rest by their own name', () => {
+  assert.equal(competition365(42, 'Premier League'), "Ha'Al");
+  assert.equal(competition365(47, 'Winner League'), 'Winner');
+  assert.equal(competition365(609, 'Winner Cup - Final'), 'Winner Cup');
+  assert.equal(competition365(7685, 'UEFA Conference League'), 'UECL');
+  assert.equal(competition365(596, 'UEFA Europa League Qualifiers'), 'UEL');
+  assert.equal(competition365(1, 'UEFA Champions League - League Phase'), 'UCL');
+  assert.equal(competition365(7016, 'UEFA Nations League - League B - Group 3'), 'UNL');
+  assert.equal(competition365(5421, 'UEFA WC Qualification'), 'WC qual.');
+  assert.equal(competition365(6894, 'FIBA World Cup Qualification'), 'WC qual.');
+  assert.equal(competition365(471, 'FIBA World Cup'), 'World Cup');
+  assert.equal(competition365(329, 'Eurocup'), 'EuroCup');
+  assert.equal(competition365(321, 'Club Friendlies'), 'Friendly');
+  assert.equal(competition365(570, 'Friendly International'), 'Friendly');
+  assert.equal(competition365('constructor', 'X'), 'X');
+  assert.equal(competition365(9, undefined), '');
+});
+
+test('365Scores logos and links are built from whole-number ids only; slugs are escaped', () => {
+  assert.equal(logo365(566, 11), `${IMG}/v11/Competitors/566`);
+  assert.equal(logo365('566', 11), '');
+  assert.equal(logo365(566, undefined), '');
+  assert.equal(logo365(-1, 1), '');
+  assert.equal(link365('il-soccer', { ...totoFinal, id: '1/../x' }, null), '');
+  assert.equal(link365('il-soccer', { ...totoFinal, homeCompetitor: { ...totoFinal.homeCompetitor, nameForURL: 'a/b?c#d' } }, { nameForURL: 'cup' }),
+    'https://www.365scores.com/football/match/cup-546/a%2Fb%3Fc%23d-hapoel-tel-aviv-566-567-546#id=4815899');
+});
+
+test('teamTtl: 30 s while a game may be on, hourly once it ended by the clock without being over, else 6 hours', () => {
+  const il = over => game({ id: '365:1', sport: 'il-basket', league: '', tag: 'Winner', ...over });
+  assert.equal(lengthOf(il()), 120 * 60e3);
+  assert.equal(teamTtl([il({ start: NOW + 3600e3 })], NOW), 6 * 3600e3);
+  assert.equal(teamTtl([il({ start: NOW - 3600e3 })], NOW), 30e3);                   // started, 365Scores not told yet
+  assert.equal(teamTtl([il({ start: NOW - 3600e3, state: 'in' })], NOW), 30e3);
+  assert.equal(teamTtl([il({ start: NOW - 5 * 3600e3 })], NOW), 3600e3);             // past twice its length
+  assert.equal(teamTtl([il({ start: NOW - 30 * 3600e3 })], NOW), 6 * 3600e3);        // a day after its end
+  assert.equal(teamTtl([il({ start: NOW - 3600e3, state: 'post' })], NOW), 6 * 3600e3);
+  assert.equal(teamTtl([il({ start: NOW - 3600e3, state: 'post', off: 'Postponed' })], NOW), 6 * 3600e3);
+  assert.equal(teamTtl([il({ start: NOW + DAY }), il({ id: '365:2', start: NOW - 60e3 })], NOW), 30e3);
+  assert.equal(teamTtl([], NOW), 6 * 3600e3);
+});
+
+test('ESPN scoreboards leave 365Scores games alone', () => {
+  assert.deepEqual(scoreboards([game({ id: '365:1', sport: 'il-soccer', league: '', start: NOW - 3600e3 })], NOW), []);
+});
+
+test('timeline: a derby between two followed clubs is one row, from either club\'s games', () => {
+  const json = { competitions: [{ id: 546, name: 'Toto League Cup', nameForURL: 'toto-league-cup' }], games: [totoFinal] };
+  const events = [...parse365Games(json, 'il-soccer'), ...parse365Games(json, 'il-soccer')];
+  const days = timeline(events, { follow: ['il-soccer:566', 'il-soccer:567'], f1Sessions: [], now: NOW, timeZone: TZ });
+  assert.deepEqual(days.map(d => [d.label, d.events.map(e => [e.id, e.side])]), [['Thu 29 Oct', [['365:4815899', 'both']]]]);
+  const mine = timeline(events, { follow: ['il-soccer:567'], f1Sessions: [], now: NOW, timeZone: TZ });
+  assert.equal(mine[0].events[0].side, 'away');
 });

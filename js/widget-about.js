@@ -28,7 +28,7 @@ export const ABOUT = {
   },
   sports: {
     tagline: 'Your teams’ games',
-    about: 'Your NBA and NFL teams’ games, Messi’s matches and F1 sessions in one list by day, with live scores. Choose who to follow with ✎.',
+    about: 'Your NBA, NFL and Israeli teams’ games, Messi’s matches and F1 sessions in one list by day, with live scores. Choose who to follow with ✎.',
   },
   tiles: {
     tagline: 'Your sites as tiles',

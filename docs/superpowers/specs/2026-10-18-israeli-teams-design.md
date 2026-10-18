@@ -72,7 +72,8 @@ Like the other team games:
   UCL, Europa League UEL, Conference League UECL (their qualifiers too), Nations League UNL (as
   ESPN's abbreviation for it), World Cup qualifiers WC qual., EuroLeague, Eurocup EuroCup,
   Basketball Champions League BCL, friendlies Friendly. Anything else: the competition's name
-  before " - ".
+  before " - ". The tag column grows from 46 to 60px, so EuroLeague (59px), Winner Cup (60px),
+  State Cup and Super Cup show whole (narrow copies keep 38px and cut them short as before).
 - **Live** (`statusGroup` 3): `state` 'in', detail by the display type ("63'", "HT", "Q2 0:31",
   leading zero dropped).
 - **Over** (`statusGroup` 4): `state` 'post', detail FT (soccer), FT-Pens after penalties, AET
