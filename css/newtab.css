@@ -498,7 +498,10 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .sp-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .sp-chips + .widget-sub { margin-top: 12px; }
 .mk-checks + .sp-chips { margin-top: 4px; }
-.sp-chip { padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.sp-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border: 1px solid var(--border); border-radius: 6px; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.sp-chip-logo { flex: none; width: 14px; height: 14px; object-fit: contain; }
+.mk-check > .sp-chip-logo { margin-right: -2px; }
+.sp-editor .mk-checks { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* Inter Miami with its logo needs more than a third */
 .sp-chip:hover { color: var(--text); background: var(--hover); }
 .sp-chip[aria-pressed="true"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); background: var(--accent-soft); }
 .sp-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

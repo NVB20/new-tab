@@ -11,7 +11,7 @@ import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
   NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, NATIONAL_TEAMS, F1_SESSIONS, F1_SESSION_LABELS,
   teamOf, schedulePath, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl,
-  etDay, parse365Games, teamTtl, searchLists, parse365Search, mergeResults, parseF1Season, parseF1Last, raceAwaitingResult,
+  etDay, parse365Games, teamTtl, searchLists, parse365Search, mergeResults, teamLogo, parseF1Season, parseF1Last, raceAwaitingResult,
   parseOpenF1Season, openF1RaceKey, parseOpenF1Podium, timeline, resultFor, formatTime, isNight, longDay,
 } from './sports.js';
 
@@ -329,16 +329,22 @@ export function mountSports(root, store, copy) {
     syncFollowed();
   }
 
-  // A button that stays pressed while its item is chosen.
+  // A team's logo on its button: loaded as it scrolls into view, gone if it can't load.
+  const chipLogo = id => {
+    const src = teamLogo(id);
+    return src ? el('img', { class: 'sp-chip-logo', src, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer', onerror: e => e.target.remove() }) : null;
+  };
+
+  // A button that stays pressed while its item is chosen; a team's (follow: its id) has its logo.
   function chip(text, title, pressed, onToggle, follow) {
     const button = el('button', {
-      type: 'button', class: 'sp-chip', text, title, 'aria-pressed': String(pressed), 'data-follow': follow,
+      type: 'button', class: 'sp-chip', title, 'aria-pressed': String(pressed), 'data-follow': follow,
       onclick: () => {
         const on = button.getAttribute('aria-pressed') !== 'true';
         button.setAttribute('aria-pressed', String(on));
         onToggle(on);
       },
-    });
+    }, follow ? chipLogo(follow) : null, text);
     return button;
   }
   const followChip = (id, text, title) => chip(text, title, settings().follow.includes(id), on => setFollowed(id, on), id);
@@ -427,7 +433,7 @@ export function mountSports(root, store, copy) {
         type: 'checkbox', checked: s.follow.includes(id), 'data-follow': id,
         onchange: () => setFollowed(id, input.checked),
       });
-      return el('label', { class: 'mk-check' }, input, el('span', { text }));
+      return el('label', { class: 'mk-check' }, input, chipLogo(id), el('span', { text }));
     };
     const sessionChip = x => chip(F1_SESSION_LABELS[x], null, s.f1Sessions.includes(x),
       on => update(own => { own.f1Sessions = F1_SESSIONS.filter(y => (y === x ? on : own.f1Sessions.includes(y))); }));

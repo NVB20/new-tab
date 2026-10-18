@@ -435,9 +435,25 @@ const KIND_LABEL = { soccer: 'Soccer', basketball: 'Basketball' };
 // Lower case, without accents or apostrophes: 'Atlético' and "Ha'Al" match 'atletico' and 'haal'.
 const fold = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ'’]/g, '').toLowerCase().trim();
 
+const ESPN_LOGOS = 'https://a.espncdn.com/combiner/i?img=/i/teamlogos';
+const ESPN_TO_365 = Object.fromEntries(Object.entries(ON_ESPN).map(([id365, espn]) => [espn, id365]));
+
+// The logo a followed id's button shows in the editor: ESPN's for NBA and NFL teams (40 px from its
+// resizer, by abbreviation), 365Scores' for the rest (its current one: no version needed); '' for
+// F1 and unknown ids.
+export function teamLogo(followId) {
+  const [sport, id] = String(followId).split(':');
+  if (sport === 'nba' || sport === 'nfl') {
+    const team = teamOf(followId);
+    return team ? `${ESPN_LOGOS}/${sport}/500/${team.abbr.toLowerCase()}.png&w=40&h=40` : '';
+  }
+  const on365 = sport === '365' && /^\d+$/.test(id ?? '') ? id : Object.hasOwn(ESPN_TO_365, followId) ? ESPN_TO_365[followId] : null;
+  return on365 ? `${IMAGES}/Competitors/${on365}` : '';
+}
+
 // A search result: id (what following it adds), name, meta (the muted line), logo, and team (what a
 // copy saves for a 365Scores team no list has).
-const result = (id, name, meta, logo = '', team = null) => ({ id, name, meta, logo, team });
+const result = (id, name, meta, logo = teamLogo(id), team = null) => ({ id, name, meta, logo, team });
 
 // Words of a name, each after a space: ' hapoel beer sheva dimona'.
 const words = s => ` ${fold(s).replace(/[^a-z0-9]+/g, ' ').trim()}`;
@@ -467,7 +483,7 @@ export function parse365Search(json) {
   for (const c of json.competitors) {
     const kind = Object.hasOwn(KIND_OF, c?.sportId) ? KIND_OF[c.sportId] : null;
     if (!kind || !whole(c.id) || c.hideOnSearch === true || c.mainCompetitionId === NBA_365 || !c.name) continue;
-    const logo = logo365(c.id, c.imageVersion);
+    const logo = logo365(c.id, c.imageVersion) || teamLogo(`365:${c.id}`);
     if (Object.hasOwn(ON_ESPN, c.id)) {
       out.push(result(ON_ESPN[c.id], teamOf(ON_ESPN[c.id]).name, 'Messi', logo));
       continue;
