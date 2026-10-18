@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, ISRAEL, IL_SPORTS,
+  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, NATIONAL_TEAMS, ON_ESPN,
   teamOf, cleanSports, competitionTag, leaguePath, schedulePath, raceShort,
-  competition365, logo365, link365, parse365Game, parse365Games, teamTtl,
+  competition365, logo365, link365, parse365Game, parse365Games, teamTtl, searchLists, parse365Search, mergeResults,
   parseEspnEvent, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, etDay, scoreboards, boardTtl, lengthOf,
   parseF1Season, parseF1Last, raceAwaitingResult, parseOpenF1Season, openF1RaceKey, parseOpenF1Podium,
   rowState, resultFor, followedSide, dayKey, dayLabel, formatTime, isNight, longDay, timeline,
@@ -29,10 +29,10 @@ test('teamOf reads a followed id', () => {
 });
 
 test('cleanSports keeps known ids once and known sessions in order; missing fields take defaults', () => {
-  assert.deepEqual(cleanSports({}), { follow: ['soccer:20232', 'soccer:202', 'f1'], f1Sessions: ['sprint', 'qualifying', 'race'], edited: false });
+  assert.deepEqual(cleanSports({}), { follow: ['soccer:20232', 'soccer:202', 'f1'], f1Sessions: ['sprint', 'qualifying', 'race'], edited: false, teams: {} });
   assert.deepEqual(
     cleanSports({ follow: ['nba:13', 'junk', 'nba:13', 'f1', 5, 'nfl:12'], f1Sessions: ['race', 'x', 'practice'], edited: true }),
-    { follow: ['nba:13', 'f1', 'nfl:12'], f1Sessions: ['practice', 'race'], edited: true });
+    { follow: ['nba:13', 'f1', 'nfl:12'], f1Sessions: ['practice', 'race'], edited: true, teams: {} });
   assert.deepEqual(cleanSports({ follow: [], f1Sessions: [] }).follow, []);
   assert.equal(cleanSports({ edited: 'yes' }).edited, false);
 });
@@ -549,21 +549,45 @@ test('the Israeli lists hold 14 clubs each, every id and abbreviation once, and 
     assert.equal(new Set(list.map(t => t.id)).size, 14);
     assert.equal(new Set(list.map(t => t.abbr)).size, 14);
   }
-  assert.deepEqual(teamOf('il-basket:631'), { sport: 'il-basket', id: '631', abbr: 'MTA', name: 'Maccabi Tel Aviv' });
-  assert.equal(teamOf('il-soccer:559').name, 'Beitar Jerusalem');
-  assert.deepEqual(teamOf(`il-soccer:${ISRAEL['il-soccer'].id}`), { sport: 'il-soccer', id: '5034', abbr: 'ISR', name: 'Israel' });
-  assert.equal(teamOf(`il-basket:${ISRAEL['il-basket'].id}`).id, '1728');
-  assert.equal(teamOf('il-soccer:631'), null);   // the basketball club's id
-  assert.deepEqual(Object.keys(IL_SPORTS), ['il-soccer', 'il-basket']);
-  assert.deepEqual(cleanSports({ follow: ['il-soccer:566', 'il-basket:631', 'il-basket:5034', 'il-soccer:1'] }).follow,
-    ['il-soccer:566', 'il-basket:631']);
+  assert.deepEqual(teamOf('365:631'), { sport: '365', id: '631', abbr: 'MTA', name: 'Maccabi Tel Aviv', kind: 'basketball' });
+  assert.equal(teamOf('365:559').name, 'Beitar Jerusalem');
+  assert.equal(teamOf('365:559').kind, 'soccer');
+  assert.deepEqual(NATIONAL_TEAMS.map(t => [t.id, t.name, t.kind]), [['5034', 'Israel', 'soccer'], ['1728', 'Israel', 'basketball']]);
+  assert.equal(teamOf('365:1'), null);
+  assert.equal(teamOf('il-basket:631'), null);
+});
+
+test('cleanSports turns the Israeli ids saved before search into 365Scores ids', () => {
+  assert.deepEqual(cleanSports({ follow: ['il-soccer:566', 'il-basket:631', 'il-soccer:1', 'nba:13'] }).follow, ['365:566', '365:631', 'nba:13']);
+  assert.deepEqual(cleanSports({ follow: ['il-soccer:566', '365:566'] }).follow, ['365:566']);
+});
+
+test('cleanSports keeps a found team\'s name for as long as it is followed, and only a sound one', () => {
+  const madrid = { name: 'Real Madrid', abbr: 'RMA', kind: 'soccer' };
+  const s = cleanSports({ follow: ['365:131', '365:204', '365:566', '365:9', '365:10'], teams: {
+    131: madrid,
+    204: { name: '  Real Madrid  ', abbr: '', kind: 'basketball' },   // no short name: one is made
+    566: { name: 'Maccabi Tel Aviv', abbr: 'MTA', kind: 'soccer' },   // a listed team keeps none
+    9: { name: 'X', abbr: 'X', kind: 'hockey' },
+    10: { name: '', abbr: 'Y', kind: 'soccer' },
+    777: madrid,                                                       // not followed
+  } });
+  assert.deepEqual(s.follow, ['365:131', '365:204', '365:566']);
+  assert.deepEqual(s.teams, { 131: madrid, 204: { name: 'Real Madrid', abbr: 'REA', kind: 'basketball' } });
+  assert.deepEqual(cleanSports({ follow: ['365:131'], teams: 'junk' }).follow, []);
+  assert.equal(cleanSports({ follow: ['365:131'], teams: { 131: { ...madrid, name: 'x'.repeat(200) } } }).teams[131].name.length, 80);
+  assert.deepEqual(teamOf('365:131', { 131: madrid }), { sport: '365', id: '131', ...madrid });
+  assert.equal(teamOf('365:131'), null);
+  assert.equal(teamOf('365:1x', { '1x': madrid }), null);
+  assert.equal(teamOf('nba:131', { 131: madrid }), null);
 });
 
 // 365Scores games as /web/games/current and /web/games/allscores sent them on 2026-10-18, trimmed
 // to the fields the parser reads (live and other leagues' games show the states).
 const c365 = (id, name, symbolicName, score, imageVersion, nameForURL, isWinner = false) => ({ id, name, symbolicName, score, isWinner, imageVersion, nameForURL });
+const SPORT_IDS = { 147: 1, 618: 1, 113: 1, 7741: 1, 546: 1 };   // competitions of soccer games; the rest are basketball
 const g365 = (id, competitionId, competitionDisplayName, startTime, [statusGroup, statusText, shortStatusText, displayType = 0, gameTimeDisplay = ''], home, away) => ({
-  id, competitionId, competitionDisplayName, startTime, statusGroup, statusText, shortStatusText,
+  id, sportId: SPORT_IDS[competitionId] ?? 2, competitionId, competitionDisplayName, startTime, statusGroup, statusText, shortStatusText,
   gameTimeAndStatusDisplayType: displayType, gameTimeDisplay, homeCompetitor: home, awayCompetitor: away,
 });
 const SCHEDULED = [2, 'Scheduled', 'Sched.'];
@@ -591,9 +615,9 @@ const IMG = 'https://imagecache.365scores.com/image/upload/f_png,w_32,h_32,c_lim
 
 test('parse365Games reads a team\'s games: tags, short names, logos and links to the game on 365scores.com', () => {
   const json = { competitions: [{ id: 47, name: 'Winner League', nameForURL: 'winner-league' }, { id: 569, name: 'EuroLeague', nameForURL: 'euroleague' }], games: [mtaAta, dubaiHta] };
-  const [mta, dubai] = parse365Games(json, 'il-basket');
+  const [mta, dubai] = parse365Games(json);
   assert.deepEqual(mta, {
-    id: '365:4829925', sport: 'il-basket', league: '', tag: 'Winner', start: Date.parse('2026-10-18T17:55:00Z'), timeValid: true,
+    id: '365:4829925', sport: '365', kind: 'basketball', league: '', tag: 'Winner', start: Date.parse('2026-10-18T17:55:00Z'), timeValid: true,
     state: 'pre', detail: '', off: null,
     home: { id: '631', abbr: 'MTA', name: 'Maccabi Tel Aviv', logo: `${IMG}/v3/Competitors/631`, score: null, winner: false },
     away: { id: '641', abbr: 'ATA', name: 'Ironi Kiryat Ata', logo: `${IMG}/v4/Competitors/641`, score: null, winner: false },
@@ -605,7 +629,7 @@ test('parse365Games reads a team\'s games: tags, short names, logos and links to
 });
 
 test('parse365Games: a cup game decided on penalties is over, level, and won by the side 365Scores names', () => {
-  const [derby, pens] = parse365Games({ competitions: [{ id: 546, name: 'Toto League Cup', nameForURL: 'toto-league-cup' }], games: [totoFinal, onPens] }, 'il-soccer');
+  const [derby, pens] = parse365Games({ competitions: [{ id: 546, name: 'Toto League Cup', nameForURL: 'toto-league-cup' }], games: [totoFinal, onPens] });
   assert.equal(derby.tag, 'Toto Cup');
   assert.equal(derby.url, 'https://www.365scores.com/football/match/toto-league-cup-546/maccabi-tel-aviv-hapoel-tel-aviv-566-567-546#id=4815899');
   assert.equal(pens.state, 'post');
@@ -616,23 +640,23 @@ test('parse365Games: a cup game decided on penalties is over, level, and won by 
 });
 
 test('parse365Game reads live and finished games: the minute, half time, quarter and clock, FT and Final/OT', () => {
-  const read = (g, sport) => parse365Game(g, sport, null);
-  const live = read(secondHalf, 'il-soccer');
-  assert.deepEqual([live.state, live.detail, live.home.score, live.away.score], ['in', "63'", '1', '0']);
+  const read = g => parse365Game(g, null);
+  const live = read(secondHalf);
+  assert.deepEqual([live.kind, live.state, live.detail, live.home.score, live.away.score], ['soccer', 'in', "63'", '1', '0']);
   assert.equal(live.tag, 'J1 League');   // no entry in competitions: the game's own name
-  assert.equal(read(halfTime, 'il-soccer').detail, 'HT');
-  const q2 = read(quarter, 'il-basket');
-  assert.deepEqual([q2.state, q2.detail, q2.home.abbr, q2.away.abbr], ['in', 'Q2 0:31', 'ANY', 'KCC']);
+  assert.equal(read(halfTime).detail, 'HT');
+  const q2 = read(quarter);
+  assert.deepEqual([q2.kind, q2.state, q2.detail, q2.home.abbr, q2.away.abbr], ['basketball', 'in', 'Q2 0:31', 'ANY', 'KCC']);
   assert.equal(q2.tag, 'Korean Basketball League');
-  const ot = read(overtime, 'il-basket');
+  const ot = read(overtime);
   assert.deepEqual([ot.state, ot.detail, ot.home.score, ot.home.winner, ot.home.abbr], ['post', 'Final/OT', '92', true, 'COM']);
-  const ft = read(ended, 'il-soccer');
+  const ft = read(ended);
   assert.deepEqual([ft.state, ft.detail, ft.home.score, ft.away.score], ['post', 'FT', '1', '0']);
   assert.equal(resultFor(ft, 'home'), 'W');
 });
 
 test('parse365Game: a postponed game comes among the finished ones, and reads as postponed with no score', () => {
-  const g = parse365Game(postponed, 'il-soccer', null);
+  const g = parse365Game(postponed, null);
   assert.equal(g.off, 'Postponed');
   assert.equal(g.detail, '');
   assert.deepEqual([g.home.score, g.away.score], [null, null]);
@@ -642,13 +666,19 @@ test('parse365Game: a postponed game comes among the finished ones, and reads as
 });
 
 test('parse365Games returns null for a response that is not a game list, so it never replaces saved data', () => {
-  assert.equal(parse365Games({}, 'il-soccer'), null);
-  assert.equal(parse365Games({ games: 'x' }, 'il-soccer'), null);
-  assert.equal(parse365Games({ games: [{ id: 'x' }, null] }, 'il-soccer'), null);
-  assert.deepEqual(parse365Games({ games: [] }, 'il-soccer'), []);
-  assert.deepEqual(parse365Games({ games: [mtaAta, { id: 1 }] }, 'il-basket').map(e => e.id), ['365:4829925']);
-  assert.equal(parse365Game({ ...mtaAta, startTime: 'soon' }, 'il-basket', null), null);
-  assert.equal(parse365Game({ ...mtaAta, homeCompetitor: { id: '631' } }, 'il-basket', null), null);
+  assert.equal(parse365Games({}), null);
+  assert.equal(parse365Games({ games: 'x' }), null);
+  assert.equal(parse365Games({ games: [{ id: 'x' }, null] }), null);
+  assert.deepEqual(parse365Games({ games: [] }), []);
+  assert.deepEqual(parse365Games({ games: [mtaAta, { id: 1 }] }).map(e => e.id), ['365:4829925']);
+  assert.equal(parse365Game({ ...mtaAta, startTime: 'soon' }, null), null);
+  assert.equal(parse365Game({ ...mtaAta, homeCompetitor: { id: '631' } }, null), null);
+});
+
+test('parse365Games keeps soccer and basketball games only', () => {
+  const hockey = { ...mtaAta, id: 1, sportId: 4 };
+  assert.deepEqual(parse365Games({ games: [mtaAta, hockey, { ...mtaAta, id: 2, sportId: 'constructor' }] }).map(e => e.id), ['365:4829925']);
+  assert.equal(parse365Games({ games: [hockey] }), null);
 });
 
 test('competition365: Israeli competitions by id, international ones by name, the rest by their own name', () => {
@@ -665,6 +695,8 @@ test('competition365: Israeli competitions by id, international ones by name, th
   assert.equal(competition365(329, 'Eurocup'), 'EuroCup');
   assert.equal(competition365(321, 'Club Friendlies'), 'Friendly');
   assert.equal(competition365(570, 'Friendly International'), 'Friendly');
+  assert.equal(competition365(7, 'Premier League'), 'EPL');
+  assert.equal(competition365(11, 'LaLiga'), 'LaLiga');
   assert.equal(competition365('constructor', 'X'), 'X');
   assert.equal(competition365(9, undefined), '');
 });
@@ -674,13 +706,13 @@ test('365Scores logos and links are built from whole-number ids only; slugs are 
   assert.equal(logo365('566', 11), '');
   assert.equal(logo365(566, undefined), '');
   assert.equal(logo365(-1, 1), '');
-  assert.equal(link365('il-soccer', { ...totoFinal, id: '1/../x' }, null), '');
-  assert.equal(link365('il-soccer', { ...totoFinal, homeCompetitor: { ...totoFinal.homeCompetitor, nameForURL: 'a/b?c#d' } }, { nameForURL: 'cup' }),
+  assert.equal(link365('soccer', { ...totoFinal, id: '1/../x' }, null), '');
+  assert.equal(link365('soccer', { ...totoFinal, homeCompetitor: { ...totoFinal.homeCompetitor, nameForURL: 'a/b?c#d' } }, { nameForURL: 'cup' }),
     'https://www.365scores.com/football/match/cup-546/a%2Fb%3Fc%23d-hapoel-tel-aviv-566-567-546#id=4815899');
 });
 
 test('teamTtl: 30 s while a game may be on, hourly once it ended by the clock without being over, else 6 hours', () => {
-  const il = over => game({ id: '365:1', sport: 'il-basket', league: '', tag: 'Winner', ...over });
+  const il = over => game({ id: '365:1', sport: '365', kind: 'basketball', league: '', tag: 'Winner', ...over });
   assert.equal(lengthOf(il()), 120 * 60e3);
   assert.equal(teamTtl([il({ start: NOW + 3600e3 })], NOW), 6 * 3600e3);
   assert.equal(teamTtl([il({ start: NOW - 3600e3 })], NOW), 30e3);                   // started, 365Scores not told yet
@@ -694,14 +726,75 @@ test('teamTtl: 30 s while a game may be on, hourly once it ended by the clock wi
 });
 
 test('ESPN scoreboards leave 365Scores games alone', () => {
-  assert.deepEqual(scoreboards([game({ id: '365:1', sport: 'il-soccer', league: '', start: NOW - 3600e3 })], NOW), []);
+  assert.deepEqual(scoreboards([game({ id: '365:1', sport: '365', kind: 'soccer', league: '', start: NOW - 3600e3 })], NOW), []);
 });
 
 test('timeline: a derby between two followed clubs is one row, from either club\'s games', () => {
   const json = { competitions: [{ id: 546, name: 'Toto League Cup', nameForURL: 'toto-league-cup' }], games: [totoFinal] };
-  const events = [...parse365Games(json, 'il-soccer'), ...parse365Games(json, 'il-soccer')];
-  const days = timeline(events, { follow: ['il-soccer:566', 'il-soccer:567'], f1Sessions: [], now: NOW, timeZone: TZ });
+  const events = [...parse365Games(json), ...parse365Games(json)];
+  const days = timeline(events, { follow: ['365:566', '365:567'], f1Sessions: [], now: NOW, timeZone: TZ });
   assert.deepEqual(days.map(d => [d.label, d.events.map(e => [e.id, e.side])]), [['Thu 29 Oct', [['365:4815899', 'both']]]]);
-  const mine = timeline(events, { follow: ['il-soccer:567'], f1Sessions: [], now: NOW, timeZone: TZ });
+  const mine = timeline(events, { follow: ['365:567'], f1Sessions: [], now: NOW, timeZone: TZ });
   assert.equal(mine[0].events[0].side, 'away');
+});
+
+// ---- searching for a team ----
+
+test('searchLists finds the lists\' teams by name or exact abbreviation, without minding case or accents', () => {
+  assert.deepEqual(searchLists('lakers'), [{ id: 'nba:13', name: 'Los Angeles Lakers', meta: 'NBA', logo: '', team: null }]);
+  assert.deepEqual(searchLists('chiefs').map(r => r.id), ['nfl:12']);
+  assert.deepEqual(searchLists('mta').map(r => [r.id, r.meta]), [['365:566', "Ligat Ha'Al"], ['365:631', 'Winner League']]);
+  assert.deepEqual(searchLists('ISRAEL').map(r => [r.id, r.meta]), [['365:5034', 'National team · Soccer'], ['365:1728', 'National team · Basketball']]);
+  assert.deepEqual(searchLists('Inter').map(r => r.id), ['soccer:20232']);
+  assert.deepEqual(searchLists('MIÁMI').map(r => r.id), ['nba:14', 'nfl:15', 'soccer:20232']);
+  assert.deepEqual(searchLists('ar').map(r => r.id), ['nfl:22', 'soccer:202']);   // words starting with it: Arizona, Argentina, not Charlotte
+  assert.deepEqual(searchLists('maccabi tel').map(r => r.id), ['365:566', '365:631']);
+  assert.deepEqual(searchLists('dimona').map(r => r.id), ['365:27923']);   // Hapoel Beer Sheva/Dimona
+  assert.deepEqual(searchLists('m'), []);
+  assert.deepEqual(searchLists(' '), []);
+});
+
+// /web/search's answer to "real madrid", "lakers" and "argentina" (2026-10-18), trimmed.
+const SEARCH = {
+  countries: [{ id: 2, name: 'Spain' }, { id: 323, name: 'California (USA)' }, { id: 9, name: 'Argentina' }],
+  competitors: [
+    { id: 131, sportId: 1, type: 1, name: 'Real Madrid', symbolicName: 'RMA', countryId: 2, mainCompetitionId: 11, imageVersion: 10 },
+    { id: 204, sportId: 2, type: 1, name: 'Real Madrid', symbolicName: 'RMA', countryId: 2, mainCompetitionId: 14, imageVersion: 2 },
+    { id: 1317, sportId: 2, type: 1, name: 'Los Angeles Lakers', symbolicName: 'LAL', countryId: 323, mainCompetitionId: 103, imageVersion: 9 },
+    { id: 7381, sportId: 4, type: 1, name: 'Vaxjo Lakers', countryId: 24, mainCompetitionId: 373, imageVersion: 2 },
+    { id: 2378, sportId: 1, type: 2, name: 'Argentina', symbolicName: 'ARG', countryId: 9, mainCompetitionId: 5930, imageVersion: 1 },
+    { id: 82460, sportId: 1, type: 1, name: 'Real Madrid C', symbolicName: null, countryId: 2, mainCompetitionId: 7741, imageVersion: 3 },
+    { id: 5, sportId: 1, name: 'Hidden FC', hideOnSearch: true },
+    { id: '6', sportId: 1, name: 'Bad id' },
+  ],
+};
+
+test('parse365Search: soccer and basketball teams in 365Scores\' order, Messi\'s as ESPN\'s, no NBA team', () => {
+  const found = parse365Search(SEARCH);
+  assert.deepEqual(found.map(r => [r.id, r.name, r.meta]), [
+    ['365:131', 'Real Madrid', 'Spain · Soccer'],
+    ['365:204', 'Real Madrid', 'Spain · Basketball'],
+    ['soccer:202', 'Argentina', 'Messi'],
+    ['365:82460', 'Real Madrid C', 'Spain · Soccer'],
+  ]);
+  assert.deepEqual(found[0].team, { name: 'Real Madrid', abbr: 'RMA', kind: 'soccer' });
+  assert.equal(found[0].logo, `${IMG}/v10/Competitors/131`);
+  assert.equal(found[2].team, null);   // following it follows ESPN's Argentina
+  assert.deepEqual(found[3].team, { name: 'Real Madrid C', abbr: 'REA', kind: 'soccer' });
+  assert.deepEqual(ON_ESPN, { 54729: 'soccer:20232', 2378: 'soccer:202' });
+  assert.equal(parse365Search({}), null);
+  assert.equal(parse365Search({ competitors: 'x' }), null);
+  assert.deepEqual(parse365Search({ competitors: [] }), []);
+});
+
+test('mergeResults: the lists\' matches first, one row per team, 365Scores\' logo for a team both have, at most eight', () => {
+  const listed = searchLists('argentina');
+  const merged = mergeResults(listed, parse365Search(SEARCH));
+  assert.deepEqual(merged.map(r => r.id), ['soccer:202', '365:131', '365:204', '365:82460']);
+  assert.equal(merged[0].meta, 'Messi');
+  assert.equal(merged[0].logo, `${IMG}/v1/Competitors/2378`);
+  assert.equal(listed[0].logo, '');   // the lists' own results are left alone
+  assert.deepEqual(mergeResults(listed, null).map(r => r.id), ['soccer:202']);
+  const many = Array.from({ length: 12 }, (_, i) => ({ id: `365:${i}`, name: `T${i}`, meta: '', logo: '', team: null }));
+  assert.equal(mergeResults([], many).length, 8);
 });

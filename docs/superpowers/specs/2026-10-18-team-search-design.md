@@ -21,8 +21,9 @@ the browser for a day). It answers `competitors[]` sorted by popularity (`id`, `
 - Teams the widget already gets from ESPN aren't offered twice: 365Scores' NBA teams
   (`mainCompetitionId` 103) are dropped, and Inter Miami (54729) and Argentina (2378) are shown as
   the Messi entries (`soccer:20232`, `soccer:202`).
-- The fixed lists are searched too, by name or abbreviation, and come first: "Lakers" finds the
-  NBA entry, "Chiefs" the NFL one, "MTA" both Maccabi Tel Aviv clubs.
+- The fixed lists are searched too, from 2 letters and with no request, and come first: a name
+  word starting with the text, or the exact abbreviation ("Lakers" finds the NBA entry, "Chiefs"
+  the NFL one, "MTA" both Maccabi Tel Aviv clubs, "ar" Arizona and Argentina but not Charlotte).
 - A result: logo (365Scores teams), name, and a muted line: country · Soccer / Basketball, or the
   list's name (NBA, NFL, Messi). It's a button pressed while followed; a click follows or
   unfollows.

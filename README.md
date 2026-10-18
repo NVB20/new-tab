@@ -55,7 +55,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
 | **Markets** | Coins from Bybit, SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to three copies can split them up. |
-| **Sports** | Your NBA, NFL and Israeli teams' games (Ligat Ha'Al and Winner League clubs, the national teams), Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
+| **Sports** | Your NBA, NFL and Israeli teams' games (Ligat Ha'Al and Winner League clubs, the national teams), any soccer or basketball team you search for, Messi's (Inter Miami and Argentina) and F1 sessions in one list by day, with live scores and a day of results. |
 | **Website** | Any site, live and logged in as you are, such as your Pinterest feed; up to two, each with its own address and zoom. |
 | **Weather** | A city's weather now, the next hours and the week ahead, in °C or °F; up to three, each with its own city. |
 | **Countdown** | Days to go until a date (a trip, a birthday every year) or a timer, big; confetti and a Chrome notification at zero. One list of countdowns; each of up to three widgets shows one. |
@@ -321,26 +321,32 @@ you follow in one list by day (Today, Tomorrow, Sun 18 Oct), in your computer's 
 
 - **Choose what's shown:** hover the widget and click **✎**. Press the NBA and NFL teams you
   follow (hover a button for the team's full name), tick Messi's teams (Inter Miami, Argentina),
-  press Ligat Ha'Al and Winner League clubs, tick Israel's national soccer and basketball teams
-  and F1, and pick the F1 sessions you want (Practice, Sprint, Qualifying, Race). Changes apply as
-  you go; **✓** closes the editor. A new widget follows Inter Miami, Argentina and F1.
-- **Israeli teams** bring every competition they play: league, cups, European games (Ha'Al,
-  Toto Cup, State Cup, Winner, Winner Cup, EuroLeague, UECL, …) and the national teams' Nations
-  League, qualifiers and friendlies.
+  press Ligat Ha'Al and Winner League clubs and Israel's national teams, tick F1, and pick the F1
+  sessions you want (Practice, Sprint, Qualifying, Race). Changes apply as you go; **✓** closes
+  the editor. A new widget follows Inter Miami, Argentina and F1.
+- **Search for any team:** type in **Search teams…** at the top of the editor (Real Madrid,
+  Celtics, Maccabi) and click a result to follow it, again to stop. It finds soccer and basketball
+  clubs and national teams worldwide, women's and youth teams too, from the third letter; teams in
+  the lists come first, and NBA and Messi's teams always come from their lists. Teams you found
+  show under **Your teams**, where a click stops following them.
+- **Clubs and national teams bring every competition they play:** league, cups, European games
+  (Ha'Al, Toto Cup, State Cup, Winner, Winner Cup, EuroLeague, UECL, …) and the national teams'
+  Nations League, qualifiers and friendlies.
 - **A row:** the league or competition (NBA, NFL, MLS, Leagues Cup, World Cup, F1, …), the
   teams with yours in bold (F1: a race car, the race and the session), the start time and the TV channel
-  (none for Israeli teams). A moon marks games that start
+  (none for Israeli teams and teams you searched for). A moon marks games that start
   between midnight and 7 in the morning. Times follow the Clock's 12/24-hour setting.
 - **Live:** a red dot, the score and the clock (Q3 5:21, 67'). Scores refresh every 30 seconds
   while the tab is in view. F1 sessions read LIVE while they're scheduled to run.
 - **Results:** a finished game stays for a day with its score and W, L or D for your team; after
   a race, the podium.
-- **Click a row** to open the game on ESPN (Israeli teams: on 365Scores; F1: the season on
-  formula1.com).
+- **Click a row** to open the game on ESPN (Israeli teams and teams you searched for: on
+  365Scores; F1: the season on formula1.com).
 - The list covers the next 14 days; a team with nothing in that time still shows its next game.
   Up to five copies can each follow their own list (say, F1 alone in a corner).
 
-Schedules come from ESPN's public site API, 365Scores' web API (Israeli teams) and Jolpica F1
+Schedules come from ESPN's public site API, 365Scores' web API (Israeli teams, the search and the
+teams it finds) and Jolpica F1
 (the successor of the Ergast API), all free and without a key. Team schedules are checked every 6
 hours and the F1 calendar once a day; every copy and every open tab shares one fetch. While ESPN's usual host can't be reached the
 same API answers on its web host; while Jolpica can't, [OpenF1](https://openf1.org/) gives the
@@ -622,7 +628,8 @@ list the coin), and are sent the same thing:
 | Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) [`data-api.ecb.europa.eu`, then currency-api on `cdn.jsdelivr.net` or `currency-api.pages.dev`] | once an hour |
 | GitHub | `api.github.com`, and `github.com` for the heatmap [`github-contributions-api.jogruber.de`, with your username] | once an hour, or when you press Refresh |
 | Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores) [`site.web.api.espn.com`]; team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
-| Sports (Israeli teams) | `webws.365scores.com` (schedules, scores; the team's id); team logos from `imagecache.365scores.com` | every 6 hours; every 30 s while one of your games is on |
+| Sports (Israeli teams, teams you searched for) | `webws.365scores.com` (schedules, scores; the team's id); team logos from `imagecache.365scores.com` | every 6 hours; every 30 s while one of your games is on |
+| Sports (team search) | `webws.365scores.com` (what you type in **Search teams…**, from the third letter) | as you type in the editor |
 | Sports (F1) | `api.jolpi.ca` [`api.openf1.org`] | calendar once a day; hourly after a race until the result is in |
 | Weather | `api.open-meteo.com` (the forecast for the city's coordinates) [`api.met.no`]; `geocoding-api.open-meteo.com` (the name you type, while choosing a city) [`photon.komoot.io`] | every 15 min while visible (30 min from `api.met.no`) |
 | Tile logos | wherever each tile's icon link points (e.g. `assets.speeddial2.com`) | once per logo, then it's saved |
@@ -658,7 +665,7 @@ run script (`javascript:`, `data:`) or a wallpaper that's a link.
 - Sports: ESPN's site API is public but unofficial and can change without notice; its web host
   serves the same API, so a change reaches both. The widget then keeps the last schedule it had
   and says ESPN is unreachable. F1 "live" follows the timetable, not live timing (there is no free
-  live timing). 365Scores' API (Israeli teams) is unofficial in the same way. The Ligat Ha'Al and
+  live timing). 365Scores' API (Israeli teams, the search) is unofficial in the same way. The Ligat Ha'Al and
   Winner League clubs to choose from are the 2026-27 season's.
 - Backup sources aren't exact copies. MET Norway gives chances of rain only in the Nordic
   countries, and today's high and low from the current hour on; for a city it has never had a

@@ -1,18 +1,18 @@
-// Sports widget: the followed NBA, NFL and Israeli teams' games, Messi's (Inter Miami, Argentina)
-// and the chosen F1 sessions in one list by day, with live scores and a day of results. Schedules
-// come from ESPN's site API (its web host while the first is down), 365Scores (Israeli clubs and
-// national teams) and Jolpica F1 (OpenF1 while it's down) through the request cache, shared by
-// every copy and tab.
+// Sports widget: the followed NBA, NFL, Israeli and other teams' games, Messi's (Inter Miami,
+// Argentina) and the chosen F1 sessions in one list by day, with live scores and a day of results.
+// Schedules come from ESPN's site API (its web host while the first is down), 365Scores (Israeli
+// clubs, national teams and any team found with the editor's search) and Jolpica F1 (OpenF1 while
+// it's down) through the request cache, shared by every copy and tab.
 
 import { el, icon, widgetHead, widgetSub, widgetEmpty } from './ui.js';
 import { feed, fetchJson, peek, sweep } from './net.js';
 import { timeAgo } from './feeds.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
-  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, ISRAEL, IL_SPORTS, F1_SESSIONS, F1_SESSION_LABELS,
+  NBA_TEAMS, NFL_TEAMS, SOCCER_TEAMS, IL_SOCCER_CLUBS, IL_BASKET_CLUBS, NATIONAL_TEAMS, F1_SESSIONS, F1_SESSION_LABELS,
   teamOf, schedulePath, parseSchedule, nextPhases, joinParts, parseScoreboard, trimEvents, applyLive, scoreboards, boardTtl,
-  etDay, parse365Games, teamTtl, parseF1Season, parseF1Last, raceAwaitingResult, parseOpenF1Season, openF1RaceKey,
-  parseOpenF1Podium, timeline, resultFor, formatTime, isNight, longDay,
+  etDay, parse365Games, teamTtl, searchLists, parse365Search, mergeResults, parseF1Season, parseF1Last, raceAwaitingResult,
+  parseOpenF1Season, openF1RaceKey, parseOpenF1Podium, timeline, resultFor, formatTime, isNight, longDay,
 } from './sports.js';
 
 // ESPN's site API answers the same on its web host.
@@ -21,6 +21,9 @@ const ESPN = [
   ['ESPN web', 'https://site.web.api.espn.com/apis/site/v2/sports'],
 ];
 const S365 = 'https://webws.365scores.com/web/games/current/?appTypeId=5&langId=1&timezoneName=UTC&userCountryId=6';
+const SEARCH = 'https://webws.365scores.com/web/search/?appTypeId=5&langId=1';
+const SEARCH_MIN = 3;          // letters before asking 365Scores (two bring thousands of teams)
+const SEARCH_WAIT_MS = 300;    // after typing stops
 const JOLPICA = 'https://api.jolpi.ca/ergast/f1';
 const OPENF1 = 'https://api.openf1.org/v1';
 const HOUR = 3600e3;
@@ -35,14 +38,15 @@ const F1_SEASON = `${KEY}:f1:season`;
 const F1_LAST = `${KEY}:f1:last`;
 const liveKey = b => `${KEY}:live:${b.path}:${b.day}`;
 
-const from365 = id => id !== 'f1' && Object.hasOwn(IL_SPORTS, teamOf(id).sport);
+const from365 = id => id.startsWith('365:');
+const kindLabel = kind => (kind === 'basketball' ? 'Basketball' : 'Soccer');
 
-// The cache keys a followed id reads: a team's schedule (soccer: upcoming games and results; an
-// Israeli team: its games on 365Scores), or F1's season.
+// The cache keys a followed id reads: a team's schedule (soccer: upcoming games and results; a
+// 365Scores team: its games there), or F1's season.
 function sourceKeys(id) {
   if (id === 'f1') return [F1_SEASON];
+  if (from365(id)) return [`${KEY}:365:${id.slice(4)}`];
   const { sport, id: team } = teamOf(id);
-  if (from365(id)) return [`${KEY}:365:${team}`];
   return sport === 'soccer' ? [`${KEY}:soccer:${team}:next`, `${KEY}:soccer:${team}:last`] : [`${KEY}:team:${sport}:${team}`];
 }
 
@@ -72,15 +76,15 @@ const f1Season = [
 
 async function loadSource(id) {
   if (id === 'f1') return feed(F1_SEASON, F1_TTL, f1Season);
-  const { sport, id: team } = teamOf(id);
   const [key, lastKey] = sourceKeys(id);
   if (from365(id)) {
     // Its games are fresh for 6 hours, 30 s while one of them may be under way (teamTtl).
     return feed(key, teamTtl(peek(key)?.data ?? [], Date.now()), [{
       name: '365Scores',
-      load: async () => trimmed(must(parse365Games(await fetchJson(`${S365}&competitors=${team}`), sport), '365Scores')),
+      load: async () => trimmed(must(parse365Games(await fetchJson(`${S365}&competitors=${id.slice(4)}`)), '365Scores')),
     }]);
   }
+  const { sport, id: team } = teamOf(id);
   const path = schedulePath(sport, team);
   const schedule = async from => must(parseSchedule(await fetchJson(from), sport), 'ESPN');
   if (sport === 'soccer') {
@@ -225,17 +229,18 @@ export function mountSports(root, store, copy) {
     return parts.join(', ');
   }
 
-  const siteOf = e => (Object.hasOwn(IL_SPORTS, e.sport) ? 'https://www.365scores.com/' : 'https://www.espn.com/');
+  const siteOf = e => (e.sport === '365' ? 'https://www.365scores.com/' : 'https://www.espn.com/');
   const row = e => el('a', { class: `sp-row ${e.status}`, 'aria-label': label(e), ...linkProps(e.url || siteOf(e)) },
     el('span', { class: 'sp-tag', text: e.tag }), matchup(e), when(e));
 
   // ---- list ----
 
-  // 'the schedule for Maccabi Tel Aviv (basketball)': Israeli clubs share names across sports.
+  // 'the schedule for Maccabi Tel Aviv (basketball)': clubs share names across sports.
   function what(id) {
     if (id === 'f1') return 'the F1 calendar';
-    const team = teamOf(id);
-    return `the schedule for ${team.name}${from365(id) ? ` (${IL_SPORTS[team.sport]})` : ''}`;
+    const team = teamOf(id, settings().teams);
+    if (!team) return 'a team\'s schedule';
+    return `the schedule for ${team.name}${team.kind ? ` (${team.kind})` : ''}`;
   }
   const hostOf = id => (id === 'f1' ? 'Jolpica and OpenF1' : from365(id) ? '365Scores' : 'ESPN');
 
@@ -274,7 +279,7 @@ export function mountSports(root, store, copy) {
     }
     const days = timeline(applyLive(events(), live), { follow: s.follow, f1Sessions: s.f1Sessions, now: Date.now() });
     const empty = loaded && nothingLoaded(s.follow);
-    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl|il-soccer|il-basket):/.test(id));
+    const hint = !s.edited && !s.follow.some(id => /^(nba|nfl|365):/.test(id));
     const lines = problems(s.follow);
     const next = JSON.stringify([days, loaded, empty, hint, lines.map(p => p.textContent), podium, hour24(), prefs().openInNewTab]);
     if (next === drawn) return;
@@ -286,7 +291,7 @@ export function mountSports(root, store, copy) {
       ...(hint ? [el('p', { class: 'widget-note' }, pickLink('Pick your teams'))] : []));
   }
 
-  // ---- editor: ✎ swaps the list for team buttons; changes apply as they're made ----
+  // ---- editor: ✎ swaps the list for a team search and team buttons; changes apply as they're made ----
 
   let editing = false;
 
@@ -298,10 +303,36 @@ export function mountSports(root, store, copy) {
   }
   const toggled = (ids, id, on) => [...ids.filter(x => x !== id), ...(on ? [id] : [])];
 
+  // Every button and checkbox that follows an id says so in data-follow, so following from the
+  // search presses the team's own button too.
+  function syncFollowed() {
+    const ids = settings().follow;
+    for (const node of editor.querySelectorAll('[data-follow]')) {
+      const on = ids.includes(node.dataset.follow);
+      if (node.type === 'checkbox') node.checked = on;
+      else node.setAttribute('aria-pressed', String(on));
+    }
+  }
+
+  // Follows an id or stops; a 365Scores team no list has keeps its name, short name and sport in
+  // the copy (team, from the search).
+  function setFollowed(id, on, team = null) {
+    update(own => {
+      own.follow = toggled(own.follow, id, on);
+      if (!from365(id)) return;
+      const teams = { ...(own.teams ?? {}) };
+      if (on && team && !teamOf(id)) teams[id.slice(4)] = team;
+      if (!on) delete teams[id.slice(4)];
+      own.teams = teams;
+    });
+    drawYours();
+    syncFollowed();
+  }
+
   // A button that stays pressed while its item is chosen.
-  function chip(text, title, pressed, onToggle) {
+  function chip(text, title, pressed, onToggle, follow) {
     const button = el('button', {
-      type: 'button', class: 'sp-chip', text, title, 'aria-pressed': String(pressed),
+      type: 'button', class: 'sp-chip', text, title, 'aria-pressed': String(pressed), 'data-follow': follow,
       onclick: () => {
         const on = button.getAttribute('aria-pressed') !== 'true';
         button.setAttribute('aria-pressed', String(on));
@@ -310,30 +341,108 @@ export function mountSports(root, store, copy) {
     });
     return button;
   }
+  const followChip = (id, text, title) => chip(text, title, settings().follow.includes(id), on => setFollowed(id, on), id);
+
+  // ---- the search: the lists' teams at once, 365Scores' from the third letter ----
+
+  const searchBox = el('input', {
+    type: 'search', class: 'pref-input sp-search', placeholder: 'Search teams…', 'aria-label': 'Search teams',
+    autocomplete: 'off', spellcheck: false,
+    oninput: () => search(searchBox.value),
+    onkeydown: e => {
+      if (e.key !== 'Escape' || !searchBox.value) return;
+      e.preventDefault();
+      e.stopPropagation();
+      searchBox.value = '';
+      search('');
+    },
+  });
+  const results = el('div', { class: 'sp-results', hidden: true });
+  const yours = el('div', { class: 'sp-yours' });
+  let query = '';
+  let found = null;     // 365Scores' results for the query
+  let asking = '';      // '', 'busy' or 'failed'
+  let searchSeq = 0;
+  let searchTimer = 0;
+
+  function search(text) {
+    query = text.trim();
+    clearTimeout(searchTimer);
+    const my = ++searchSeq;
+    found = null;
+    asking = query.length >= SEARCH_MIN ? 'busy' : '';
+    drawResults();
+    if (!asking) return;
+    searchTimer = setTimeout(async () => {
+      let answer = null;
+      try {
+        answer = parse365Search(await fetchJson(`${SEARCH}&query=${encodeURIComponent(query)}`));
+      } catch {
+        // drawn as a failed search below
+      }
+      if (my !== searchSeq) return;   // the box has changed since
+      found = answer;
+      asking = answer ? '' : 'failed';
+      drawResults();
+    }, SEARCH_WAIT_MS);
+  }
+
+  function resultButton(r) {
+    return el('button', {
+      type: 'button', class: 'sp-result', title: r.name, 'data-follow': r.id, 'aria-pressed': String(settings().follow.includes(r.id)),
+      onclick: () => setFollowed(r.id, !settings().follow.includes(r.id), r.team),
+    },
+    r.logo
+      ? el('img', { class: 'sp-logo', src: r.logo, alt: '', loading: 'lazy', referrerPolicy: 'no-referrer', onerror: e => e.target.replaceWith(el('span', { class: 'sp-logo' })) })
+      : el('span', { class: 'sp-logo' }),   // keeps the names in line
+    el('span', { class: 'sp-result-name', text: r.name }),
+    el('span', { class: 'sp-result-meta', text: r.meta }),
+    icon('plus', 14), icon('check', 14));
+  }
+
+  function drawResults() {
+    const rows = mergeResults(searchLists(query), found);
+    const status = asking === 'busy' ? 'Searching…'
+      : asking === 'failed' ? 'Couldn\'t search, check your connection'
+        : query.length >= SEARCH_MIN && !rows.length ? 'No teams found' : '';
+    results.hidden = !rows.length && !status;
+    results.replaceChildren(...rows.map(resultButton), ...(status ? [el('p', { class: 'widget-note', text: status })] : []));
+  }
+
+  // The followed teams found by search that no list has, to stop following them.
+  function drawYours() {
+    const s = settings();
+    const mine = s.follow.filter(id => from365(id) && !teamOf(id)).map(id => teamOf(id, s.teams)).filter(Boolean);
+    yours.replaceChildren(...(mine.length ? [
+      widgetSub('Your teams'),
+      el('div', { class: 'sp-chips' }, mine.map(t => followChip(`365:${t.id}`, t.name, `${t.name} · ${kindLabel(t.kind)}`))),
+    ] : []));
+  }
 
   function renderEditor() {
     const s = settings();
-    const teamChip = (sport, t) => {
-      const id = `${sport}:${t.id}`;
-      return chip(t.abbr, t.name, s.follow.includes(id), on => update(own => { own.follow = toggled(own.follow, id, on); }));
-    };
+    const teamChip = (sport, t) => followChip(`${sport}:${t.id}`, t.abbr, t.name);
     const check = (id, text) => {
       const input = el('input', {
-        type: 'checkbox', checked: s.follow.includes(id),
-        onchange: () => update(own => { own.follow = toggled(own.follow, id, input.checked); }),
+        type: 'checkbox', checked: s.follow.includes(id), 'data-follow': id,
+        onchange: () => setFollowed(id, input.checked),
       });
       return el('label', { class: 'mk-check' }, input, el('span', { text }));
     };
     const sessionChip = x => chip(F1_SESSION_LABELS[x], null, s.f1Sessions.includes(x),
       on => update(own => { own.f1Sessions = F1_SESSIONS.filter(y => (y === x ? on : own.f1Sessions.includes(y))); }));
+    searchBox.value = '';
+    search('');
+    drawYours();
     editor.replaceChildren(
+      searchBox, results, yours,
       widgetSub('NBA'), el('div', { class: 'sp-chips' }, NBA_TEAMS.map(t => teamChip('nba', t))),
       widgetSub('NFL'), el('div', { class: 'sp-chips' }, NFL_TEAMS.map(t => teamChip('nfl', t))),
       widgetSub('Messi'), el('div', { class: 'mk-checks' }, SOCCER_TEAMS.map(t => check(`soccer:${t.id}`, t.name))),
-      widgetSub("Ligat Ha'Al"), el('div', { class: 'sp-chips' }, IL_SOCCER_CLUBS.map(t => teamChip('il-soccer', t))),
-      widgetSub('Winner League'), el('div', { class: 'sp-chips' }, IL_BASKET_CLUBS.map(t => teamChip('il-basket', t))),
-      widgetSub('Israel'), el('div', { class: 'mk-checks' },
-        check(`il-soccer:${ISRAEL['il-soccer'].id}`, 'Soccer'), check(`il-basket:${ISRAEL['il-basket'].id}`, 'Basketball')),
+      widgetSub("Ligat Ha'Al"), el('div', { class: 'sp-chips' }, IL_SOCCER_CLUBS.map(t => teamChip('365', t))),
+      widgetSub('Winner League'), el('div', { class: 'sp-chips' }, IL_BASKET_CLUBS.map(t => teamChip('365', t))),
+      widgetSub('National teams'), el('div', { class: 'sp-chips' },
+        NATIONAL_TEAMS.map(t => followChip(`365:${t.id}`, `${t.name} · ${kindLabel(t.kind)}`, null))),
       widgetSub('Formula 1'), el('div', { class: 'mk-checks' }, check('f1', 'Follow F1')),
       el('div', { class: 'sp-chips' }, F1_SESSIONS.map(sessionChip)));
   }
@@ -418,8 +527,10 @@ export function mountSports(root, store, copy) {
   return {
     destroy() {
       seq++;   // a load still running draws nothing
+      searchSeq++;
       clearInterval(interval);
       clearTimeout(timer);
+      clearTimeout(searchTimer);
       document.removeEventListener('visibilitychange', refresh);
       unsubscribe();
     },
