@@ -76,6 +76,20 @@ export function googleCalendarId(url) {
 // URL, pasted instead of the secret address.
 export const notIcalLink = url => /^https:\/\/(calendar|www)\.google\.com\//.test(url) && !googleCalendarId(url);
 
+// What was pasted instead of an iCal address, or '' when it may be one: 'calendar-id' (the
+// Calendar ID, which looks like an email address), 'page' (a link to Google Calendar itself) or
+// 'not-link'.
+export function pasteProblem(text) {
+  const s = String(text ?? '').trim();
+  if (/^[^\s@/:]+@[^\s@/:]+\.[^\s@/:]+$/.test(s)) return 'calendar-id';
+  const url = calendarUrl(s);
+  if (!url) return 'not-link';
+  return notIcalLink(url) ? 'page' : '';
+}
+
+// Google's public iCal address (…/public/basic.ics), which answers only for a calendar made public.
+export const isPublicAddress = url => !!googleCalendarId(url) && /\/public\/[^/]+$/.test(new URL(url).pathname);
+
 // ---- reading the file ----
 
 // One content line: NAME;PARAM=value;PARAM="quoted":value. Null when it isn't one.

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cleanCalendars, cleanGcal, nextColor, colorAfter, calendarUrl, googleCalendarId, notIcalLink, parseCalendar, agenda,
+  cleanCalendars, cleanGcal, nextColor, colorAfter, calendarUrl, googleCalendarId, notIcalLink, pasteProblem, isPublicAddress, parseCalendar, agenda,
   joinState, failureOf, NOT_A_CALENDAR, COLORS, MAX_CALENDARS, JOIN_EARLY_MS,
 } from '../js/gcal.js';
 
@@ -383,6 +383,21 @@ test('links: webcal becomes https, only http(s) without credentials; the Google 
   assert.equal(notIcalLink('https://calendar.google.com/calendar/u/0/r'), true);
   assert.equal(notIcalLink(GOOGLE), false);
   assert.equal(notIcalLink('https://outlook.office365.com/owa/calendar/x/reachcalendar.ics'), false);
+});
+
+test('a paste that isn’t the secret address says what it is', () => {
+  assert.equal(pasteProblem(GOOGLE), '');
+  assert.equal(pasteProblem(` ${GOOGLE}\n`), '');
+  assert.equal(pasteProblem('webcal://p01-caldav.icloud.com/published/2/abc'), '');
+  assert.equal(pasteProblem('me@gmail.com'), 'calendar-id');
+  assert.equal(pasteProblem('c_0f3a9e@group.calendar.google.com'), 'calendar-id');
+  assert.equal(pasteProblem('https://calendar.google.com/calendar/embed?src=me%40gmail.com&ctz=Asia%2FJerusalem'), 'page');
+  assert.equal(pasteProblem('https://calendar.google.com/calendar/u/0/r/settings/calendar/bWU'), 'page');
+  assert.equal(pasteProblem('my calendar'), 'not-link');
+  assert.equal(pasteProblem(''), 'not-link');
+  assert.equal(isPublicAddress('https://calendar.google.com/calendar/ical/me%40gmail.com/public/basic.ics'), true);
+  assert.equal(isPublicAddress(GOOGLE), false);
+  assert.equal(isPublicAddress('https://example.com/public/basic.ics'), false);
 });
 
 test('calendars and a copy’s settings, cleaned', () => {
