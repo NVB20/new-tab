@@ -37,9 +37,9 @@ Set up the "New Tab" Chrome extension for me from https://github.com/NVB20/new-t
      fine-grained token at https://github.com/settings/personal-access-tokens/new with Contents,
      Issues and Pull requests set to read-only. I paste it into the Access token box myself.
      Never ask me to paste the token into this chat.
-   - Markets: pick the coins and currency pairs I want to follow (the ✎ in the Markets widget's
-     heading; any Bybit spot coin, priced in USDT, the SPY, QQQ and DJIA indexes, commodities such
-     as gold, oil and corn, plus pairs such as USD/ILS and EUR/ILS).
+   - Markets: pick what I want to follow (the ✎ in the Markets widget's heading: search for any
+     stock, index, fund, future, coin or currency pair, or tick coins priced on Bybit in USDT, the
+     SPY, QQQ and DJIA indexes, commodities such as gold, oil and corn, and pairs such as USD/ILS).
 5. Finish by telling me how to update later: git pull in that folder, then the reload button
    on the extension's card in chrome://extensions.
 ```
@@ -53,7 +53,7 @@ Rather do it yourself? See [Install by hand](#install-by-hand).
 | **Tiles and groups** | Speed-dial tiles, organised into groups shown as tabs along the top. |
 | **Layout mode** | One 12 × 12 canvas: drag, resize, add, duplicate and remove the widgets, the search bar and blocks of tiles, and stack up to three widgets in one spot. |
 | **Folders** | Drop one tile on another to make a folder; it shows up to four icons inside. |
-| **Markets** | Coins from Bybit, SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, and currency pairs (USD/ILS, EUR/ILS, …), with sparklines, picked from a checklist, dragged into order and grouped under your own headings. |
+| **Markets** | Any stock, index, fund, future or currency pair Yahoo Finance quotes (US, Tel Aviv, London, …), found with a search, plus coins from Bybit and SPY, QQQ, the Dow and commodities (gold, silver, oil, corn, …) from CNBC, with sparklines, dragged into order and grouped under your own headings. |
 | **Economic calendar** | This week's releases for the USA, the Eurozone and Israel (CPI, rate decisions, jobs reports, …) with the forecast, the previous and the number once it's out, filtered by importance; up to three, each with its own markets. |
 | **Google Calendar** | Today's events and the next two weeks' from your Google calendars, merged, each in its colour, with what's on now, what's next and a Join button for calls; chips choose which calendars each of up to two widgets shows. |
 | **GitHub** | Any of your profile stats, contribution heatmap, open pull requests, review requests, open issues, latest repos and latest commits, in the order you choose, including private repos with a token; up to three copies can split them up. |
@@ -165,12 +165,22 @@ The Markets widget starts on the right of the page; Layout mode moves it anywher
 copies can each follow their own list (say, coins in one and currencies in another).
 
 - **Choose what's shown:** hover the widget and click **✎** next to the heading. Tick the coins,
-  indexes, commodities and currency pairs you want and untick the rest; the list updates as you go. To follow a
-  coin that isn't listed, type its ticker (e.g. `PEPE`) and press **Add**. Click **✓** when you're
-  done. New picks go to the bottom of the list.
+  indexes, commodities and currency pairs you want and untick the rest; the list updates as you go.
+  Click **✓** when you're done. New picks go to the bottom of the list.
+- **Add any ticker:** type in the search box at the top of ✎: a name or a symbol (`apple`, `teva`,
+  `ta 125`, `eur pln`, `pepe`). The listed products that match come first, then what Yahoo
+  Finance finds: stocks and ETFs on any exchange (`TEVA.TA` is Teva in Tel Aviv, `TEVA` in New
+  York), indexes, funds, futures, coins and currency pairs, with the exchange and type on each.
+  Click one to add it (click again to remove it), or press Enter for the top one; Esc clears the
+  box. Coins it finds are priced on Bybit like the listed ones, and currency pairs join the
+  currencies. What you add without a checkbox is under **Your symbols**, to remove or add back.
 - **Coins:** BTC, SOL, XRP and ETH by default, as Bybit spot prices in USDT. Each row shows the
   price, its 24h change and a sparkline of the last 24 hours. A coin Bybit doesn't list comes from
   Binance or OKX instead; one none of them lists shows a dash.
+- **Found symbols:** live Yahoo Finance quotes: the price (in the exchange's currency; Tel Aviv
+  stocks are in agorot and London's in pence, as the hover says), the change on the day and a
+  sparkline of today's session (funds have no prices during the day, so no sparkline). An index goes
+  by its short name when it fits (TA-125, S&P 500), anything else by its symbol.
 - **US indexes:** SPY, QQQ and the Dow (DJIA), as CNBC quotes. Each row shows the last
   regular-session price, its change on the day and a sparkline of that session; outside market
   hours that's the last close.
@@ -180,10 +190,12 @@ copies can each follow their own list (say, coins in one and currencies in anoth
   bushel, coffee and sugar in cents a pound), its change since the last settlement and a sparkline
   of the last 24 hours of trading.
 - **Currency pairs:** USD/ILS by default; EUR/ILS, GBP/ILS, EUR/USD, GBP/USD, USD/JPY and USD/CHF
-  are in the list too. They use the daily ECB reference rates, with a sparkline of the last 12 days.
+  are in the list too, and the search adds any other. They're live Yahoo Finance rates, with their
+  change on the day and a sparkline of today.
 - **Click a row** to open the coin's chart on the exchange its price came from (the index or
-  commodity on CNBC, or the pair on Google Finance); the candles icon at the end opens it on
-  TradingView. Hover a row to see where its numbers came from.
+  commodity on CNBC, a found symbol or a pair on Yahoo Finance); the candles icon at the end opens
+  it on TradingView (not for found indexes and futures, whose names there differ). Hover a row to
+  see where its numbers came from.
 - **Drag a row** up or down to reorder the list; a line shows where it will land.
 - **Segments:** right-click a row and choose **New segment above** to put a heading over it (say,
   *US* over SPY), type its name and press Enter (Esc cancels). The rows below a heading, up to the
@@ -200,7 +212,8 @@ While a source is down the widget carries on from another, so the rows keep movi
 | --- | --- | --- |
 | Coins | Bybit | Binance, then OKX (same coins in USDT) |
 | Indexes and commodities | CNBC | Yahoo Finance (the same index or front-month future) |
-| Currency pairs | Frankfurter (the ECB's rates) | the ECB itself, then currency-api's market rates for the last two days |
+| Found symbols | Yahoo Finance | CNBC for US tickers; others show a dash |
+| Currency pairs | Yahoo Finance | the ECB's daily rates (from Frankfurter, the ECB itself, then currency-api's market rates for the last two days) |
 
 A source that doesn't answer is skipped by every tab for 10 minutes, then asked first again.
 
@@ -706,7 +719,8 @@ list the coin), and are sent the same thing:
 | --- | --- | --- |
 | Markets (coins) | `api.bybit.com` (public market data) [`data-api.binance.vision`, then `www.okx.com`] | every 30 s while visible; sparklines every 5 min |
 | Markets (indexes, commodities) | `quote.cnbc.com` and `ts-api.cnbc.com` (public quotes and charts) [`query1.finance.yahoo.com`] | every 30 s while visible; sparklines every 5 min |
-| Markets (currency pairs) | `api.frankfurter.dev` (ECB rates) [`data-api.ecb.europa.eu`, then currency-api on `cdn.jsdelivr.net` or `currency-api.pages.dev`] | once an hour |
+| Markets (found symbols, currency pairs) | `query1.finance.yahoo.com` (public quotes and today's charts) [`quote.cnbc.com` and `ts-api.cnbc.com` for US tickers; `api.frankfurter.dev`, `data-api.ecb.europa.eu`, then currency-api on `cdn.jsdelivr.net` or `currency-api.pages.dev` for pairs] | every 30 s while visible; the backup rates once an hour |
+| Markets search | `query1.finance.yahoo.com`: what you type in the search box in ✎ | 300 ms after you stop typing |
 | Economic calendar | `economic-calendar.tradingview.com` (the releases of the USA, the Eurozone and Israel from yesterday to 9 days on) [`nfs.faireconomy.media`, ForexFactory's weekly feed] | every 15 min while visible, every minute while a release shown is due (hourly from `nfs.faireconomy.media`) |
 | GitHub | `api.github.com`, and `github.com` for the heatmap [`github-contributions-api.jogruber.de`, with your username] | once an hour, or when you press Refresh |
 | Sports (NBA, NFL, soccer) | `site.api.espn.com` (schedules, scores) [`site.web.api.espn.com`]; team logos from `a.espncdn.com` | every 6 hours; every 30 s while one of your games is on |
@@ -768,8 +782,9 @@ run script (`javascript:`, `data:`) or a wallpaper that's a link.
 - Backup sources aren't exact copies. MET Norway gives chances of rain only in the Nordic
   countries, and today's high and low from the current hour on; for a city it has never had a
   forecast for, it takes your computer's time zone (or, far away, one guessed from the longitude).
-  Binance's and OKX's prices differ from Bybit's by cents, currency-api's market rates from the
-  ECB's daily reference rates by a little, and its sparkline covers two days.
+  Binance's and OKX's prices differ from Bybit's by cents. While Yahoo Finance is down, a currency
+  pair shows the ECB's daily reference rate (one a day, with a sparkline of the last 12 days, or
+  currency-api's, of two), and a found symbol that isn't a US ticker shows a dash.
 
 ## Development
 

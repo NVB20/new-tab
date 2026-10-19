@@ -19,8 +19,8 @@ export const ABOUT = {
     about: 'Room to write a long message; Enter sends it to a new chat on Claude, Shift+Enter starts a new line.',
   },
   markets: {
-    tagline: 'Coins, indexes, gold, FX',
-    about: 'Live prices with a line for the last few days: coins, SPY, QQQ, the Dow, commodities such as gold, oil and corn, and currency pairs. Choose and order what it lists with ✎; each copy can list different things.',
+    tagline: 'Stocks, coins, gold, FX',
+    about: 'Live prices with a line for the day: any stock, index, fund, coin or currency pair you search for (Apple, Teva in Tel Aviv, the TA-125, …), or picks from a list of coins, SPY, QQQ, the Dow and commodities such as gold, oil and corn. Choose and order what it lists with ✎; each copy can list different things.',
   },
   github: {
     tagline: 'Your activity and PRs',

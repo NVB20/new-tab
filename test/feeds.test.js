@@ -6,6 +6,7 @@ import {
   isPair, isSegment, segmentItem, moveMarketItem, headingDropIndex, parseContributions, heatmapLayout,
   parseBinanceTicker, parseBinanceKline, parseOkxTicker, parseOkxCandles, parseYahooChart, parseYahooSpark, yahooCloses,
   parseEcbRates, parseCurrencyApi, parseContributionsApi,
+  isSymbol, pairSymbol, parseYahooSearch, symbolLabel, searchProducts, tradingViewSymbol, usTicker, priceUnit,
 } from '../js/feeds.js';
 
 test('parseTicker reads Bybit last price and 24h change', () => {
@@ -92,8 +93,117 @@ test('parseCnbcDay keeps the closes of the 24 hours up to the latest bar', () =>
 });
 
 test('cleanMarketItems keeps valid coins and pairs once, in order', () => {
-  assert.deepEqual(cleanMarketItems(['btc', 'EUR/ILS', 'BTC', '$x', 'usd/ils', 'EURO/ILS', 7, 'SOL']), ['BTC', 'EUR/ILS', 'USD/ILS', 'SOL']);
+  assert.deepEqual(cleanMarketItems(['btc', 'EUR/ILS', 'BTC', '$', 'usd/ils', 'EURO/ILS', 7, 'SOL']), ['BTC', 'EUR/ILS', 'USD/ILS', 'SOL']);
   assert.deepEqual(cleanMarketItems('BTC'), null);
+});
+
+test('cleanMarketItems keeps symbols found with the search, upper-cased and once', () => {
+  assert.deepEqual(
+    cleanMarketItems(['$aapl', '$TEVA.TA', '$^TA125.TA', '$BRK-B', '$GC=F', '$AAPL', '$', '$a b', '$^', '$.TA', '$' + 'X'.repeat(21), 'AAPL']),
+    ['$AAPL', '$TEVA.TA', '$^TA125.TA', '$BRK-B', '$GC=F', 'AAPL']);
+  assert.equal(isSymbol('$M&M.NS'), true);
+  assert.equal(isSymbol('AAPL'), false);
+  assert.equal(isPair('$EURUSD=X'), false);
+});
+
+test('a pair\'s Yahoo Finance symbol', () => {
+  assert.equal(pairSymbol('EUR/PLN'), 'EURPLN=X');
+  assert.equal(pairSymbol('USD/ILS'), 'USDILS=X');
+});
+
+// Yahoo Finance's search, trimmed: what "sol", "eur pln" and "gold" bring among others.
+const YAHOO_SEARCH = { quotes: [
+  { symbol: 'SOL-USD', quoteType: 'CRYPTOCURRENCY', shortname: 'Solana USD', exchDisp: 'CCC' },
+  { symbol: 'PEPE24478-USD', quoteType: 'CRYPTOCURRENCY', shortname: 'Pepe USD', exchDisp: 'CCC' },
+  { symbol: 'PEPE34519-USD', quoteType: 'CRYPTOCURRENCY', shortname: 'Pepe on Sui USD', exchDisp: 'CCC' },
+  { symbol: 'SOL-EUR', quoteType: 'CRYPTOCURRENCY', shortname: 'Solana EUR', exchDisp: 'CCC' },
+  { symbol: 'EURPLN=X', quoteType: 'CURRENCY', shortname: 'EUR/PLN', exchDisp: 'CCY' },
+  { symbol: 'ILS=X', quoteType: 'CURRENCY', shortname: 'USD/ILS', exchDisp: 'CCY' },
+  { symbol: 'GC=F', quoteType: 'FUTURE', shortname: 'Gold Dec 26', exchDisp: 'New York Commodity Exchange' },
+  { symbol: 'TEVA.TA', quoteType: 'EQUITY', shortname: 'TEVA PHARMA IND', longname: 'Teva Pharmaceutical Industries Limited', exchDisp: 'Tel Aviv' },
+  { symbol: '^TA125.TA', quoteType: 'INDEX', shortname: 'TA-125', exchDisp: 'Tel Aviv' },
+  { symbol: 'BSOL', quoteType: 'ETF', shortname: 'Bitwise Solana Staking ETF', exchDisp: 'NYSEArca' },
+  { symbol: 'VFIAX', quoteType: 'MUTUALFUND', shortname: 'Vanguard 500 Index Fd Admiral S', exchDisp: 'Nasdaq' },
+  { symbol: 'AAPL260116C00200000', quoteType: 'OPTION', shortname: 'AAPL Jan 2026 200 call', exchDisp: 'OPR' },
+  { symbol: 'NOPE', quoteType: 'EQUITY' },
+  { symbol: 'TEVA.TA', quoteType: 'EQUITY', shortname: 'TEVA PHARMA IND', exchDisp: 'Tel Aviv' },
+] };
+
+test('Yahoo Finance\'s search reads as items to add: coins on Bybit, pairs, listed items, other symbols', () => {
+  assert.deepEqual(parseYahooSearch(YAHOO_SEARCH, { 'GC=F': 'GOLD' }), [
+    { id: 'SOL', label: 'SOL', name: 'Solana', meta: 'Crypto · Bybit' },
+    { id: 'PEPE', label: 'PEPE', name: 'Pepe', meta: 'Crypto · Bybit' },
+    { id: 'EUR/PLN', label: 'EUR/PLN', name: '', meta: 'Currency' },
+    { id: 'USD/ILS', label: 'USD/ILS', name: '', meta: 'Currency' },
+    { id: 'GOLD', label: 'GOLD', name: 'Gold Dec 26', meta: 'New York Commodity Exchange · Future' },
+    { id: '$TEVA.TA', label: 'TEVA.TA', name: 'Teva Pharmaceutical Industries Limited', meta: 'Tel Aviv · Stock' },
+    { id: '$^TA125.TA', label: 'TA-125', name: 'TA-125', meta: 'Tel Aviv · Index' },
+    { id: '$BSOL', label: 'BSOL', name: 'Bitwise Solana Staking ETF', meta: 'NYSEArca · ETF' },
+    { id: '$VFIAX', label: 'VFIAX', name: 'Vanguard 500 Index Fd Admiral S', meta: 'Nasdaq · Fund' },
+    { id: '$NOPE', label: 'NOPE', name: '', meta: 'Stock' },
+  ]);
+  assert.deepEqual(parseYahooSearch({ finance: { error: {} } }), []);
+  assert.deepEqual(parseYahooSearch({ quotes: [{ symbol: '__PROTO__', quoteType: 'EQUITY' }, null, { quoteType: 'ETF' }] }), []);
+});
+
+test('a found symbol\'s label: the symbol plainly, an index by its short name when it fits', () => {
+  assert.equal(symbolLabel('$TEVA.TA'), 'TEVA.TA');
+  assert.equal(symbolLabel('$ZN=F'), 'ZN');
+  assert.equal(symbolLabel('$^TA125.TA'), 'TA125');
+  assert.equal(symbolLabel('$^TA125.TA', { type: 'INDEX', short: 'TA-125' }), 'TA-125');
+  assert.equal(symbolLabel('$TA35.TA', { type: 'INDEX', short: 'TA-35' }), 'TA-35');
+  assert.equal(symbolLabel('$^IXIC', { type: 'INDEX', short: 'NASDAQ Composite' }), 'IXIC');
+  assert.equal(symbolLabel('$^GDAXI', { type: 'INDEX', short: 'DAX                           P' }), 'DAX P');
+  assert.equal(symbolLabel('$AAPL', { type: 'EQUITY', short: 'Apple' }), 'AAPL');
+});
+
+test('searchProducts finds the listed products by id, name word or a pair\'s letters', () => {
+  const products = [
+    { id: 'BTC', name: 'Bitcoin' }, { id: 'GOLD', name: 'Gold' }, { id: 'NATGAS', name: 'Natural gas' },
+    { id: 'SPY', name: 'S&P 500 ETF' }, { id: 'USD/ILS', name: '' }, { id: 'EUR/ILS', name: '' }, { id: 'EUR/USD', name: '' },
+  ];
+  const ids = text => searchProducts(products, text).map(p => p.id);
+  assert.deepEqual(ids('go'), ['GOLD']);
+  assert.deepEqual(ids('bitcoin'), ['BTC']);
+  assert.deepEqual(ids('natural gas'), ['NATGAS']);
+  assert.deepEqual(ids('gas'), ['NATGAS']);
+  assert.deepEqual(ids('s&p'), ['SPY']);
+  assert.deepEqual(ids('usd'), ['USD/ILS', 'EUR/USD']);
+  assert.deepEqual(ids('usd ils'), ['USD/ILS']);
+  assert.deepEqual(ids('eur/'), ['EUR/ILS', 'EUR/USD']);
+  assert.deepEqual(ids('ils'), ['USD/ILS', 'EUR/ILS']);
+  assert.deepEqual(ids('  '), []);
+  assert.deepEqual(ids('teva'), []);
+});
+
+test('a found US ticker\'s symbol on CNBC; other symbols have none', () => {
+  assert.equal(usTicker('$AAPL'), 'AAPL');
+  assert.equal(usTicker('$BRK-B'), 'BRK.B');
+  assert.equal(usTicker('$TEVA.TA'), null);
+  assert.equal(usTicker('$^GSPC'), null);
+  assert.equal(usTicker('$GC=F'), null);
+  assert.equal(usTicker('AAPL'), null);
+});
+
+test('TradingView names: US tickers, pairs and stocks on the exchanges it can tell, no indexes or futures', () => {
+  assert.equal(tradingViewSymbol('$AAPL'), 'AAPL');
+  assert.equal(tradingViewSymbol('$BRK-B'), 'BRK.B');
+  assert.equal(tradingViewSymbol('$TEVA.TA'), 'TASE:TEVA');
+  assert.equal(tradingViewSymbol('$BT-A.L'), 'LSE:BT.A');
+  assert.equal(tradingViewSymbol('$0700.HK'), 'HKEX:700');
+  assert.equal(tradingViewSymbol('$7203.T'), 'TSE:7203');
+  assert.equal(tradingViewSymbol('EUR/PLN'), 'FX_IDC:EURPLN');
+  assert.equal(tradingViewSymbol('$^TA125.TA'), null);
+  assert.equal(tradingViewSymbol('$GC=F'), null);
+  assert.equal(tradingViewSymbol('$ABC.XX'), null);
+});
+
+test('priceUnit names what a Yahoo Finance price is counted in, nothing for dollars', () => {
+  assert.equal(priceUnit('USD'), '');
+  assert.equal(priceUnit(''), '');
+  assert.equal(priceUnit('ILA'), 'agorot');
+  assert.equal(priceUnit('GBp'), 'pence');
+  assert.equal(priceUnit('EUR'), 'EUR');
 });
 
 test('cleanMarketItems keeps segment headings as typed, repeats allowed, empty ones dropped', () => {
@@ -220,6 +330,11 @@ test('formatPrice adapts decimals to the size of the price', () => {
   assert.equal(formatPrice(2.41567), '2.4157');
   assert.equal(formatPrice(0.000123456), '0.0001235');
   assert.equal(formatRate(3.1022), '3.1022');
+  // At most the decimals a quote comes with (Yahoo Finance's hint: 2 for a stock).
+  assert.equal(formatPrice(41.31, 2), '41.31');
+  assert.equal(formatPrice(105.203125, 6), '105.20');
+  assert.equal(formatPrice(12930, 2), '12,930');
+  assert.equal(formatPrice(7.5, 0), '8');
 });
 
 test('formatChange shows a signed percentage', () => {
@@ -295,7 +410,7 @@ test('OKX reads like Bybit: its change is since the price 24 hours ago; unknown 
 // A trimmed Yahoo Finance chart for SPY, the session of 2026-10-16.
 const YAHOO_SPY = {
   meta: {
-    symbol: 'SPY', longName: 'State Street SPDR S&P 500 ETF Trust', regularMarketPrice: 763.25,
+    symbol: 'SPY', longName: 'State Street SPDR S&P 500 ETF Trust', shortName: 'SPDR S&P 500', instrumentType: 'ETF', currency: 'USD', priceHint: 2, regularMarketPrice: 763.25,
     regularMarketChangePercent: -1.107, previousClose: 771.79, regularMarketTime: 1792180800,
   },
   timestamp: [1792157400, 1792157700, 1792158000],
@@ -305,8 +420,11 @@ const YAHOO_SPY = {
 test('a Yahoo Finance chart reads as a CNBC-style quote (New York time) and its bars', () => {
   assert.deepEqual(parseYahooChart(YAHOO_SPY), {
     quote: { price: 763.25, change: -0.01107, name: 'State Street SPDR S&P 500 ETF Trust', time: '4:00 PM EDT' },
+    info: { type: 'ETF', currency: 'USD', short: 'SPDR S&P 500', decimals: 2 },
     bars: [{ at: 1792157400e3, close: 762.67 }, { at: 1792158000e3, close: 763.25 }],
   });
+  // Without the type, currency, short name or decimals they're blank.
+  assert.deepEqual(parseYahooChart({ meta: { regularMarketPrice: 1, priceHint: 'x' } }).info, { type: '', currency: '', short: '', decimals: null });
   // Without Yahoo's own change it's worked out from the previous close.
   const { regularMarketChangePercent, ...meta } = YAHOO_SPY.meta;
   assert.ok(Math.abs(parseYahooChart({ ...YAHOO_SPY, meta }).quote.change - (763.25 / 771.79 - 1)) < 1e-12);

@@ -55,8 +55,9 @@ export function parseOkxCandles(json) {
 const NEW_YORK = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
 // One Yahoo Finance chart (the result of /v8/finance/chart, or one response of /v7/finance/spark)
-// → { quote, bars }: the quote like parseCnbcQuotes' (change as a fraction, time on New York's
-// clock), the bars { at, close } oldest first. null without a price.
+// → { quote, info, bars }: the quote like parseCnbcQuotes' (change as a fraction, time on New
+// York's clock), info its { type ('EQUITY', 'INDEX', …), currency, short name, decimals its price
+// comes with }, the bars { at, close } oldest first. null without a price.
 export function parseYahooChart(r) {
   const meta = r?.meta;
   const price = finite(meta?.regularMarketPrice);
@@ -74,6 +75,10 @@ export function parseYahooChart(r) {
       change: pct != null ? pct / 100 : prev ? price / prev - 1 : 0,
       name: String(meta.longName ?? meta.shortName ?? meta.symbol ?? ''),
       time: time != null ? NEW_YORK.format(time * 1000) : '',
+    },
+    info: {
+      type: String(meta.instrumentType ?? ''), currency: String(meta.currency ?? ''), short: String(meta.shortName ?? ''),
+      decimals: finite(meta.priceHint),
     },
     bars,
   };
@@ -256,11 +261,12 @@ export function parseIssues(json) {
 
 const grouped = (n, digits) => n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-export function formatPrice(n) {
+// most: at most this many decimals, the ones the quote comes with (a stock's 2).
+export function formatPrice(n, most = 4) {
   const abs = Math.abs(n);
   if (abs >= 10000) return grouped(n, 0);
-  if (abs >= 100) return grouped(n, 2);
-  if (abs >= 1) return grouped(n, 4);
+  if (abs >= 100) return grouped(n, Math.min(2, most));
+  if (abs >= 1) return grouped(n, Math.min(4, most));
   return String(Number(n.toPrecision(4)));
 }
 
@@ -294,9 +300,105 @@ export function timeAgo(ms, now = Date.now()) {
 
 const COIN = /^[A-Z0-9]{2,10}$/;
 const PAIR = /^[A-Z]{3}\/[A-Z]{3}$/;
+// A symbol found with the search: '$' and its Yahoo Finance symbol ('$AAPL', '$TEVA.TA', '$^TA125.TA').
+const SYMBOL = /^\$\^?[A-Z0-9][A-Z0-9.=&-]{0,19}$/;
 export const SEGMENT_MAX = 24;
 export const isPair = id => PAIR.test(id);
+export const isSymbol = id => SYMBOL.test(id);
 export const isSegment = item => item.startsWith('#');
+
+// A currency pair's Yahoo Finance symbol: 'EUR/PLN' → 'EURPLN=X'.
+export const pairSymbol = pair => `${pair.replace('/', '')}=X`;
+
+// A found US ticker's symbol on CNBC (and TradingView), or null for other symbols. Yahoo Finance
+// writes US tickers without an exchange's suffix, a share class after a dash ('BRK-B' is 'BRK.B').
+export function usTicker(id) {
+  const m = /^\$([A-Z]{1,5})(?:-([A-Z]))?$/.exec(id);
+  return !m ? null : m[2] ? `${m[1]}.${m[2]}` : m[1];
+}
+
+// A found symbol's label: the Yahoo Finance symbol without '^' and a future's '=F', with its
+// exchange's suffix ('TEVA.TA', 'ZN'); an index goes by its short name when that has 8 characters
+// or fewer ('TA-125', 'S&P 500'), else by its symbol without the suffix ('IXIC').
+export function symbolLabel(id, { type = '', short = '' } = {}) {
+  const symbol = id.slice(1);
+  const index = type === 'INDEX' || symbol.startsWith('^');
+  const name = String(short).replace(/\s+/g, ' ').trim();
+  if (index && name && name.length <= 8) return name;
+  const bare = symbol.replace(/^\^/, '').replace(/=F$/, '');
+  return index ? bare.replace(/\.[A-Z]+$/, '') : bare;
+}
+
+// Yahoo Finance's suffix for an exchange → its name on TradingView.
+const TV_EXCHANGES = { TA: 'TASE', L: 'LSE', DE: 'XETR', T: 'TSE', HK: 'HKEX', TO: 'TSX', PA: 'EURONEXT', AS: 'EURONEXT', SW: 'SIX' };
+
+// A found symbol's or a pair's name on TradingView, or null when it can't be told from Yahoo
+// Finance's: a US ticker as CNBC writes it, a stock on an exchange above with its prefix
+// ('TEVA.TA' → 'TASE:TEVA', '0700.HK' → 'HKEX:700'), a pair 'FX_IDC:EURPLN'. Not indexes or futures.
+export function tradingViewSymbol(id) {
+  if (isPair(id)) return `FX_IDC:${id.replace('/', '')}`;
+  const us = usTicker(id);
+  if (us) return us;
+  const m = /^\$([A-Z0-9-]+)\.([A-Z]+)$/.exec(id);
+  if (!m || !Object.hasOwn(TV_EXCHANGES, m[2])) return null;
+  const code = m[2] === 'HK' ? m[1].replace(/^0+(?=\d)/, '') : m[1];
+  return `${TV_EXCHANGES[m[2]]}:${code.replaceAll('-', '.')}`;
+}
+
+// What a Yahoo Finance price is counted in, for a row's hover: nothing for US dollars, else the
+// currency, by its small unit where Yahoo gives that (Tel Aviv's agorot, London's pence).
+export function priceUnit(currency) {
+  const small = { ILA: 'agorot', GBp: 'pence', GBX: 'pence' };
+  return currency === 'USD' || !currency ? '' : small[currency] ?? currency;
+}
+
+// Yahoo Finance's search types kept as found symbols, and their names.
+const SEARCH_TYPES = { EQUITY: 'Stock', ETF: 'ETF', INDEX: 'Index', MUTUALFUND: 'Fund', FUTURE: 'Future' };
+
+// Yahoo Finance's search (/v1/finance/search) → results to add, [{ id, label, name, meta }] in its
+// order: a symbol in known (Yahoo symbol → listed item) is that item; a coin priced in USD the
+// coin, priced on Bybit ('SOL-USD' → 'SOL'; 'PEPE24478-USD', CoinMarketCap's id telling coins of
+// one name apart, → 'PEPE'); a currency the pair ('EURPLN=X' → 'EUR/PLN', 'ILS=X' → 'USD/ILS');
+// a stock, ETF, index, fund or future '$' + its symbol. Anything else, and repeats, are dropped.
+export function parseYahooSearch(json, known = {}) {
+  const seen = new Set();
+  return (Array.isArray(json?.quotes) ? json.quotes : []).flatMap(q => {
+    const symbol = typeof q?.symbol === 'string' ? q.symbol.toUpperCase() : '';
+    const name = String(q?.longname ?? q?.shortname ?? '').replace(/\s+/g, ' ').trim();
+    const meta = [String(q?.exchDisp ?? '').trim(), SEARCH_TYPES[q?.quoteType]].filter(Boolean).join(' · ');
+    let r = null;
+    if (symbol && Object.hasOwn(known, symbol)) {
+      r = { id: known[symbol], label: known[symbol], name, meta };
+    } else if (q?.quoteType === 'CRYPTOCURRENCY') {
+      const coin = /^([A-Z0-9]+)-USD$/.exec(symbol)?.[1].replace(/(?<=[A-Z])\d{4,}$/, '');
+      if (coin && COIN.test(coin)) r = { id: coin, label: coin, name: name.replace(/ USD$/, ''), meta: 'Crypto · Bybit' };
+    } else if (q?.quoteType === 'CURRENCY') {
+      const m = /^([A-Z]{3})?([A-Z]{3})=X$/.exec(symbol);
+      const id = m && `${m[1] ?? 'USD'}/${m[2]}`;
+      if (m && id.slice(0, 3) !== m[2]) r = { id, label: id, name: '', meta: 'Currency' };
+    } else if (Object.hasOwn(SEARCH_TYPES, q?.quoteType ?? '') && SYMBOL.test('$' + symbol)) {
+      const id = '$' + symbol;
+      r = { id, label: symbolLabel(id, { type: q.quoteType, short: q.shortname ?? '' }), name, meta };
+    }
+    if (!r || seen.has(r.id)) return [];
+    seen.add(r.id);
+    return r;
+  });
+}
+
+// The listed products ([{ id, name }]) matching typed text, in order: an id starting with it
+// ('go' → GOLD), a word of the name, or the whole name, starting with it ('gas' → NATGAS,
+// 'bitcoin' → BTC), or a pair by its letters or either currency ('usd ils', 'eur/', 'ils').
+export function searchProducts(products, text) {
+  const t = String(text ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+  if (!t) return [];
+  const letters = t.replace(/[\s/]+/g, '');
+  return products.filter(({ id, name }) => {
+    const words = name.toUpperCase();
+    return id.startsWith(t) || words.startsWith(t) || words.split(/[\s/&-]+/).some(w => w && w.startsWith(t))
+      || (isPair(id) && (id.replace('/', '').startsWith(letters) || id.slice(4) === letters));
+  });
+}
 
 // "btc, SOL xrp" → ['BTC', 'SOL', 'XRP'] (tickers only, no duplicates).
 export function parseCoins(text) {
@@ -310,16 +412,16 @@ export function segmentItem(name) {
   return text ? '#' + text : null;
 }
 
-// Markets items: coin tickers ('BTC'), currency pairs ('EUR/ILS') and segment headings
-// ('#Crypto'), in order. Products are kept once, valid ones only; a heading keeps its case and may
-// repeat. Anything but a list gives null.
+// Markets items: coin tickers ('BTC'), currency pairs ('EUR/ILS'), found symbols ('$TEVA.TA')
+// and segment headings ('#Crypto'), in order. Products are kept once, valid ones only; a heading
+// keeps its case and may repeat. Anything but a list gives null.
 export function cleanMarketItems(list) {
   if (!Array.isArray(list)) return null;
   const seen = new Set();
   return list.filter(i => typeof i === 'string').map(i => i.trim()).flatMap(i => {
     if (isSegment(i)) return segmentItem(i.slice(1)) ?? [];
     const id = i.toUpperCase();
-    if (!(COIN.test(id) || PAIR.test(id)) || seen.has(id)) return [];
+    if (!(COIN.test(id) || PAIR.test(id) || SYMBOL.test(id)) || seen.has(id)) return [];
     seen.add(id);
     return id;
   });

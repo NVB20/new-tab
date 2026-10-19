@@ -1,18 +1,19 @@
-// Markets widget: live crypto prices from Bybit, US index and commodity quotes from CNBC and ECB
-// exchange rates with sparklines, for the coins, indexes and currency pairs chosen in its ✎ editor, under segment
-// headings added from its right-click menu, in the order they're dragged into. Each copy on the
-// page has its own list; the prices are fetched once and shared through the request cache. Each
-// kind has sources to fall back on while its own is down: Binance and OKX, Yahoo Finance, the
-// ECB itself and currency-api.
+// Markets widget: live crypto prices from Bybit, US index and commodity quotes from CNBC, and any
+// stock, index, fund, future or currency pair from Yahoo Finance, with sparklines, for the
+// products ticked or found with the search in its ✎ editor, under segment headings added from its
+// right-click menu, in the order they're dragged into. Each copy on the page has its own list; the
+// prices are fetched once and shared through the request cache. Each kind has sources to fall
+// back on while its own is down: Binance and OKX, Yahoo Finance, CNBC, and the ECB's daily rates.
 
 import { el, icon, svgEl, widgetHead, widgetSub, widgetEmpty, showMenu } from './ui.js';
 import { feed, fetchJson, fetchText, peek } from './net.js';
 import {
   parseTicker, parseKline, parseBinanceTicker, parseBinanceKline, parseOkxTicker, parseOkxCandles,
   parseFxPair, fxCurrencies, parseEcbRates, parseCurrencyApi, parseCnbcQuotes, parseCnbcSession, parseCnbcDay,
-  parseYahooChart, parseYahooSpark, yahooCloses, isPair,
+  parseYahooChart, parseYahooSpark, yahooCloses, isPair, isSymbol, pairSymbol, usTicker, symbolLabel,
+  tradingViewSymbol, priceUnit, parseYahooSearch, searchProducts,
   isSegment, segmentItem, blockEnd, moveMarketItem, headingDropIndex, SEGMENT_MAX,
-  formatPrice, formatRate, formatChange, sparkPoints, parseCoins,
+  formatPrice, formatRate, formatChange, sparkPoints,
 } from './feeds.js';
 import { copyById, TYPES } from './layout.js';
 
@@ -30,30 +31,37 @@ const ECB = 'https://data-api.ecb.europa.eu/service/data/EXR';
 const CNBC_QUOTES = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol';
 const CNBC_BARS = 'https://ts-api.cnbc.com/harmony/app/bars';
 const YAHOO = 'https://query1.finance.yahoo.com';
-// Products offered by the editor (any other coin can be typed in). Coins are Bybit spot pairs
-// against USDT; indexes and commodities are CNBC quotes, by their symbol there, on Yahoo Finance
-// and on TradingView (commodities are front-month futures, priced in their unit); currency pairs
-// use the ECB's daily reference rates.
-const COINS = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'DOGE', 'ADA', 'TRX', 'AVAX', 'LINK', 'DOT', 'LTC', 'SUI', 'HYPE'];
+const SPARK_MAX = 20;          // symbols Yahoo Finance's spark answers in one request
+const SEARCH_WAIT_MS = 300;    // wait for typing to stop before searching
+const SEARCH_LIMIT = 8;        // results shown
+const SEARCH_LISTED = 4;       // of them, the listed products shown first, at most
+// Products listed in the editor, with names to search them by (anything else is found with the
+// search). Coins are Bybit spot pairs against USDT; indexes and commodities are CNBC quotes, by
+// their symbol there, on Yahoo Finance and on TradingView (commodities are front-month futures,
+// priced in their unit); currency pairs, like found symbols, are Yahoo Finance's.
+const COINS = {
+  BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', XRP: 'XRP', BNB: 'BNB', DOGE: 'Dogecoin', ADA: 'Cardano',
+  TRX: 'TRON', AVAX: 'Avalanche', LINK: 'Chainlink', DOT: 'Polkadot', LTC: 'Litecoin', SUI: 'Sui', HYPE: 'Hyperliquid',
+};
 const STOCKS = {
-  SPY: { cnbc: 'SPY', yahoo: 'SPY', tv: 'AMEX:SPY' },
-  QQQ: { cnbc: 'QQQ', yahoo: 'QQQ', tv: 'NASDAQ:QQQ' },
-  DJIA: { cnbc: '.DJI', yahoo: '^DJI', tv: 'DJ:DJI' },
+  SPY: { cnbc: 'SPY', yahoo: 'SPY', tv: 'AMEX:SPY', name: 'S&P 500 ETF' },
+  QQQ: { cnbc: 'QQQ', yahoo: 'QQQ', tv: 'NASDAQ:QQQ', name: 'Nasdaq-100 ETF' },
+  DJIA: { cnbc: '.DJI', yahoo: '^DJI', tv: 'DJ:DJI', name: 'Dow Jones Industrial Average' },
 };
 const COMMODITIES = {
-  GOLD: { cnbc: '@GC.1', yahoo: 'GC=F', tv: 'COMEX:GC1!', unit: 'USD per troy ounce' },
-  SILVER: { cnbc: '@SI.1', yahoo: 'SI=F', tv: 'COMEX:SI1!', unit: 'USD per troy ounce' },
-  PLAT: { cnbc: '@PL.1', yahoo: 'PL=F', tv: 'NYMEX:PL1!', unit: 'USD per troy ounce' },
-  COPPER: { cnbc: '@HG.1', yahoo: 'HG=F', tv: 'COMEX:HG1!', unit: 'USD per pound' },
-  OIL: { cnbc: '@CL.1', yahoo: 'CL=F', tv: 'NYMEX:CL1!', unit: 'USD per barrel' },
-  BRENT: { cnbc: '@LCO.1', yahoo: 'BZ=F', tv: 'ICEEUR:BRN1!', unit: 'USD per barrel' },
-  NATGAS: { cnbc: '@NG.1', yahoo: 'NG=F', tv: 'NYMEX:NG1!', unit: 'USD per MMBtu' },
-  CORN: { cnbc: '@C.1', yahoo: 'ZC=F', tv: 'CBOT:ZC1!', unit: 'US cents per bushel' },
-  WHEAT: { cnbc: '@W.1', yahoo: 'ZW=F', tv: 'CBOT:ZW1!', unit: 'US cents per bushel' },
-  SOY: { cnbc: '@S.1', yahoo: 'ZS=F', tv: 'CBOT:ZS1!', unit: 'US cents per bushel' },
-  COFFEE: { cnbc: '@KC.1', yahoo: 'KC=F', tv: 'ICEUS:KC1!', unit: 'US cents per pound' },
-  SUGAR: { cnbc: '@SB.1', yahoo: 'SB=F', tv: 'ICEUS:SB1!', unit: 'US cents per pound' },
-  COCOA: { cnbc: '@CC.1', yahoo: 'CC=F', tv: 'ICEUS:CC1!', unit: 'USD per tonne' },
+  GOLD: { cnbc: '@GC.1', yahoo: 'GC=F', tv: 'COMEX:GC1!', unit: 'USD per troy ounce', name: 'Gold' },
+  SILVER: { cnbc: '@SI.1', yahoo: 'SI=F', tv: 'COMEX:SI1!', unit: 'USD per troy ounce', name: 'Silver' },
+  PLAT: { cnbc: '@PL.1', yahoo: 'PL=F', tv: 'NYMEX:PL1!', unit: 'USD per troy ounce', name: 'Platinum' },
+  COPPER: { cnbc: '@HG.1', yahoo: 'HG=F', tv: 'COMEX:HG1!', unit: 'USD per pound', name: 'Copper' },
+  OIL: { cnbc: '@CL.1', yahoo: 'CL=F', tv: 'NYMEX:CL1!', unit: 'USD per barrel', name: 'WTI crude oil' },
+  BRENT: { cnbc: '@LCO.1', yahoo: 'BZ=F', tv: 'ICEEUR:BRN1!', unit: 'USD per barrel', name: 'Brent crude oil' },
+  NATGAS: { cnbc: '@NG.1', yahoo: 'NG=F', tv: 'NYMEX:NG1!', unit: 'USD per MMBtu', name: 'Natural gas' },
+  CORN: { cnbc: '@C.1', yahoo: 'ZC=F', tv: 'CBOT:ZC1!', unit: 'US cents per bushel', name: 'Corn' },
+  WHEAT: { cnbc: '@W.1', yahoo: 'ZW=F', tv: 'CBOT:ZW1!', unit: 'US cents per bushel', name: 'Wheat' },
+  SOY: { cnbc: '@S.1', yahoo: 'ZS=F', tv: 'CBOT:ZS1!', unit: 'US cents per bushel', name: 'Soybeans' },
+  COFFEE: { cnbc: '@KC.1', yahoo: 'KC=F', tv: 'ICEUS:KC1!', unit: 'US cents per pound', name: 'Coffee' },
+  SUGAR: { cnbc: '@SB.1', yahoo: 'SB=F', tv: 'ICEUS:SB1!', unit: 'US cents per pound', name: 'Sugar' },
+  COCOA: { cnbc: '@CC.1', yahoo: 'CC=F', tv: 'ICEUS:CC1!', unit: 'USD per tonne', name: 'Cocoa' },
 };
 // The exchanges a coin's price and 24h chart come from, in turn: another answers while Bybit is
 // down or doesn't list the coin. Each with its trading page and its name on TradingView.
@@ -85,10 +93,27 @@ const CURRENCY_API = [
 ];
 const CNBC = { ...STOCKS, ...COMMODITIES };
 const PAIRS = ['USD/ILS', 'EUR/ILS', 'GBP/ILS', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'USD/CHF'];
+// What the search finds among the listed products with no request, and the Yahoo Finance symbols
+// it reads as them.
+const PRODUCTS = [
+  ...Object.entries(COINS).map(([id, name]) => ({ id, name, meta: 'Crypto · Bybit' })),
+  ...Object.entries(STOCKS).map(([id, s]) => ({ id, name: s.name, meta: 'US index · CNBC' })),
+  ...Object.entries(COMMODITIES).map(([id, c]) => ({ id, name: c.name, meta: 'Commodity · CNBC' })),
+  ...PAIRS.map(id => ({ id, name: '', meta: 'Currency' })),
+];
+const LISTED_SYMBOLS = Object.fromEntries(Object.entries(CNBC).map(([id, s]) => [s.yahoo, id]));
 
 const isCnbc = id => Object.hasOwn(CNBC, id);
 const isCommodity = id => Object.hasOwn(COMMODITIES, id);
-const isCoin = id => !isSegment(id) && !isPair(id) && !isCnbc(id);
+// Found symbols and currency pairs are quoted by Yahoo Finance.
+const isYahoo = id => isSymbol(id) || isPair(id);
+const isCoin = id => !isSegment(id) && !isYahoo(id) && !isCnbc(id);
+const isListed = id => Object.hasOwn(COINS, id) || isCnbc(id) || PAIRS.includes(id);
+const yahooSymbol = id => (isPair(id) ? pairSymbol(id) : id.slice(1));
+// While Yahoo Finance is down, a found US ticker is quoted by CNBC like the listed indexes.
+const cnbcSpec = id => (isCnbc(id) ? CNBC[id] : { cnbc: usTicker(id), yahoo: id.slice(1) });
+// A row's label: a found symbol's from its symbol (and an index's short name), else the item.
+const rowLabel = (id, info) => (isSymbol(id) ? symbolLabel(id, info) : id);
 const segmentName = item => item.slice(1);
 const isoDay = ms => new Date(ms).toISOString().slice(0, 10);
 const trendOf = change => (change > 0 ? 'up' : change < 0 ? 'down' : 'flat');
@@ -153,21 +178,31 @@ export function mountMarkets(root, store, copy) {
     });
   };
 
-  const pairRow = ({ id, fx, via }) => marketRow({
-    label: id,
-    href: `https://www.google.com/finance/quote/${id.replace('/', '-')}`,
-    title: !fx ? `No rate for ${id} yet`
-      : via?.startsWith('currency-api') ? `Market rate for ${fx.date} (currency-api, while the ECB's can't be reached)`
-        : `ECB reference rate for ${fx.date} · last ${fx.series.length} days`,
-    value: fx ? formatRate(fx.rate) : '—',
-    change: fx?.change ?? null,
-    closes: fx?.series ?? [],
-  });
+  // A found symbol or a pair, from Yahoo Finance; while it's down a US ticker's from CNBC, a pair's
+  // the ECB's daily rate (date: its day) or currency-api's.
+  const quoteRow = ({ id, quote, info, closes = [], via, date }) => {
+    const label = rowLabel(id, info);
+    const pair = isPair(id);
+    const unit = pair ? '' : priceUnit(info?.currency);
+    const tv = tradingViewSymbol(id);
+    return marketRow({
+      label,
+      href: via === 'CNBC' ? `https://www.cnbc.com/quotes/${usTicker(id)}` : `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSymbol(id))}`,
+      title: !quote ? `No quote for ${label}`
+        : date && via?.startsWith('currency-api') ? `Market rate for ${date} (currency-api, while Yahoo Finance and the ECB can't be reached)`
+          : date ? `ECB reference rate for ${date} (while Yahoo Finance can't be reached) · last ${closes.length} days`
+            : `${quote.name || label}${unit ? ` in ${unit}` : ''} on ${via} · as of ${quote.time}`,
+      value: !quote ? '—' : pair ? formatRate(quote.price) : formatPrice(quote.price, info?.decimals ?? undefined),
+      change: quote?.change ?? null,
+      closes,
+      chart: tv && { href: `https://www.tradingview.com/chart/?symbol=${tv}`, title: `${label} chart on TradingView` },
+    });
+  };
 
   // One entry of the list, a heading or a row, which knows its place in the items for dragging.
   function entryNode(r, index) {
     const node = isSegment(r.id) ? el('div', { class: 'mk-segment', dir: 'auto', text: segmentName(r.id) })
-      : isPair(r.id) ? pairRow(r) : isCnbc(r.id) ? cnbcRow(r) : coinRow(r);
+      : isYahoo(r.id) ? quoteRow(r) : isCnbc(r.id) ? cnbcRow(r) : coinRow(r);
     node.dataset.index = index;
     node.draggable = true;
     return node;
@@ -203,23 +238,31 @@ export function mountMarkets(root, store, copy) {
   }
 
   const marketKeys = coin => ({ ticker: `ticker:${coin}USDT`, kline: `kline:${coin}USDT` });
-  // All pairs come from one request: the ECB's EUR rates for every currency they use.
+  // While Yahoo Finance is down, all pairs come from one request: the ECB's EUR rates for every
+  // currency they use.
   const fxKey = currencies => `fx:EUR:${currencies.join(',')}`;
   // All indexes' and commodities' quotes come from one request too; each one's chart from its own.
   const cnbcOf = list => list.filter(isCnbc).sort();
   const quotesKey = ids => `cnbc:quotes:${ids.join(',')}`;
   const sessionKey = id => `cnbc:session:${id}`;
+  // All found symbols' and pairs' quotes and charts come from Yahoo Finance's spark, by item.
+  const yahooOf = list => list.filter(isYahoo).sort();
+  const yahooKey = ids => `yahoo:quotes:${ids.join(',')}`;
 
   // Rows in the chosen order, headings among them; coin(id) gives a coin's { ticker, closes, via },
-  // cnbc(id) an index's or commodity's { quote, closes, via }, fx the pairs' { table, via }.
-  const marketRows = (list, coin, cnbc, fx) => list.map(id => (isSegment(id) ? { id }
-    : isPair(id) ? { id, fx: fx.table ? parseFxPair(fx.table, id) : null, via: fx.via }
+  // cnbc(id) an index's or commodity's { quote, closes, via }, yahoo the found symbols' and pairs'
+  // { quote, info, closes, via, date } by item.
+  const marketRows = (list, coin, cnbc, yahoo) => list.map(id => (isSegment(id) ? { id }
+    : isYahoo(id) ? { id, ...(Object.hasOwn(yahoo, id) ? yahoo[id] : null) }
     : { id, ...(isCnbc(id) ? cnbc(id) : coin(id)) }));
+
+  const cachedYahoo = list => {
+    const ids = yahooOf(list);
+    return (ids.length && peek(yahooKey(ids))?.data) || {};
+  };
 
   function renderCachedMarkets() {
     const list = items();
-    const currencies = fxCurrencies(list);
-    const fx = currencies.length ? peek(fxKey(currencies)) : null;
     const ids = cnbcOf(list);
     const quotes = ids.length ? peek(quotesKey(ids)) : null;
     renderMarkets(marketRows(list, id => {
@@ -229,7 +272,7 @@ export function mountMarkets(root, store, copy) {
       quote: quotes?.data?.[CNBC[id].cnbc] ?? null,
       closes: peek(sessionKey(id))?.data ?? [],
       via: quotes?.via,
-    }), { table: fx?.data ?? null, via: fx?.via }));
+    }), cachedYahoo(list)));
   }
 
   // Price and chart each from the first exchange that has the coin.
@@ -248,10 +291,12 @@ export function mountMarkets(root, store, copy) {
     return [coin, { ticker: ticker.data, closes: kline.data ?? [], via: ticker.via }];
   }
 
-  // Quotes keyed by CNBC's symbols, whichever source gave them.
+  // Listed indexes' and commodities' quotes, or found US tickers' while Yahoo Finance is down, keyed
+  // by CNBC's symbols, whichever source gave them.
   async function loadCnbc(ids) {
     if (!ids.length) return new Map();
-    const symbols = ids.map(id => CNBC[id].cnbc).join('|');
+    const spec = Object.fromEntries(ids.map(id => [id, cnbcSpec(id)]));
+    const symbols = ids.map(id => spec[id].cnbc).join('|');
     const [quotes, sessions] = await Promise.all([
       feed(quotesKey(ids), PRICE_TTL, [
         {
@@ -264,15 +309,15 @@ export function mountMarkets(root, store, copy) {
         {
           name: 'Yahoo Finance',
           load: async () => {
-            const charts = parseYahooSpark(await fetchJson(`${YAHOO}/v7/finance/spark?symbols=${encodeURIComponent(ids.map(id => CNBC[id].yahoo).join(','))}&range=1d&interval=5m`));
-            const found = ids.filter(id => charts[CNBC[id].yahoo]);
-            return found.length ? Object.fromEntries(found.map(id => [CNBC[id].cnbc, charts[CNBC[id].yahoo].quote])) : null;
+            const charts = parseYahooSpark(await fetchJson(`${YAHOO}/v7/finance/spark?symbols=${encodeURIComponent(ids.map(id => spec[id].yahoo).join(','))}&range=1d&interval=5m`));
+            const found = ids.filter(id => charts[spec[id].yahoo]);
+            return found.length ? Object.fromEntries(found.map(id => [spec[id].cnbc, charts[spec[id].yahoo].quote])) : null;
           },
         },
       ]),
       Promise.all(ids.map(loadSession)),
     ]);
-    return new Map(ids.map((id, i) => [id, { quote: quotes.data?.[CNBC[id].cnbc] ?? null, closes: sessions[i], via: quotes.via }]));
+    return new Map(ids.map((id, i) => [id, { quote: quotes.data?.[spec[id].cnbc] ?? null, closes: sessions[i], via: quotes.via }]));
   }
 
   // 10-minute bars of the last five days, which reach back over a long weekend: an index charts
@@ -281,6 +326,7 @@ export function mountMarkets(root, store, copy) {
   // session (5-minute bars) and two days of a commodity's (15-minute bars) to take 24 hours of.
   async function loadSession(id) {
     const stamp = ms => isoDay(ms).replaceAll('-', '') + '000000';
+    const spec = cnbcSpec(id);
     const commodity = isCommodity(id);
     const parse = commodity ? parseCnbcDay : parseCnbcSession;
     const result = await feed(sessionKey(id), KLINE_TTL, [
@@ -288,7 +334,7 @@ export function mountMarkets(root, store, copy) {
         name: 'CNBC',
         load: async () => {
           const span = `${stamp(Date.now() - 5 * 86400e3)}/${stamp(Date.now() + 86400e3)}`;
-          const closes = parse(await fetchJson(`${CNBC_BARS}/${encodeURIComponent(CNBC[id].cnbc)}/10M/${span}/adjusted/EST5EDT.json`));
+          const closes = parse(await fetchJson(`${CNBC_BARS}/${encodeURIComponent(spec.cnbc)}/10M/${span}/adjusted/EST5EDT.json`));
           return closes.length ? closes : null;
         },
       },
@@ -296,7 +342,7 @@ export function mountMarkets(root, store, copy) {
         name: 'Yahoo Finance',
         load: async () => {
           const range = commodity ? 'range=2d&interval=15m' : 'range=1d&interval=5m';
-          const chart = parseYahooChart((await fetchJson(`${YAHOO}/v8/finance/chart/${encodeURIComponent(CNBC[id].yahoo)}?${range}`))?.chart?.result?.[0]);
+          const chart = parseYahooChart((await fetchJson(`${YAHOO}/v8/finance/chart/${encodeURIComponent(spec.yahoo)}?${range}`))?.chart?.result?.[0]);
           const closes = chart ? yahooCloses(chart.bars, commodity) : [];
           return closes.length ? closes : null;
         },
@@ -334,22 +380,65 @@ export function mountMarkets(root, store, copy) {
     return { table: result.data, via: result.via };
   }
 
+  // Found symbols' and pairs' quotes, with today's closes, by item: from Yahoo Finance's spark (in
+  // batches of SPARK_MAX), else from the backups.
+  async function loadYahoo(ids) {
+    if (!ids.length) return {};
+    const result = await feed(yahooKey(ids), PRICE_TTL, [
+      {
+        name: 'Yahoo Finance',
+        load: async () => {
+          const batches = [];
+          for (let i = 0; i < ids.length; i += SPARK_MAX) batches.push(ids.slice(i, i + SPARK_MAX));
+          const charts = Object.assign(Object.create(null), ...await Promise.all(batches.map(async batch =>
+            parseYahooSpark(await fetchJson(`${YAHOO}/v7/finance/spark?symbols=${encodeURIComponent(batch.map(yahooSymbol).join(','))}&range=1d&interval=5m`)))));
+          const found = ids.filter(id => charts[yahooSymbol(id)]);
+          return found.length ? Object.fromEntries(found.map(id => {
+            const { quote, info, bars } = charts[yahooSymbol(id)];
+            return [id, { quote, info, closes: yahooCloses(bars), via: 'Yahoo Finance' }];
+          })) : null;
+        },
+      },
+      { name: 'CNBC and the ECB', load: () => yahooBackup(ids) },
+    ]);
+    return result.data ?? {};
+  }
+
+  // While Yahoo Finance is down: found US tickers from CNBC, with their session's closes, and pairs
+  // from the ECB's daily rates (or currency-api's). Other found symbols have no backup.
+  async function yahooBackup(ids) {
+    const tickers = ids.filter(usTicker);
+    const pairs = ids.filter(isPair);
+    const [cnbc, fx] = await Promise.all([loadCnbc(tickers), loadFx(fxCurrencies(pairs))]);
+    const rows = {};
+    for (const id of tickers) {
+      const { quote, closes, via } = cnbc.get(id);
+      if (quote) rows[id] = { quote, info: { currency: 'USD', decimals: 2 }, closes, via };
+    }
+    for (const id of pairs) {
+      const rate = fx.table ? parseFxPair(fx.table, id) : null;
+      if (rate) rows[id] = { quote: { price: rate.rate, change: rate.change }, closes: rate.series, via: fx.via, date: rate.date };
+    }
+    return Object.keys(rows).length ? rows : null;
+  }
+
   let seq = 0;
   async function loadMarkets() {
     const list = items();
     const my = ++seq;
-    const [coins, cnbc, fx] = await Promise.all([
+    const [coins, cnbc, yahoo] = await Promise.all([
       Promise.all(list.filter(isCoin).map(loadCoin)).then(entries => new Map(entries)),
       loadCnbc(cnbcOf(list)),
-      loadFx(fxCurrencies(list)),
+      loadYahoo(yahooOf(list)),
     ]);
-    if (my === seq) renderMarkets(marketRows(list, id => coins.get(id), id => cnbc.get(id), fx));
+    if (my === seq) renderMarkets(marketRows(list, id => coins.get(id), id => cnbc.get(id), yahoo));
   }
 
-  // ---- editor: ✎ swaps the rows for checkboxes; changes apply as they're made ----
+  // ---- editor: ✎ swaps the rows for a search and checkboxes; changes apply as they're made ----
 
   let editing = false;
-  let customShown = [];   // typed-in coins stay listed while the editor is open, even unticked
+  let yoursShown = [];            // items no list has: shown while the editor is open, even once removed
+  const described = new Map();    // item → the search result that added it ({ label, name })
 
   function setEditing(on) {
     editing = on;
@@ -361,8 +450,10 @@ export function mountMarkets(root, store, copy) {
     marketList.hidden = on;
     marketEditor.hidden = !on;
     if (on) {
-      customShown = items().filter(id => isCoin(id) && !COINS.includes(id));
+      yoursShown = items().filter(id => !isSegment(id) && !isListed(id));
       renderEditor();
+    } else {
+      search('');   // a search still waiting asks nothing
     }
   }
 
@@ -378,37 +469,141 @@ export function mountMarkets(root, store, copy) {
     editItems(list => [...list.filter(i => i !== id), ...(on ? [id] : [])]);
   }
 
+  // Every checkbox and button that adds an item says so in data-item, so adding from the search
+  // ticks the item's own checkbox too.
+  function syncChosen() {
+    const list = items();
+    for (const node of marketEditor.querySelectorAll('[data-item]')) {
+      const on = list.includes(node.dataset.item);
+      if (node.type === 'checkbox') node.checked = on;
+      else node.setAttribute('aria-pressed', String(on));
+    }
+  }
+
+  // Adds an item or removes it; one that no list has joins Your symbols (result: the search result
+  // that added it, for its label and name).
+  function choose(id, on, result = null) {
+    if (result) described.set(id, result);
+    if (on && !isListed(id) && !yoursShown.includes(id)) {
+      yoursShown.push(id);
+      drawYours();
+    }
+    setItem(id, on);
+    syncChosen();
+  }
+
   function checkbox(id) {
-    const input = el('input', { type: 'checkbox', checked: items().includes(id), onchange: () => setItem(id, input.checked) });
+    const input = el('input', { type: 'checkbox', checked: items().includes(id), 'data-item': id, onchange: () => choose(id, input.checked) });
     return el('label', { class: 'mk-check' }, input, el('span', { text: id }));
   }
 
-  function renderEditor() {
-    const input = el('input', {
-      type: 'text', class: 'pref-input', placeholder: 'Other coin, e.g. PEPE', maxLength: 10,
-      spellcheck: false, autocomplete: 'off', 'aria-label': 'Add a coin by its ticker',
-    });
-    const addForm = el('form', {
-      class: 'mk-add',
-      onsubmit: e => {
+  // ---- the search: the listed products at once, Yahoo Finance's once typing stops ----
+
+  const searchBox = el('input', {
+    type: 'search', class: 'pref-input sp-search', placeholder: 'Search a name or ticker…',
+    'aria-label': 'Search stocks, indexes, coins and currencies', autocomplete: 'off', spellcheck: false,
+    oninput: () => search(searchBox.value),
+    onkeydown: e => {
+      if (e.key === 'Enter') {
         e.preventDefault();
-        const [coin] = parseCoins(input.value);
-        if (!coin) return;
-        if (isCoin(coin) && !COINS.includes(coin) && !customShown.includes(coin)) customShown.push(coin);
-        if (!items().includes(coin)) setItem(coin, true);
-        renderEditor();
-        marketEditor.querySelector('.mk-add input').focus();
-      },
-    }, input, el('button', { type: 'submit', class: 'btn', text: 'Add' }));
+        const top = shownResults[0];
+        if (top && !items().includes(top.id)) choose(top.id, true, top);
+      } else if (e.key === 'Escape' && searchBox.value) {
+        e.preventDefault();
+        e.stopPropagation();
+        searchBox.value = '';
+        search('');
+      }
+    },
+  });
+  const results = el('div', { class: 'sp-results', hidden: true });
+  const yours = el('div');
+  let query = '';
+  let found = null;        // Yahoo Finance's results for the query
+  let asking = '';         // '', 'busy' or 'failed'
+  let shownResults = [];
+  let searchSeq = 0;
+  let searchTimer = 0;
+
+  function search(text) {
+    query = text.trim();
+    clearTimeout(searchTimer);
+    const my = ++searchSeq;
+    found = null;
+    asking = query ? 'busy' : '';
+    drawResults();
+    if (!asking) return;
+    searchTimer = setTimeout(async () => {
+      let answer = null;
+      try {
+        answer = parseYahooSearch(await fetchJson(`${YAHOO}/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=10&newsCount=0&listsCount=0`), LISTED_SYMBOLS);
+      } catch {
+        // drawn as a failed search below
+      }
+      if (my !== searchSeq) return;   // the box has changed since
+      found = answer;
+      asking = answer ? '' : 'failed';
+      drawResults();
+    }, SEARCH_WAIT_MS);
+  }
+
+  function resultButton(r) {
+    return el('button', {
+      type: 'button', class: 'sp-result', title: [r.label, r.name].filter(Boolean).join(' · '), 'data-item': r.id,
+      'aria-pressed': String(items().includes(r.id)),
+      onclick: () => choose(r.id, !items().includes(r.id), r),
+    },
+    el('span', { class: 'mk-result-sym', text: r.label }),
+    el('span', { class: 'sp-result-name', text: r.name }),
+    el('span', { class: 'sp-result-meta', text: r.meta }),
+    icon('plus', 14), icon('check', 14));
+  }
+
+  function drawResults() {
+    const listed = searchProducts(PRODUCTS, query).slice(0, SEARCH_LISTED).map(p => ({ ...p, label: p.id }));
+    const ids = new Set(listed.map(r => r.id));
+    shownResults = [...listed, ...(found ?? []).filter(r => !ids.has(r.id))].slice(0, SEARCH_LIMIT);
+    const status = asking === 'busy' ? 'Searching…'
+      : asking === 'failed' ? 'Couldn\'t search, check your connection'
+        : query && !shownResults.length ? 'Nothing found' : '';
+    results.hidden = !shownResults.length && !status;
+    results.replaceChildren(...shownResults.map(resultButton), ...(status ? [el('p', { class: 'widget-note', text: status })] : []));
+  }
+
+  // An item's label and name on its chip: from the search result that added it, else its quote.
+  function describe(id) {
+    if (described.has(id)) return described.get(id);
+    const entry = cachedYahoo(items())[id];
+    return { label: rowLabel(id, entry?.info), name: entry?.quote?.name ?? '' };
+  }
+
+  // The items no list has (found symbols, other pairs and coins), to remove or add back.
+  function drawYours() {
+    yours.replaceChildren(...(yoursShown.length ? [
+      widgetSub('Your symbols'),
+      el('div', { class: 'sp-chips' }, yoursShown.map(id => {
+        const { label, name } = describe(id);
+        return el('button', {
+          type: 'button', class: 'sp-chip', title: name && name !== label ? `${label} · ${name}` : label, 'data-item': id,
+          'aria-pressed': String(items().includes(id)), onclick: () => choose(id, !items().includes(id)),
+        }, label);
+      })),
+    ] : []));
+  }
+
+  function renderEditor() {
+    searchBox.value = '';
+    search('');
+    drawYours();
     marketEditor.replaceChildren(
+      searchBox, results, yours,
       widgetSub('Crypto · Bybit, in USDT'),
-      el('div', { class: 'mk-checks' }, [...COINS, ...customShown].map(checkbox)),
-      addForm,
+      el('div', { class: 'mk-checks' }, Object.keys(COINS).map(checkbox)),
       widgetSub('US indexes · CNBC'),
       el('div', { class: 'mk-checks' }, Object.keys(STOCKS).map(checkbox)),
       widgetSub('Commodities · CNBC futures'),
       el('div', { class: 'mk-checks' }, Object.keys(COMMODITIES).map(checkbox)),
-      widgetSub('Currencies · ECB daily rate'),
+      widgetSub('Currencies · Yahoo Finance, live'),
       el('div', { class: 'mk-checks' }, PAIRS.map(checkbox)));
   }
 
@@ -470,7 +665,7 @@ export function mountMarkets(root, store, copy) {
         addAtEnd,
       ] : [
         { label: 'New segment above', icon: 'plus', action: () => startNaming(at, false) },
-        { label: `Remove ${item}`, icon: 'x', action: () => setItem(item, false) },
+        { label: `Remove ${rowLabel(item, shownRows[at].info)}`, icon: 'x', action: () => setItem(item, false) },
         { separator: true },
         choose,
       ]);
@@ -581,8 +776,10 @@ export function mountMarkets(root, store, copy) {
   return {
     destroy() {
       seq++;   // a load still running draws nothing
+      searchSeq++;   // nor a search
       clearInterval(interval);
       clearTimeout(timer);
+      clearTimeout(searchTimer);
       document.removeEventListener('visibilitychange', refresh);
       unsubscribe();
     },

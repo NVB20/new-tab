@@ -63,6 +63,8 @@ coins are found by the search. The currencies heading becomes *Currencies · Yah
 - Label: the symbol without `^` and `=F`, with its exchange suffix (`TEVA.TA`, `TEVA`); an index
   goes by its short name when it has 8 characters or fewer (TA-125, TA-35, S&P 500), else by its
   symbol without the suffix (`IXIC`). Long labels end in an ellipsis.
+- Price: with at most the decimals Yahoo Finance gives the symbol (`priceHint`: a stock's 2, so
+  TEVA is 41.31, not 41.3100); a US ticker from CNBC gets 2.
 - Hover: the name, on Yahoo Finance, as of the time, and the currency when it isn't USD ("in
   agorot" for ILA, "in pence" for GBp). Pairs: "USD/ILS on Yahoo Finance · as of …", or the ECB
   wording while on the backup.
