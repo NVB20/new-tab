@@ -94,7 +94,9 @@ export function mountMarvel(root, store, copy) {
     bar.setAttribute('aria-valuenow', String(done));
     bar.setAttribute('aria-valuetext', `${done} of ${shown.length} watched`);
 
-    const top = scroller.scrollTop;
+    // Not read on a reveal: it's replaced anyway, and on the first draw reading it would force a
+    // layout of the half-built page.
+    const top = reveal ? 0 : scroller.scrollTop;
     // A row ticked from the keyboard keeps the focus once the rows are redrawn.
     const focused = list.contains(document.activeElement) ? document.activeElement.closest('.mv-item')?.dataset.id : null;
     list.replaceChildren(...(s.hideWatched ? shown.filter(e => !seen.has(e.id)) : shown).map(e => row(e, seen.has(e.id), e === up)));

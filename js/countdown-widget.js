@@ -149,9 +149,12 @@ export function mountCountdown(root, store, copy, ctx = {}) {
   // clock's time does. A short widget drops a timer's line and has smaller buttons. Measured
   // again only when the count's length or the widget's size changes. Offset sizes are layout
   // pixels, so the fit holds when the widget is drawn scaled.
+  // The first fit waits for the observer's first call, which comes before the first paint, once
+  // every widget is on the page, rather than forcing a layout of the half-built page.
   let fitted = '';
+  let observed = false;
   function fit() {
-    if (body.hidden || !body.clientHeight) return;
+    if (!observed || body.hidden || !body.clientHeight) return;
     const stacked = STACKED.matches;
     section.classList.toggle('short', !stacked && body.clientHeight < 150);
     const key = [stacked, big.textContent.length, unit.textContent, body.clientWidth, body.clientHeight, section.className].join('|');
@@ -169,7 +172,10 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     const size = Math.min(100 * wide * body.clientWidth / count.scrollWidth, 100 * (body.clientHeight - others - 4) / count.offsetHeight);
     count.style.fontSize = `${Math.round(Math.max(18, Math.min(150, size)))}px`;
   }
-  const resized = new ResizeObserver(() => fit());
+  const resized = new ResizeObserver(() => {
+    observed = true;
+    fit();
+  });
   resized.observe(body);
 
   // Confetti from the widget, once per finish: the finish is marked as seen for every tab.
