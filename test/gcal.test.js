@@ -119,6 +119,41 @@ test('keeps only yesterday to 16 days on (UTC), in start order', () => {
   assert.deepEqual(cal.events.map(e => e.title), ['Still running', 'A', 'B']);
 });
 
+test('at the window’s edges, a zone far from UTC decides: a day outside on the wall clock can be inside', () => {
+  const cal = parse([`
+    UID:in1@google.com
+    DTSTART;TZID=Pacific/Pago_Pago:20261016T200000
+    SUMMARY:Samoa evening
+  `, `
+    UID:out1@google.com
+    DTSTART;TZID=Pacific/Pago_Pago:20261016T100000
+    DTEND;TZID=Pacific/Pago_Pago:20261016T110000
+    SUMMARY:Samoa morning
+  `, `
+    UID:in2@google.com
+    DTSTART;TZID=Pacific/Kiritimati:20261104T090000
+    SUMMARY:Kiribati morning
+  `, `
+    UID:out2@google.com
+    DTSTART;TZID=Pacific/Kiritimati:20261104T150000
+    SUMMARY:Kiribati afternoon
+  `]);
+  // The window is 17 Oct 00:00Z to 4 Nov 00:00Z: Samoa is UTC−11, Kiribati UTC+14.
+  assert.deepEqual(cal.events.map(e => e.title), ['Samoa evening', 'Kiribati morning']);
+});
+
+test('a series that ran for years ends exactly at its UNTIL, in a zone far from UTC', () => {
+  const cal = parse([`
+    UID:yrs@google.com
+    DTSTART;TZID=Pacific/Pago_Pago:20190101T200000
+    DTEND;TZID=Pacific/Pago_Pago:20190101T203000
+    RRULE:FREQ=DAILY;UNTIL=20261020T050000Z
+    SUMMARY:Evening call
+  `]);
+  // 20:00 in Samoa is 07:00Z the next day: the call on the 19th (20 Oct 07:00Z) is after UNTIL.
+  assert.deepEqual(starts(cal), ['2026-10-17T07:00:00.000Z', '2026-10-18T07:00:00.000Z', '2026-10-19T07:00:00.000Z']);
+});
+
 test('weekly repeats keep their wall-clock time across a DST change', () => {
   const cal = parse([`
     UID:w1@google.com

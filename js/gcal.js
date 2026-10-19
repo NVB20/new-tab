@@ -385,15 +385,19 @@ const instanceKeyOf = original => (typeof original === 'string' ? original.repla
   : new Date(original).toISOString().replace(/[-:]/g, '').replace(/\.\d+/, ''));
 
 // What every occurrence of a VEVENT shares, or null for one with no start, cancelled, or declined
-// by the calendar's owner (me: their address).
-function details(e, calZone, me) {
+// by the calendar's owner (me: their address). Its text is read by describe(), only once the event
+// has an occurrence in the window: a feed holds years of past events.
+// window: [first, last] serial days for a one-off event, which is null (passed over) when it's
+// nowhere near them.
+function details(e, calZone, me, window = null) {
   const start = timeOf(one(e, 'DTSTART'), calZone);
   if (!start) return null;
+  const end = timeOf(one(e, 'DTEND'), calZone);
+  const span = duration(one(e, 'DURATION')?.value);
+  if (window && !nearDays(start, end, span, window)) return null;
   const uid = one(e, 'UID')?.value.trim() ?? '';
   const declined = me && (e.ATTENDEE ?? []).some(a => a.value.trim().toLowerCase() === `mailto:${me}` && a.params.PARTSTAT?.toUpperCase() === 'DECLINED');
   if (declined || one(e, 'STATUS')?.value.trim().toUpperCase() === 'CANCELLED') return { start, uid, cancelled: true };
-  const end = timeOf(one(e, 'DTEND'), calZone);
-  const span = duration(one(e, 'DURATION')?.value);
   let length;   // whole days for a date, ms for a time
   if (start.date) {
     length = end?.date ? serialOfKey(end.date) - serialOfKey(start.date) : span ? Math.round(span / DAY) : 1;
@@ -402,13 +406,25 @@ function details(e, calZone, me) {
     length = end && !end.date ? instant(end.wall, end.zone) - instant(start.wall, start.zone) : span ?? 0;
     length = Math.max(0, length);
   }
+  return { e, start, length, uid };
+}
+
+// Whether an event's wall-clock days come within a day of first to last (serial UTC days): no
+// zone is a day off UTC, so this needs no time zone sums, which the years of past events a feed
+// holds would otherwise each cost. It may keep an event that turns out to miss the window.
+function nearDays(start, end, span, [first, last]) {
+  const dayOf = t => (t.date ? serialOfKey(t.date) : serialOf(t.wall.y, t.wall.mo, t.wall.d));
+  const from = dayOf(start);
+  const to = Math.max(from, end ? dayOf(end) : from + Math.ceil(Math.max(0, span ?? DAY) / DAY));
+  return to >= first - 1 && from <= last + 1;
+}
+
+// A VEVENT's title, place, description, call link and URL.
+function describe(e) {
   const rawAbout = unescape(one(e, 'DESCRIPTION')?.value ?? '');
   const where = text(unescape(one(e, 'LOCATION')?.value ?? ''), 200);
   const url = one(e, 'URL')?.value.trim() ?? '';
   return {
-    start,
-    length,
-    uid,
     title: text(unescape(one(e, 'SUMMARY')?.value ?? ''), 200) || '(No title)',
     where,
     about: plainText(rawAbout),
@@ -417,16 +433,19 @@ function details(e, calZone, me) {
   };
 }
 
+// When an occurrence runs: allDay with from/to (dates, to exclusive), or start/end (ms).
+const when = (d, at) => (at.date
+  ? { allDay: true, from: at.date, to: plusDays(at.date, d.length) }
+  : { allDay: false, start: at.ms, end: at.ms + d.length });
+
 // One event of the agenda: { id, title, allDay, from/to (dates, to exclusive) or start/end (ms),
 // where, about, meet, link }.
 function occurrence(d, at, original, { calendarId, recurring }) {
   const key = original ?? (at.date ?? at.ms);
-  const link = googleLink(d.uid, calendarId, recurring ? instanceKeyOf(key) : '') || d.url
+  const { title, where, about, meet, url } = (d.text ??= describe(d.e));
+  const link = googleLink(d.uid, calendarId, recurring ? instanceKeyOf(key) : '') || url
     || (calendarId ? `https://calendar.google.com/calendar/r/day/${(at.date ?? new Date(at.ms).toISOString().slice(0, 10)).replaceAll('-', '/')}` : '');
-  const common = { id: `${d.uid || d.title}|${key}`, title: d.title, where: d.where, about: d.about, meet: d.meet, link };
-  return at.date
-    ? { ...common, allDay: true, from: at.date, to: plusDays(at.date, d.length) }
-    : { ...common, allDay: false, start: at.ms, end: at.ms + d.length };
+  return { id: `${d.uid || title}|${key}`, title, where, about, meet, link, ...when(d, at) };
 }
 
 // The calendar in an iCal file, { name, events } with the events from yesterday to WINDOW days
@@ -454,11 +473,10 @@ export function parseCalendar(ics, { url = '', now = Date.now() } = {}) {
     replaced.add(`${d.uid}|${key}`);
     if (d.cancelled) continue;
     const at = d.start.date ? { date: d.start.date } : { ms: instant(d.start.wall, d.start.zone) };
-    const o = occurrence(d, at, key, { calendarId, recurring: true });
-    if (overlaps(o)) out.push(o);
+    if (overlaps(when(d, at))) out.push(occurrence(d, at, key, { calendarId, recurring: true }));
   }
   for (const e of events.filter(x => !x['RECURRENCE-ID'])) {
-    const d = details(e, calZone, me);
+    const d = details(e, calZone, me, e.RRULE ? null : [firstDay, lastDay]);
     if (!d || d.cancelled) continue;
     const ruleLine = one(e, 'RRULE');
     const rule = ruleLine ? parseRule(ruleLine.value, calZone) : null;
@@ -469,12 +487,19 @@ export function parseCalendar(ics, { url = '', now = Date.now() } = {}) {
       const { y, mo, d: dd } = dateOfSerial(day);
       return { ms: instant({ ...start.wall, y, mo, d: dd }, start.zone) };
     };
+    // UNTIL is worked out once. An occurrence starts within a day of its day's UTC midnight (zones
+    // are at most 14 h off), so only the days next to UNTIL need its own instant: an ended series
+    // runs through years of days.
+    const until = rule?.until;
+    const untilDay = until?.date ? serialOfKey(until.date) : null;
+    const untilMs = until && !until.date ? instant(until.wall, until.zone) : null;
     const untilOk = day => {
-      const u = rule?.until;
-      if (!u) return true;
-      if (u.date) return day <= serialOfKey(u.date);
+      if (!until) return true;
+      if (untilDay !== null) return day <= untilDay;
+      if ((day + 2) * DAY <= untilMs) return true;
+      if ((day - 1) * DAY > untilMs) return false;
       const at = atDay(day);
-      return (at.ms ?? day * DAY) <= instant(u.wall, u.zone);
+      return (at.ms ?? day * DAY) <= untilMs;
     };
     const reach = start.date ? d.length : Math.ceil(d.length / DAY) + 1;   // days an occurrence may run into
     const days = rule ? repeatDays(rule, startDay, firstDay - reach - 1, lastDay + 1, untilOk) : [startDay];
@@ -491,8 +516,7 @@ export function parseCalendar(ics, { url = '', now = Date.now() } = {}) {
       const at = atDay(day);
       const key = at.date ?? at.ms;
       if (exDates.has(keyOfSerial(day)) || exTimes.has(at.ms) || replaced.has(`${d.uid}|${key}`)) continue;
-      const o = occurrence(d, at, key, { calendarId, recurring: !!ruleLine });
-      if (overlaps(o)) out.push(o);
+      if (overlaps(when(d, at))) out.push(occurrence(d, at, key, { calendarId, recurring: !!ruleLine }));
     }
   }
   const startOf = o => (o.allDay ? Date.parse(`${o.from}T00:00:00Z`) : o.start);
