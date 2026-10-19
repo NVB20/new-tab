@@ -282,8 +282,13 @@ function formatter(locale, options) {
   return f;
 }
 
-// The calendar day of a time in a time zone (undefined: the computer's), as 'YYYY-MM-DD'.
+// The calendar day of a time in a time zone (undefined: the computer's), as 'YYYY-MM-DD'. The
+// computer's is read off a Date, far cheaper than formatToParts: agendas ask for every event.
 function ymd(ms, timeZone) {
+  if (timeZone === undefined) {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
   const f = formatter('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
   const p = Object.fromEntries(f.formatToParts(ms).map(x => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}`;

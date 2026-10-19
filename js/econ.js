@@ -95,11 +95,13 @@ const ISRAEL_LEVELS = {
 };
 
 const CURRENCY_UNITS = ['$', '€', '£', '₪'];
+// One formatter for every value: toLocaleString with options builds a new one each call.
+const DIGITS = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
 
 // '4.2%', '29K', '$9,743M', '−€7.8B', '87B cf'; '' for no value.
 export function formatValue(n, unit, scale) {
   if (num(n) == null) return '';
-  const digits = Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 3 });
+  const digits = DIGITS.format(Math.abs(n));
   const sign = n < 0 ? '−' : '';
   const s = typeof scale === 'string' ? scale.slice(0, 2) : '';
   const u = typeof unit === 'string' ? unit.trim().slice(0, 8) : '';
