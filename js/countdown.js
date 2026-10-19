@@ -1,10 +1,13 @@
-// Countdowns: the page's list (state.countdowns), each a Timer or a Date, and what a Countdown
-// widget shows of one. Pure: unit-tested in Node, and read by the background script, which rings
-// them when they end.
+// Countdowns: the page's list (state.countdowns), each a Timer, a Stopwatch or a Date, and what a
+// Timers widget shows of one. Pure: unit-tested in Node, and read by the background script, which
+// rings them when they end.
 //
 // timer: { id, kind: 'timer', name, duration, endsAt, left, seen }
 //   duration in ms. Ready: endsAt and left null. Running: endsAt (epoch ms). Paused: left (ms).
 //   Done: endsAt has passed.
+// stopwatch: { id, kind: 'stopwatch', name, startedAt, elapsed, seen }
+//   elapsed: ms counted before startedAt. Running: startedAt (epoch ms). Paused: startedAt null,
+//   elapsed > 0. Ready: both empty. It never ends.
 // date: { id, kind: 'date', name, date, time, yearly, since, seen }
 //   date 'YYYY-MM-DD', time 'HH:MM' or '' (the start of the day). A yearly date falls on the
 //   first of its days from `since` ('YYYY-MM-DD', or '' for the date itself) on; Dismiss moves
@@ -13,9 +16,9 @@
 
 import { uid, clamp } from './util.js';
 
-export const KINDS = ['timer', 'date'];
-export const KIND_LABELS = { timer: 'Timer', date: 'Date' };
-export const KIND_ICONS = { timer: 'timer', date: 'calendar' };
+export const KINDS = ['timer', 'stopwatch', 'date'];
+export const KIND_LABELS = { timer: 'Timer', stopwatch: 'Stopwatch', date: 'Date' };
+export const KIND_ICONS = { timer: 'hourglass', stopwatch: 'stopwatch', date: 'calendar' };
 export const PRESETS = [5, 10, 25, 60];   // minutes, for a new timer
 export const MAX_DURATION = (99 * 3600 + 59 * 60 + 59) * 1000;
 export const MAX_COUNTDOWNS = 50;
@@ -54,6 +57,7 @@ export function cleanCountdown(c) {
     const left = endsAt == null && num(c.left) != null ? clamp(c.left, 0, MAX_DURATION) : null;
     return { ...base, duration, endsAt, left };
   }
+  if (c.kind === 'stopwatch') return { ...base, startedAt: num(c.startedAt), elapsed: Math.max(0, Math.round(num(c.elapsed) ?? 0)) };
   if (!isDay(c.date)) return null;
   return { ...base, date: c.date, time: isTime(c.time) ? c.time : '', yearly: c.yearly === true, since: isDay(c.since) ? c.since : '' };
 }
@@ -73,13 +77,14 @@ export function cleanCountdowns(raw) {
 }
 
 export const newTimer = ({ name = '', duration }) => cleanCountdown({ id: uid(), kind: 'timer', name, duration, endsAt: null, left: null });
+export const newStopwatch = ({ name = '' }) => cleanCountdown({ id: uid(), kind: 'stopwatch', name, startedAt: null, elapsed: 0 });
 
 // A yearly date counts from today: its next day on or after it.
 export const newDate = ({ name = '', date, time = '', yearly = false }, now = Date.now()) =>
   cleanCountdown({ id: uid(), kind: 'date', name, date, time, yearly, since: yearly ? dayKey(now) : '' });
 
 // What a countdown is called when it has no name.
-export const nameOf = c => c.name || (c.kind === 'timer' ? 'Timer' : 'Countdown');
+export const nameOf = c => c.name || (c.kind === 'date' ? 'Countdown' : KIND_LABELS[c.kind]);
 
 // ---- when it ends ----
 
@@ -94,18 +99,21 @@ export function dayOf(c) {
   }
 }
 
-// When it ends (epoch ms), or null for a timer that isn't running. A date ends at its time on its
-// day, or at the start of the day without one. Doesn't depend on the time now, so the background
-// script can tell whether an alarm it set still matches.
+// When it ends (epoch ms), or null for a timer that isn't running and a stopwatch. A date ends at
+// its time on its day, or at the start of the day without one. Doesn't depend on the time now, so
+// the background script can tell whether an alarm it set still matches.
 export function endOf(c) {
+  if (c.kind === 'stopwatch') return null;
   if (c.kind === 'timer') return c.endsAt;
   const [y, m, d] = parts(dayOf(c));
   const [hh, mm] = c.time ? c.time.split(':').map(Number) : [0, 0];
   return new Date(y, m - 1, d, hh, mm).getTime();
 }
 
-// 'ready' | 'running' | 'paused' | 'done' for a timer, 'upcoming' | 'done' for a date.
+// 'ready' | 'running' | 'paused' | 'done' for a timer, 'ready' | 'running' | 'paused' for a
+// stopwatch, 'upcoming' | 'done' for a date.
 export function statusOf(c, now) {
+  if (c.kind === 'stopwatch') return c.startedAt != null ? 'running' : c.elapsed > 0 ? 'paused' : 'ready';
   if (c.kind === 'timer') {
     if (c.left != null) return 'paused';
     if (c.endsAt == null) return 'ready';
@@ -123,14 +131,23 @@ export function leftOf(c, now) {
   return Math.max(0, endOf(c) - now);
 }
 
+// How long a stopwatch has run (ms).
+export const elapsedOf = (c, now) => c.elapsed + (c.startedAt != null ? Math.max(0, now - c.startedAt) : 0);
+
+// The moment the seconds shown tick over from, give or take whole seconds: a countdown's end, or
+// for a stopwatch the moment it would have started had it never been paused.
+export const tickFrom = c => (c.kind === 'stopwatch' ? c.startedAt - c.elapsed : endOf(c));
+
 // The countdown "Next up" shows: one that ended and wasn't dismissed (the latest), else the one
-// ending soonest, else a paused timer, else a ready one; the list's order breaks ties.
+// ending soonest, else a running stopwatch (the latest started), else a paused timer or
+// stopwatch, else a ready one; the list's order breaks ties.
 export function nextUp(list, now) {
   const rank = c => {
     const s = statusOf(c, now);
     if (s === 'done') return [0, -endOf(c)];
+    if (c.kind === 'stopwatch' && s === 'running') return [2, -c.startedAt];
     if (s === 'running' || s === 'upcoming') return [1, endOf(c)];
-    return [s === 'paused' ? 2 : 3, 0];
+    return [s === 'paused' ? 3 : 4, 0];
   };
   let best = null;
   let bestRank = null;
@@ -155,7 +172,9 @@ export const shouldCelebrate = (c, now) => statusOf(c, now) === 'done' && c.seen
 
 // ---- what changes it (each returns a new countdown, or a new list) ----
 
+// Start, pause and reset work on timers and stopwatches.
 export function startTimer(c, now) {
+  if (c.kind === 'stopwatch') return c.startedAt != null ? c : { ...c, startedAt: now };
   if (c.kind !== 'timer') return c;
   const s = statusOf(c, now);
   if (s === 'running') return c;
@@ -164,11 +183,15 @@ export function startTimer(c, now) {
 }
 
 export function pauseTimer(c, now) {
-  if (c.kind !== 'timer' || statusOf(c, now) !== 'running') return c;
+  if (c.kind === 'date' || statusOf(c, now) !== 'running') return c;
+  if (c.kind === 'stopwatch') return { ...c, startedAt: null, elapsed: elapsedOf(c, now) };
   return { ...c, endsAt: null, left: c.endsAt - now };
 }
 
-export const resetTimer = c => (c.kind === 'timer' ? { ...c, endsAt: null, left: null, seen: null } : c);
+export function resetTimer(c) {
+  if (c.kind === 'stopwatch') return { ...c, startedAt: null, elapsed: 0, seen: null };
+  return c.kind === 'timer' ? { ...c, endsAt: null, left: null, seen: null } : c;
+}
 
 // +1 min: more time on a running, paused or ready timer; a finished one runs again for a minute.
 export function addMinute(c, now) {
@@ -183,11 +206,11 @@ export function addMinute(c, now) {
 }
 
 // Dismissing a finished countdown: a timer is ready to start again, a yearly date counts to its
-// next year, a one-off date leaves the list.
+// next year, a one-off date leaves the list. (A stopwatch never finishes; it would be reset.)
 export function dismiss(list, id) {
   const c = list.find(x => x.id === id);
   if (!c) return list;
-  if (c.kind === 'timer') return list.map(x => (x === c ? resetTimer(x) : x));
+  if (c.kind !== 'date') return list.map(x => (x === c ? resetTimer(x) : x));
   if (!c.yearly) return list.filter(x => x !== c);
   const [y, m, d] = parts(dayOf(c));
   return list.map(x => (x === c ? { ...x, since: dayKey(new Date(y, m - 1, d + 1).getTime()), seen: null } : x));
@@ -195,9 +218,10 @@ export function dismiss(list, id) {
 
 // ---- how it reads ----
 
-// "24:13", "1:05:00": a timer's time, or a date's last day, in whole seconds rounded up.
-export function clockText(ms) {
-  const s = Math.ceil(Math.max(0, ms) / 1000);
+// "24:13", "1:05:00": a timer's time, or a date's last day, in whole seconds rounded up; a
+// stopwatch's (up: false) rounded down.
+export function clockText(ms, up = true) {
+  const s = (up ? Math.ceil : Math.floor)(Math.max(0, ms) / 1000);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`;
@@ -207,6 +231,7 @@ export function clockText(ms) {
 // days to go until its last 24 hours, then the time left; once it's passed, "Today" or "3 days ago".
 export function display(c, now) {
   const s = statusOf(c, now);
+  if (c.kind === 'stopwatch') return { big: clockText(elapsedOf(c, now), false), unit: '', live: s === 'running' };
   if (c.kind === 'timer') return s === 'done' ? { big: 'Time’s up', unit: '', live: false } : { big: clockText(leftOf(c, now)), unit: '', live: s === 'running' };
   const end = endOf(c);
   if (s === 'done') {
@@ -228,9 +253,11 @@ export function dateLabel(c, now, hour24 = true) {
   return `${day} · ${time}`;
 }
 
-// The short "time left" a list row shows: "42 days", "18:05:12", "Paused · 4:00", "Done".
+// The short "time left" a list row shows: "42 days", "18:05:12", "Paused · 4:00", "Done"; a
+// stopwatch's time so far, or "Ready".
 export function shortLeft(c, now) {
   const s = statusOf(c, now);
+  if (c.kind === 'stopwatch') return s === 'ready' ? 'Ready' : s === 'paused' ? `Paused · ${clockText(c.elapsed, false)}` : display(c, now).big;
   if (s === 'done') return 'Done';
   if (s === 'paused') return `Paused · ${clockText(c.left)}`;
   if (s === 'ready') return clockText(c.duration);

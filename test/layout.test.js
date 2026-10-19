@@ -530,7 +530,7 @@ test('The Economic calendar goes in the clock column when the far one is full, a
   assert.deepEqual(Object.keys(t).sort(), [...near, ...far, 'tiles'].sort());
 });
 
-test('Countdown: up to three copies, one countdown each (Next up to start), never on an old page, under the clock', () => {
+test('Timers (countdown): up to three copies, one countdown each (Next up to start), never on an old page, under the clock', () => {
   assert.equal(TYPES.countdown.max, 3);
   assert.equal(prefsSection('countdown'), null);
   assert.deepEqual(TYPES.countdown.defaults(), { show: 'next' });
@@ -545,7 +545,7 @@ test('Countdown: up to three copies, one countdown each (Next up to start), neve
   assert.ok(atDefaultPlaces(l));
 });
 
-test('Countdown moves to the far column before Weather does, and is left out when both columns are full', () => {
+test('Timers (countdown) moves to the far column before Weather does, and is left out when both columns are full', () => {
   const l = { cols: COLS, rows: ROWS, widgets: [] };
   l.widgets = placeDefaults(l, ['clock', 'weather', 'countdown', 'tasks', 'notes', 'claude', 'marvel', 'markets', 'tiles']);
   let t = byType(l);

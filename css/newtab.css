@@ -1005,7 +1005,7 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
   .wx-bar { display: none; }
 }
 
-/* ---------- Countdown ---------- */
+/* ---------- Timers (type countdown) ---------- */
 
 .widget-root > .widget-countdown { display: flex; flex-direction: column; overflow: hidden; }
 .widget-countdown.editing { overflow: hidden auto; }
@@ -1029,10 +1029,10 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 /* At zero: the count in the accent, popping in once. */
 .widget-countdown.done .cd-count { color: var(--accent); font-weight: 400; animation: cd-pop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
 @keyframes cd-pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
-/* Two cells wide: the line under the count goes. Short: a timer's line goes, its buttons shrink. */
+/* Two cells wide: the line under the count goes. Short: a timer's or a stopwatch's line goes, its buttons shrink. */
 .widget-countdown.narrow .cd-when { display: none; }
 .widget-countdown.short .cd-face { gap: 4px; }
-.widget-countdown.short.is-timer .cd-when { display: none; }
+.widget-countdown.short.can-run .cd-when { display: none; }
 .widget-countdown.short .cd-ctl { width: 28px; height: 28px; }
 .widget-countdown.short .cd-btn { padding: 3px 10px; font-size: 12px; }
 
@@ -1054,8 +1054,8 @@ body.has-wallpaper .searchbar { background: color-mix(in srgb, var(--surface) 90
 .cd-more, .cd-more-gap { flex: none; width: 28px; height: 28px; border-radius: 7px; }
 .cd-new { align-self: flex-start; padding: 6px 12px; font-size: 13px; }
 
-/* The dialog: Timer or Date, then what it needs. */
-.cd-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; }
+/* The dialog: Timer, Stopwatch or Date, then what it needs. */
+.cd-kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; }
 .cd-kind {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 10px; border: 0; border-radius: 7px;
   background: none; color: var(--muted); font: inherit; font-size: 13.5px; cursor: pointer;

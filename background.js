@@ -1,4 +1,4 @@
-// The background script: rings the Countdown widget's timers and dates (js/countdown.js) when
+// The background script: rings the Timers widget's timers and dates (js/countdown.js) when
 // they end, with or without a new tab open. It reads the saved state, keeps one alarm per
 // countdown that will end, and shows a notification when one does. The page never talks to it:
 // starting, pausing or editing a countdown saves the state, and that's what it follows.

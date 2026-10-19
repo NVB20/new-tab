@@ -109,9 +109,9 @@ const ICONS = {
   fog: '<path d="M5.5 12a6 6 0 0 1 11.5-2.97A4 4 0 0 1 20.5 12"/><path d="M3 15.5h18M6 19h12"/>',
   wind: '<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h7"/>',
   unstack: '<rect x="3" y="9" width="12" height="12" rx="2"/><path d="M13 11l8-8M15 3h6v6"/>',
-  // Countdown.
+  // Timers.
   hourglass: '<path d="M6 3h12M6 21h12"/><path d="M7 3v2.5a5 5 0 0 0 2.4 4.27L12 11.5l2.6-1.73A5 5 0 0 0 17 5.5V3M7 21v-2.5a5 5 0 0 1 2.4-4.27L12 12.5l2.6 1.73A5 5 0 0 1 17 18.5V21"/>',
-  timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V10M10 2.5h4M12 2.5V6M18.5 6.5l1.5-1.5"/>',
+  stopwatch: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V10M10 2.5h4M12 2.5V6M18.5 6.5l1.5-1.5"/>',
   pause: '<path d="M9 5.5v13M15 5.5v13" stroke-width="2.6"/>',
   more: '<circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/>',
 };

@@ -1,18 +1,21 @@
-// Countdown widget: one of the page's countdowns (countdown.js) drawn big, the days to go until a
-// date or a timer with its controls. ✎ lists every countdown, to pick the one this copy shows or
-// add, edit and delete them. At zero: confetti (once per finish) and Dismiss; the background
-// script sends the notification.
+// Timers widget (type `countdown`): one of the page's countdowns (countdown.js) drawn big, the days
+// to go until a date, or a timer or a stopwatch with its controls. ✎ lists every one, to pick the
+// one this copy shows or add, edit and delete them. At zero: confetti (once per finish) and
+// Dismiss; the background script sends the notification.
 
 import { el, icon, widgetHead, widgetEmpty, showMenu, openDialog, field } from './ui.js';
 import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 import {
-  KINDS, KIND_LABELS, KIND_ICONS, PRESETS, MAX_DURATION, MAX_COUNTDOWNS, cleanCountdowns, newTimer, newDate, nameOf,
-  isDay, endOf, statusOf, leftOf, shownCountdown, nextUp, shouldCelebrate, startTimer, pauseTimer, resetTimer,
-  addMinute, dismiss, display, dateLabel, shortLeft,
+  KINDS, KIND_LABELS, KIND_ICONS, PRESETS, MAX_DURATION, MAX_COUNTDOWNS, cleanCountdowns, newTimer, newStopwatch, newDate,
+  nameOf, isDay, endOf, statusOf, leftOf, tickFrom, shownCountdown, nextUp, shouldCelebrate, startTimer, pauseTimer,
+  resetTimer, addMinute, dismiss, display, dateLabel, shortLeft,
 } from './countdown.js';
 import { confettiFrom } from './confetti.js';
 
 const SLOW_MS = 30e3;   // how often a widget showing days (or a paused timer) looks again
+const TITLE = 'Timers';
+// A new countdown (ready, for a timer or a stopwatch) from what the dialog asked.
+const fresh = (v, now) => (v.kind === 'timer' ? newTimer(v) : v.kind === 'stopwatch' ? newStopwatch(v) : newDate(v, now));
 // Under 900px the frames stack, each as tall as its content: the count has a fixed size there.
 const STACKED = matchMedia('(max-width: 900px)');
 
@@ -32,7 +35,7 @@ export function mountCountdown(root, store, copy, ctx = {}) {
   }, ['prefs']);
 
   const editButton = el('button', { type: 'button', class: 'icon-btn widget-edit', onclick: () => setEditing(!editing) });
-  const head = widgetHead('hourglass', 'Countdown');
+  const head = widgetHead('hourglass', TITLE);
   const title = head.querySelector('span');
   head.append(editButton);
   const big = el('span', { class: 'cd-big' });
@@ -70,13 +73,15 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     if (status === 'done') return c.kind === 'timer' ? [dismissButton, minute] : [dismissButton];
     if (c.kind === 'date') return [];
     const reset = button('undo', 'Reset', act(c.id, resetTimer));
-    if (status === 'running') return [button('pause', 'Pause', act(c.id, pauseTimer), 'cd-main'), reset, minute];
-    return [button('play', status === 'paused' ? 'Resume' : 'Start', act(c.id, startTimer), 'cd-main'), ...(status === 'paused' ? [reset] : []), minute];
+    const more = c.kind === 'timer' ? [minute] : [];
+    if (status === 'running') return [button('pause', 'Pause', act(c.id, pauseTimer), 'cd-main'), reset, ...more];
+    return [button('play', status === 'paused' ? 'Resume' : 'Start', act(c.id, startTimer), 'cd-main'), ...(status === 'paused' ? [reset] : []), ...more];
   }
 
-  // The line under the count: the date, or when the timer ends.
+  // The line under the count: the date, when the timer ends, or when the stopwatch (re)started.
   function whenText(c, status, now) {
     if (c.kind === 'date') return dateLabel(c, now, hour24()) + (c.yearly ? ' · every year' : '');
+    if (c.kind === 'stopwatch' && status === 'running') return `${c.elapsed ? 'Resumed' : 'Started'} ${timeOf(c.startedAt)}`;
     if (status === 'running') return `Ends ${timeOf(c.endsAt)}`;
     if (status === 'done') return `Ended ${timeOf(c.endsAt)}`;
     if (status === 'paused') return 'Paused';
@@ -96,13 +101,13 @@ export function mountCountdown(root, store, copy, ctx = {}) {
       if (drawnFace === 'empty') return;
       drawnFace = 'empty';
       drawnControls = '';
-      title.textContent = 'Countdown';
+      title.textContent = TITLE;
       if (head.dataset.kind) {
         delete head.dataset.kind;
         head.firstElementChild.replaceWith(icon('hourglass', 18));
       }
-      section.classList.remove('done', 'live', 'is-timer');
-      body.replaceChildren(widgetEmpty('No countdowns yet. ', el('button', { type: 'button', class: 'link-btn', text: 'Add one', onclick: create })));
+      section.classList.remove('done', 'live', 'can-run');
+      body.replaceChildren(widgetEmpty('No timers yet. ', el('button', { type: 'button', class: 'link-btn', text: 'Add one', onclick: create })));
       return;
     }
     if (drawnFace === 'empty') body.replaceChildren(face);
@@ -123,7 +128,7 @@ export function mountCountdown(root, store, copy, ctx = {}) {
       when.textContent = whenText(c, status, now);
       section.classList.toggle('done', status === 'done');
       section.classList.toggle('live', d.live);
-      section.classList.toggle('is-timer', c.kind === 'timer');
+      section.classList.toggle('can-run', c.kind !== 'date');
       const running = c.kind === 'timer' && (status === 'running' || status === 'paused');
       bar.hidden = !running;
       if (running) fill.style.width = `${Math.min(100, (1 - leftOf(c, now) / c.duration) * 100)}%`;
@@ -210,13 +215,13 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     const full = list.length >= MAX_COUNTDOWNS;
     picker.replaceChildren(
       list.length
-        ? el('ul', { class: 'cd-rows', 'aria-label': 'Countdowns' },
+        ? el('ul', { class: 'cd-rows', 'aria-label': TITLE },
           el('li', { class: 'cd-row' }, pick('next', 'hourglass', 'Next up', next ? nameOf(next) : ''), el('span', { class: 'cd-more-gap' })),
           rows)
-        : widgetEmpty('No countdowns yet.'),
+        : widgetEmpty('No timers yet.'),
       el('button', {
-        type: 'button', class: 'btn cd-new', disabled: full, title: full ? `Up to ${MAX_COUNTDOWNS} countdowns` : null, onclick: create,
-      }, icon('plus', 16), 'New countdown'));
+        type: 'button', class: 'btn cd-new', disabled: full, title: full ? `Up to ${MAX_COUNTDOWNS}` : 'A timer, a stopwatch or a date', onclick: create,
+      }, icon('plus', 16), 'New'));
   }
 
   // The times left change every second; the rows themselves only when the list does.
@@ -234,7 +239,7 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     editing = on;
     section.classList.toggle('editing', on);
     editButton.replaceChildren(icon(on ? 'check' : 'edit', 15));
-    editButton.title = on ? 'Done' : 'Your countdowns';
+    editButton.title = on ? 'Done' : 'Your timers';
     editButton.setAttribute('aria-label', editButton.title);
     editButton.setAttribute('aria-pressed', String(on));
     body.hidden = on;
@@ -250,7 +255,7 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     const v = await askCountdown(null);
     if (!v) return;
     const now = Date.now();
-    const c = v.kind === 'timer' ? startTimer(newTimer(v), now) : newDate(v, now);
+    const c = startTimer(fresh(v, now), now);
     setList(list => [...list, c]);
     setShow(c.id);
     if (editing) setEditing(false);
@@ -262,15 +267,17 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     const v = await askCountdown(old);
     if (!v) return;
     change(id, c => {
-      if (v.kind !== c.kind) return { ...(v.kind === 'timer' ? newTimer(v) : newDate(v, Date.now())), id };
+      if (v.kind !== c.kind) return { ...fresh(v, Date.now()), id };
+      if (c.kind === 'stopwatch') return { ...c, name: v.name };
       if (c.kind === 'timer') return c.duration === v.duration ? { ...c, name: v.name } : { ...resetTimer(c), name: v.name, duration: v.duration };
       const same = c.date === v.date && c.time === v.time && c.yearly === v.yearly;
       return same ? { ...c, name: v.name } : { ...newDate(v, Date.now()), id };
     });
   }
 
-  // The dialog for a new countdown (old: null) or a change to one: Timer or Date first, then a
-  // name, then its duration or its day. Resolves with { kind, name, duration, date, time, yearly }.
+  // The dialog for a new countdown (old: null) or a change to one: Timer, Stopwatch or Date first,
+  // then a name, then a timer's duration or a date's day. Resolves with { kind, name, duration,
+  // date, time, yearly }.
   async function askCountdown(old) {
     let kind = old?.kind ?? 'timer';
     const name = el('input', { type: 'text', value: old?.name ?? '', maxLength: 60, dir: 'auto', autocomplete: 'off' });
@@ -312,26 +319,31 @@ export function mountCountdown(root, store, copy, ctx = {}) {
       onclick: () => {
         kind = k;
         changed();
-        (k === 'timer' ? hh : dateInput).focus();
+        ({ timer: hh, date: dateInput }[k] ?? name).focus();
       },
     }, icon(KIND_ICONS[k], 16), KIND_LABELS[k]));
     const kinds = el('div', { class: 'cd-kinds', role: 'radiogroup', 'aria-label': 'Kind' }, kindButtons);
 
-    const label = () => (old ? 'Save' : kind === 'timer' ? 'Start' : 'Add');
+    const label = () => (old ? 'Save' : kind === 'date' ? 'Add' : 'Start');
+    // A new one's title follows its kind: "New timer", "New stopwatch", "New countdown".
+    const titleText = () => (old ? `Edit ${nameOf(old)}` : `New ${kind === 'date' ? 'countdown' : KIND_LABELS[kind].toLowerCase()}`);
     let primary = null;
+    let heading = null;
     function changed() {
       for (const b of kindButtons) b.setAttribute('aria-checked', String(b.dataset.kind === kind));
       timerPart.hidden = kind !== 'timer';
       datePart.hidden = kind !== 'date';
-      name.placeholder = kind === 'timer' ? 'Pasta' : 'Trip to Japan';
+      name.placeholder = { timer: 'Pasta', stopwatch: 'Workout', date: 'Trip to Japan' }[kind];
       const ms = duration();
       for (const chip of presets.children) chip.setAttribute('aria-pressed', String(Number(chip.dataset.ms) === ms));
       if (primary) primary.textContent = label();
+      if (heading) heading.textContent = titleText();
       // The dialog checks what it holds on input; a click on a chip is one too.
       name.form?.dispatchEvent(new Event('input'));
     }
 
     function validate() {
+      if (kind === 'stopwatch') return true;
       if (kind === 'timer') {
         const ms = duration();
         for (const chip of presets.children) chip.setAttribute('aria-pressed', String(Number(chip.dataset.ms) === ms));
@@ -347,13 +359,14 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     }
 
     const asked = openDialog({
-      title: old ? `Edit ${nameOf(old)}` : 'New countdown',
+      title: titleText(),
       body: [kinds, field('Name', name), timerPart, datePart],
       actions: [{ label: 'Cancel', value: false }, { label: label(), primary: true, value: true }],
       validate,
       className: 'cd-dialog',
     });
     primary = name.form?.querySelector('.btn-primary') ?? null;
+    heading = name.form?.querySelector('.dlg-title') ?? null;
     changed();
     name.focus();
     if (!await asked) return null;
@@ -370,7 +383,7 @@ export function mountCountdown(root, store, copy, ctx = {}) {
     if (document.visibilityState !== 'visible') return;
     const now = Date.now();
     const live = [shown(now), ...(editing ? countdowns() : [])].filter(Boolean).find(c => display(c, now).live);
-    const delay = live ? ((((endOf(live) - now) % 1000) + 1000) % 1000 || 1000) + 15 : SLOW_MS;
+    const delay = live ? 1000 - ((((now - tickFrom(live)) % 1000) + 1000) % 1000) + 15 : SLOW_MS;
     tick = setTimeout(() => {
       render();
       schedule();

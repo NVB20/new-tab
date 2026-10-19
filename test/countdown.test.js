@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cleanCountdowns, newTimer, newDate, nameOf, dayOf, endOf, statusOf, leftOf, nextUp, shownCountdown, shouldCelebrate,
-  startTimer, pauseTimer, resetTimer, addMinute, dismiss, clockText, display, dateLabel, shortLeft, doneText, dayKey,
-  daysBetween, MAX_DURATION,
+  cleanCountdowns, newTimer, newStopwatch, newDate, nameOf, dayOf, endOf, statusOf, leftOf, elapsedOf, tickFrom, nextUp,
+  shownCountdown, shouldCelebrate, startTimer, pauseTimer, resetTimer, addMinute, dismiss, clockText, display, dateLabel,
+  shortLeft, doneText, dayKey, daysBetween, MAX_DURATION,
 } from '../js/countdown.js';
 
 // Local times, so the tests hold in any time zone.
@@ -12,6 +12,7 @@ const NOW = at(2026, 10, 17, 12, 0);
 const MIN = 60e3;
 
 const timer = (over = {}) => ({ id: 't1', kind: 'timer', name: 'Pasta', duration: 10 * MIN, endsAt: null, left: null, seen: null, ...over });
+const stopwatch = (over = {}) => ({ id: 's1', kind: 'stopwatch', name: 'Run', startedAt: null, elapsed: 0, seen: null, ...over });
 const date = (over = {}) => ({ id: 'd1', kind: 'date', name: 'Trip', date: '2026-11-28', time: '', yearly: false, since: '', seen: null, ...over });
 
 test('cleanCountdowns keeps valid timers and dates, and drops junk and repeated ids', () => {
@@ -109,6 +110,56 @@ test('dismiss: a timer is ready again, a yearly date moves to next year, a one-o
   assert.equal(dismiss(list, 'nope'), list);
 });
 
+test('cleanCountdowns keeps stopwatches, their elapsed time whole and not below zero', () => {
+  assert.deepEqual(cleanCountdowns([stopwatch({ elapsed: 1500.4, startedAt: NOW })]), [
+    { id: 's1', kind: 'stopwatch', name: 'Run', seen: null, startedAt: NOW, elapsed: 1500 },
+  ]);
+  assert.equal(cleanCountdowns([stopwatch({ elapsed: -5 })])[0].elapsed, 0);
+  assert.equal(cleanCountdowns([stopwatch({ elapsed: 'lots', startedAt: 'now' })])[0].elapsed, 0);
+  assert.equal(cleanCountdowns([stopwatch({ startedAt: 'now' })])[0].startedAt, null);
+});
+
+test('a stopwatch is ready, running or paused, counts up, and never ends', () => {
+  const s = newStopwatch({ name: 'Run' });
+  assert.deepEqual([s.kind, s.name, s.startedAt, s.elapsed, statusOf(s, NOW)], ['stopwatch', 'Run', null, 0, 'ready']);
+  assert.equal(nameOf(newStopwatch({})), 'Stopwatch');
+  const running = startTimer(s, NOW);
+  assert.equal(running.startedAt, NOW);
+  assert.equal(statusOf(running, NOW + MIN), 'running');
+  assert.equal(elapsedOf(running, NOW + MIN), MIN);
+  assert.equal(startTimer(running, NOW + MIN), running);   // already running
+  const paused = pauseTimer(running, NOW + 4 * MIN);
+  assert.deepEqual([paused.startedAt, paused.elapsed, statusOf(paused, NOW + 99 * MIN)], [null, 4 * MIN, 'paused']);
+  assert.equal(elapsedOf(paused, NOW + 99 * MIN), 4 * MIN);
+  const resumed = startTimer(paused, NOW + 20 * MIN);
+  assert.equal(elapsedOf(resumed, NOW + 21 * MIN), 5 * MIN);
+  assert.deepEqual(resetTimer({ ...resumed, seen: 5 }), { ...s, seen: null });
+  assert.equal(pauseTimer(s, NOW), s);   // a ready stopwatch has nothing to pause
+  // No end: no alarm, no confetti, no +1 min, and Dismiss doesn't take it off the list.
+  assert.equal(endOf(running), null);
+  assert.equal(statusOf(running, NOW + 1e12), 'running');
+  assert.equal(shouldCelebrate(running, NOW + 1e12), false);
+  assert.equal(addMinute(running, NOW), running);
+  assert.deepEqual(dismiss([paused], paused.id).map(c => [c.id, statusOf(c, NOW)]), [[paused.id, 'ready']]);
+});
+
+test('how a stopwatch reads: whole seconds counting up, live while it runs', () => {
+  assert.deepEqual(display(stopwatch(), NOW), { big: '0:00', unit: '', live: false });
+  assert.deepEqual(display(stopwatch({ startedAt: NOW - 65_900 }), NOW), { big: '1:05', unit: '', live: true });
+  assert.deepEqual(display(stopwatch({ elapsed: 3600e3 + 5 * MIN }), NOW), { big: '1:05:00', unit: '', live: false });
+  assert.equal(display(stopwatch({ elapsed: 120 * 3600e3 }), NOW).big, '120:00:00');
+  assert.equal(shortLeft(stopwatch(), NOW), 'Ready');
+  assert.equal(shortLeft(stopwatch({ startedAt: NOW - 12 * MIN }), NOW), '12:00');
+  assert.equal(shortLeft(stopwatch({ elapsed: 4 * MIN + 999 }), NOW), 'Paused · 4:00');
+});
+
+test('tickFrom: when the seconds shown tick over', () => {
+  // A countdown's at its end; a stopwatch's at the moment it would have started without pauses.
+  assert.equal(tickFrom(timer({ endsAt: NOW + 65_500 })), NOW + 65_500);
+  assert.equal(tickFrom(date({ date: '2026-10-18' })), at(2026, 10, 18));
+  assert.equal(tickFrom(stopwatch({ startedAt: NOW, elapsed: 2500 })), NOW - 2500);
+});
+
 test('Next up: a finished one first, then the soonest end, then paused, then ready timers', () => {
   const ready = timer({ id: 'ready' });
   const paused = timer({ id: 'paused', left: MIN });
@@ -122,6 +173,14 @@ test('Next up: a finished one first, then the soonest end, then paused, then rea
   assert.equal(nextUp([ready, paused], NOW).id, 'paused');
   assert.equal(nextUp([ready], NOW).id, 'ready');
   assert.equal(nextUp([], NOW), null);
+  // Running stopwatches come after anything that ends (the latest started first), before paused ones.
+  const lap = stopwatch({ id: 'lap', startedAt: NOW - 2 * MIN });
+  const run = stopwatch({ id: 'run', startedAt: NOW - MIN });
+  const held = stopwatch({ id: 'held', elapsed: MIN });
+  assert.equal(nextUp([ready, paused, held, lap, run, later], NOW).id, 'later');
+  assert.equal(nextUp([ready, paused, held, lap, run], NOW).id, 'run');
+  assert.equal(nextUp([ready, held, stopwatch({ id: 'new' })], NOW).id, 'held');
+  assert.equal(nextUp([stopwatch({ id: 'new' }), ready], NOW).id, 'new');
   assert.equal(shownCountdown([soon, later], 'later', NOW).id, 'later');
   assert.equal(shownCountdown([soon, later], 'gone', NOW).id, 'soon');
   assert.equal(shownCountdown([soon, later], 'next', NOW).id, 'soon');
@@ -156,6 +215,9 @@ test('clockText rounds up to whole seconds', () => {
   assert.equal(clockText(25 * MIN), '25:00');
   assert.equal(clockText(3600e3 + 5 * MIN), '1:05:00');
   assert.equal(clockText(-5), '0:00');
+  // Counting up, a second shows once it's whole.
+  assert.equal(clockText(999, false), '0:00');
+  assert.equal(clockText(59_999, false), '0:59');
 });
 
 test('labels: the date line, the list row, the notification', () => {
