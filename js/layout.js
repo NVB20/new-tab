@@ -113,7 +113,7 @@ export const TYPES = {
   // show: the countdown (an id in state.countdowns, see countdown.js) the copy shows, or 'next'
   // for whichever ends soonest. The countdowns are the page's, not the copy's.
   countdown: {
-    label: 'Countdown', icon: 'hourglass', size: [3, 3], min: [2, 2], max: 3, prefs: null,
+    label: 'Timers', icon: 'hourglass', size: [3, 3], min: [2, 2], max: 3, prefs: null,
     defaults: () => ({ show: 'next' }),
     clean: s => ({ show: str(s.show, 'next').slice(0, 40) || 'next' }),
   },

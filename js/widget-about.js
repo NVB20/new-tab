@@ -59,7 +59,7 @@ export const ABOUT = {
     about: 'A city’s weather now, the next hours and the week ahead, from Open-Meteo. Pick the city and °C or °F with ✎; each copy can show a different city.',
   },
   countdown: {
-    tagline: 'Timers and days to go',
-    about: 'Days to go until a date, like a trip or a birthday, or a timer for the oven. ✎ lists your countdowns and picks the one this copy shows; confetti and a notification when one ends.',
+    tagline: 'Timers, stopwatches and days to go',
+    about: 'A timer for the oven, a stopwatch for a run, or the days to go until a date, like a trip or a birthday. ✎ lists them all and picks the one this copy shows; confetti and a notification when a timer or a date ends.',
   },
 };

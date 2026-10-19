@@ -88,8 +88,8 @@ export function defaultState() {
     notes: '',
     // The Marvel widget's progress: the ids (marvel.js) watched, kept when the widget is removed.
     marvel: { watched: [] },
-    // The Countdown widgets' timers and dates (countdown.js), one list for every copy, kept when
-    // the widgets are removed. The background script reads it to ring them.
+    // The Timers widgets' timers, stopwatches and dates (countdown.js), one list for every copy,
+    // kept when the widgets are removed. The background script reads it to ring them.
     countdowns: [],
     // First-run setup (onboarding.js): whether it's done, and the step to resume at.
     onboarding: { done: false, step: 'intro' },
