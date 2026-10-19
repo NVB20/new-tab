@@ -284,9 +284,12 @@ export function mountEcon(root, store, copy) {
     const ttl = force ? 0 : econTtl(saved?.data ? shownNow(saved.data, now).flatMap(d => d.events) : [], now, saved?.via);
     const r = await feed(KEY, ttl, sources);
     if (my !== seq) return;
+    // The saved copy coming back (a new tab's first load, a refresh within the TTL) draws the
+    // same, so the list isn't built again.
+    const stamp = x => JSON.stringify([x?.at, x?.via, !!x?.data, !!x?.error]);
+    if (stamp(r) !== stamp(result)) version++;
     result = r;
     loaded = true;
-    version++;
     render();
   }
 

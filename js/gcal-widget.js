@@ -337,6 +337,10 @@ export function mountGcal(root, store, copy) {
 
   // ---- loading ----
 
+  // What a set of results draws. The saved copy coming back (a new tab's first load, a refresh
+  // within the TTL) is the same, so the list isn't built again.
+  const stampOf = rs => JSON.stringify([...rs].map(([id, r]) => [id, r.at, r.via, r.missing, r.noAccess, r.url, !!r.data, r.error ? failureOf(r.error) : '']));
+
   let seq = 0;
   async function load(force = false) {
     if (!hasChrome) return;
@@ -348,9 +352,10 @@ export function mountGcal(root, store, copy) {
       return [c.id, await feed(calendarKey(c.id), force ? 0 : TTL_MS, () => fetchCalendar(url))];
     }));
     if (my !== seq) return;
-    results = new Map(got);
+    const next = new Map(got);
+    if (stampOf(next) !== stampOf(results)) version++;
+    results = next;
     loaded = true;
-    version++;
     render();
     if (editing) paintStatuses();
   }
