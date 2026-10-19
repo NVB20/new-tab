@@ -6,7 +6,7 @@
 // back on while its own is down: Binance and OKX, Yahoo Finance, CNBC, and the ECB's daily rates.
 
 import { el, icon, svgEl, widgetHead, widgetSub, widgetEmpty, showMenu } from './ui.js';
-import { feed, fetchJson, fetchText, peek } from './net.js';
+import { feed, fetchJson, fetchText, peek, sweep } from './net.js';
 import {
   parseTicker, parseKline, parseBinanceTicker, parseBinanceKline, parseOkxTicker, parseOkxCandles,
   parseFxPair, fxCurrencies, parseEcbRates, parseCurrencyApi, parseCnbcQuotes, parseCnbcSession, parseCnbcDay,
@@ -15,7 +15,7 @@ import {
   isSegment, segmentItem, blockEnd, moveMarketItem, headingDropIndex, SEGMENT_MAX,
   formatPrice, formatRate, formatChange, sparkPoints,
 } from './feeds.js';
-import { copyById, TYPES } from './layout.js';
+import { copyById, allLayouts, copiesOf, TYPES } from './layout.js';
 
 const PRICE_TTL = 30e3;
 const KLINE_TTL = 5 * 60e3;
@@ -248,6 +248,13 @@ export function mountMarkets(root, store, copy) {
   // All found symbols' and pairs' quotes and charts come from Yahoo Finance's spark, by item.
   const yahooOf = list => list.filter(isYahoo).sort();
   const yahooKey = ids => `yahoo:quotes:${ids.join(',')}`;
+  // A day of prices for every symbol is big, so the ones saved for a list no Markets copy has any
+  // more go when a list changes.
+  const sweepYahoo = state => {
+    const lists = allLayouts(state).flatMap(copiesOf).filter(c => c.type === 'markets').map(c => c.settings.items);
+    const live = new Set(lists.map(list => yahooKey(yahooOf(list))));
+    sweep('yahoo:quotes:', key => live.has(key));
+  };
 
   // Rows in the chosen order, headings among them; coin(id) gives a coin's { ticker, closes, via },
   // cnbc(id) an index's or commodity's { quote, closes, via }, yahoo the found symbols' and pairs'
@@ -760,6 +767,7 @@ export function mountMarkets(root, store, copy) {
     conf = next;
     seq++;   // a load started for the old list (say, before a drag) draws nothing
     renderCachedMarkets();
+    sweepYahoo(state);
     clearTimeout(timer);
     timer = setTimeout(loadMarkets, first ? 0 : RECONFIGURE_MS);
   }
