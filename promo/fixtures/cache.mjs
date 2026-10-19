@@ -4,7 +4,7 @@
 // sports-widget.js, weather-widget.js); the values are made up.
 import { scoreboards } from '../../js/sports.js';
 import { placeKey } from '../../js/weather.js';
-import { fxCurrencies } from '../../js/feeds.js';
+import { isPair } from '../../js/feeds.js';
 import { USER, PLACE, MARKETS } from './state.mjs';
 
 const MIN = 60e3;
@@ -45,7 +45,7 @@ const CNBC = {
   SPY: ['SPY', 'SPDR S&P 500 ETF Trust', 762.1, 771.4],
 };
 
-function markets(epoch) {
+function markets() {
   const out = {};
   let seed = 1;
   for (const [coin, [from, to, digits]] of Object.entries(COINS)) {
@@ -59,14 +59,17 @@ function markets(epoch) {
   }
   out[`cnbc:quotes:${Object.keys(CNBC).sort().join(',')}`] = { data: quotes, via: 'CNBC' };
 
-  // The ten weekdays before today: the shekel weakens a little against the euro, the dollar holds.
-  const days = [];
-  for (let ms = epoch - DAY; days.length < 10; ms -= DAY) {
-    if (![0, 6].includes(new Date(ms).getDay())) days.unshift(ms);
-  }
-  const ils = climb(3.402, 3.471, days.length, 41, 0.002);
-  const rates = Object.fromEntries(days.map((ms, i) => [new Date(ms).toISOString().slice(0, 10), { ILS: round(ils[i], 4), USD: 1.1203 }]));
-  out[`fx:EUR:${fxCurrencies(MARKETS).join(',')}`] = { data: { base: 'EUR', rates }, via: 'Frankfurter' };
+  // Pairs (and found symbols) come from Yahoo Finance's spark, by item, under one key for the
+  // copy's sorted list: the dollar gains a little on the shekel through the day.
+  const yahoo = MARKETS.filter(isPair).sort();
+  const closes = climb(3.0854, 3.0983, 60, 41, 0.0006).map(v => round(v, 4));
+  const pairs = Object.fromEntries(yahoo.map(id => [id, {
+    quote: { price: closes.at(-1), change: round(closes.at(-1) / closes[0] - 1, 4), name: id, time: '2:41 AM EDT' },
+    info: { type: 'CURRENCY', currency: id.split('/')[1], short: id, decimals: 4 },
+    closes,
+    via: 'Yahoo Finance',
+  }]));
+  out[`yahoo:quotes:${yahoo.join(',')}`] = { data: pairs, via: 'Yahoo Finance' };
   return out;
 }
 
@@ -200,6 +203,6 @@ function weather(epoch) {
 
 // Every entry, keyed without the 'newtab:cache:' prefix.
 export function buildCache(epoch) {
-  const entries = { ...markets(epoch), ...github(epoch), ...sports(epoch), ...weather(epoch) };
+  const entries = { ...markets(), ...github(epoch), ...sports(epoch), ...weather(epoch) };
   return Object.fromEntries(Object.entries(entries).map(([key, e]) => [key, { at: epoch, ...e }]));
 }

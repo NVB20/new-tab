@@ -54,9 +54,16 @@ test('markets all go up', () => {
     assert.ok(line.at(-1) > line[0], id);
   }
   for (const q of Object.values(c['cnbc:quotes:GOLD,QQQ,SPY'].data)) assert.ok(q.change > 0, q.name);
-  const days = Object.values(c['fx:EUR:ILS,USD'].data.rates);
-  assert.equal(days.length, 10);
-  assert.ok(days.at(-1).ILS > days[0].ILS);
+});
+
+test('the dollar-shekel pair comes from Yahoo Finance under the key the widget reads', () => {
+  const c = buildCache(EPOCH);
+  const pair = c['yahoo:quotes:USD/ILS'].data['USD/ILS'];
+  assert.ok(pair.quote.change > 0);
+  assert.equal(pair.quote.price, pair.closes.at(-1));
+  assert.ok(pair.closes.length > 20);
+  assert.equal(pair.info.decimals, 4);
+  assert.equal(Object.keys(c).filter(k => k.startsWith('fx:')).length, 0);
 });
 
 test('the contribution map is a full year ending today', () => {
